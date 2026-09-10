@@ -31,9 +31,21 @@
     results/ga_training.json   训练配置 + 逐局统计 + 每次 GA 调用的最终解/收敛代数/残差
     results/ga_convergence.csv 逐代收敛曲线（局号, GA 类型, 对象, 代数, 最优/平均/标准差）
     results/episodes.csv       逐局战绩（清除数, 清除比例, 虚拟时间, 测向次数）
+    results/api_calls.jsonl    每一次机器狗接口调用的记录（见下节）
 
 即：定位 GA 的"模型参数"是各频道干扰源坐标与它收敛所需的代数，路线 GA 的"模型"是访问
 序列表；两者都随 JSON 保存，收敛曲线可直接用于论文绘图。文件名固定，重复运行覆盖。
+
+接口调用日志
+============
+每一次机器狗接口调用（/enter /measure /clear /exit）都会逐条记录到
+`results/api_calls.jsonl`（每行一条，可用 --api-log 改路径、传空串关闭）：
+
+    局号、本局内序号、接口名、request_id、相对时刻与耗时、请求参数（坐标/频道）、
+    是否 accepted、原始响应全文；连不上或超时的调用也会留痕（ok=false + error）。
+
+request_id 由本程序生成（`<接口>-<局号>-<序号>`），既保证跨局不重复，又能与模拟器
+自身行为日志里的同一条请求逐行对照 —— 比赛现场据此复核每一次动作。
 
 依赖：numpy；HTTP 层复用同目录 sim_api.py；本地演练用同目录 jammers-py/（纯标准库）。
 """
@@ -51,10 +63,11 @@ import sys
 import time
 import urllib.request
 from collections import defaultdict
+from contextlib import contextmanager
 from dataclasses import asdict, dataclass
 from functools import lru_cache
 from pathlib import Path
-from typing import Any, Dict, List, NamedTuple, Optional, Sequence, Tuple
+from typing import Any, Callable, Dict, Iterator, List, NamedTuple, Optional, Sequence, Tuple
 
 import numpy as np
 
@@ -85,6 +98,7 @@ SAFETY_MARGIN = 30.0            # 现实时限预留余量 / s
 SEED = 2026
 
 RESULTS_DIR = "results"         # 训练结果输出目录（可用 --save-dir 改）
+API_LOG_NAME = "api_calls.jsonl"    # 接口调用日志文件名（落在 --save-dir 下）
 
 
 @dataclass(frozen=True)
@@ -477,14 +491,153 @@ def covering_waypoints() -> np.ndarray:
 
 
 # ----------------------------------------------------------------------------
+# 接口调用日志：逐条记录 /enter /measure /clear /exit
+# ----------------------------------------------------------------------------
+def _ms(t0: float) -> int:
+    """自 t0 起的毫秒耗时。"""
+    return int((time.monotonic() - t0) * 1000)
+
+
+class ApiLog:
+    """把每一次接口调用（请求参数 + 原始响应）写成 JSONL，并按需回显一行摘要。
+
+    模拟器自身有行为日志，但那份记录不归我们掌握；这里留一份自己的痕迹：逐条含
+    request_id，可与模拟器日志逐行对照。每次调用后立即 flush，即使中途断连或崩溃，
+    已经发生的调用也不会丢。
+    """
+
+    def __init__(self, path: Path, echo: Optional[Callable[[str], None]] = None) -> None:
+        self.path = Path(path)
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        self._fh = self.path.open("w", encoding="utf-8")
+        self._echo = echo
+        self._t0 = time.monotonic()
+        self.counts: Dict[str, int] = defaultdict(int)
+
+    def elapsed(self) -> float:
+        """自日志建立起的秒数（单调时钟），用于记录各次调用的相对时刻。"""
+        return time.monotonic() - self._t0
+
+    def write(self, rec: Dict[str, Any], line: str) -> None:
+        """落盘一条调用记录，并把单行摘要交给终端。"""
+        self.counts[rec["call"]] += 1
+        self._fh.write(json.dumps(rec, ensure_ascii=False) + "\n")
+        self._fh.flush()
+        if self._echo:
+            self._echo(line)
+
+    def report(self) -> None:
+        """打印一行统计，便于与模拟器自己的计数交叉核对。"""
+        if self.counts:
+            detail = "、".join(f"{call} {n}" for call, n in sorted(self.counts.items()))
+            print(f"接口调用日志：共 {sum(self.counts.values())} 次（{detail}）→ {self.path}")
+
+    def close(self) -> None:
+        if self._fh is not None:
+            self._fh.close()
+            self._fh = None
+
+
+@contextmanager
+def _api_log(args: argparse.Namespace, echo: bool) -> Iterator[Optional[ApiLog]]:
+    """接口日志的上下文：进入时建文件，退出时打印统计并关闭。
+
+    路径取 --api-log；未指定时用 <save-dir>/api_calls.jsonl；显式传空串则关闭日志。
+    """
+    raw = args.api_log if args.api_log is not None else str(Path(args.save_dir) / API_LOG_NAME)
+    log = ApiLog(Path(raw), echo=print if echo else None) if raw else None
+    try:
+        yield log
+    finally:
+        if log is not None:                 # 统计由 _save_and_report 统一在尾部打印
+            log.close()
+
+
+def _api_brief(call: str, resp: dict, elapsed_ms: int) -> str:
+    """一次调用的结果摘要（终端可读的单行）。"""
+    if not resp.get("accepted"):
+        return "拒绝 accepted=false"
+    tail = f"（{elapsed_ms} ms"
+    if resp.get("virtual_time_s") is not None:
+        tail += f"，虚拟 {resp['virtual_time_s']} s"
+    tail += "）"
+    if call == "/measure":
+        result = resp.get("measure_result", "?")
+        return (f"{result} {resp['svd_deg']}°{tail}" if result == "direction"
+                else f"{result}{tail}")
+    if call == "/clear":
+        return f"{resp.get('clear_result', '?')}{tail}"
+    if call == "/enter":
+        return f"accepted，现实剩余 {resp.get('remaining_real_duration_s')} s{tail}"
+    return f"accepted{tail}"
+
+
+class RecordedSim:
+    """Simulator 的记录代理：原样转发 4 个接口，并把每次调用交给 ApiLog 落盘。
+
+    request_id 由本层生成（`<接口>-<局号>-<序号>`）：既保证跨局不重复，也让我们的日志
+    能与模拟器行为日志里的同一条请求对上号。
+    """
+
+    def __init__(self, sim: "sim_api.Simulator", log: ApiLog, episode: int = 0) -> None:
+        self._sim = sim
+        self._log = log
+        self.episode = episode
+        self.seq = 0
+
+    def enter(self) -> dict:
+        return self._call("/enter", {}, lambda rid: self._sim.enter(request_id=rid))
+
+    def measure(self, x: float, y: float, channel: int) -> dict:
+        x, y = float(x), float(y)
+        return self._call("/measure", {"x": x, "y": y, "channel": int(channel)},
+                          lambda rid: self._sim.measure(x, y, int(channel), request_id=rid))
+
+    def clear(self, x: float, y: float, channel: int) -> dict:
+        x, y = float(x), float(y)
+        return self._call("/clear", {"x": x, "y": y, "channel": int(channel)},
+                          lambda rid: self._sim.clear(x, y, int(channel), request_id=rid))
+
+    def exit(self) -> dict:
+        return self._call("/exit", {}, lambda rid: self._sim.exit(request_id=rid))
+
+    def _call(self, call: str, params: Dict[str, Any], send: Callable[[str], dict]) -> dict:
+        """执行一次调用并记录：先落请求与时刻，再按成功/异常分别补全结果。"""
+        self.seq += 1
+        rid = f"{call.strip('/')}-{self.episode}-{self.seq}"
+        rec: Dict[str, Any] = {"episode": self.episode, "seq": self.seq, "call": call,
+                               "request_id": rid, "at_s": round(self._log.elapsed(), 3),
+                               **params}
+        where = "" if "channel" not in rec else f" ({rec['x']:.0f}, {rec['y']:.0f}) 频道{rec['channel']}"
+        t0 = time.monotonic()
+        try:
+            resp = send(rid)
+        except Exception as exc:            # 连不上/超时也要留痕，再把异常交回上层
+            elapsed = _ms(t0)
+            why = f"{type(exc).__name__}: {exc}"
+            self._log.write({**rec, "ok": False, "elapsed_ms": elapsed, "error": why},
+                            f"[接口] ep{self.episode} #{self.seq} {call}{where} → 失败 {why} "
+                            f"（{elapsed} ms）")
+            raise
+        rec["elapsed_ms"] = _ms(t0)
+        rec["ok"] = bool(resp.get("accepted"))
+        rec["response"] = resp
+        self._log.write(rec, f"[接口] ep{self.episode} #{self.seq} {call}{where} → "
+                             f"{_api_brief(call, resp, rec['elapsed_ms'])}")
+        return resp
+
+
+# ----------------------------------------------------------------------------
 # 机器狗策略
 # ----------------------------------------------------------------------------
 class RobotDog:
     """覆盖观测 → GA 定位 → GA 规划路线逐个清除。"""
 
     def __init__(self, sim, verbose: bool = True, logfile: Optional[str] = None,
-                 seed: int = SEED, episode: int = 0) -> None:
-        self.sim = sim
+                 seed: int = SEED, episode: int = 0,
+                 api_log: Optional[ApiLog] = None) -> None:
+        # 传入 api_log 时套一层记录代理：4 个接口的每一次调用都会落盘
+        self.sim = sim if api_log is None else RecordedSim(sim, api_log, episode)
         self.verbose = verbose
         self._logfile = open(logfile, "a", encoding="utf-8") if logfile else None
         self.obs: Dict[int, List[Obs]] = defaultdict(list)
@@ -1027,26 +1180,30 @@ def _episode_row(episode: int, seed: int, truth: Optional[List[dict]], dog: Robo
     }
 
 
-def _save_and_report(args: argparse.Namespace, episodes: List[dict],
-                     ga_runs: List[dict], meta: dict) -> None:
-    """打印 GA 训练摘要并写出训练结果。"""
+def _save_and_report(args: argparse.Namespace, episodes: List[dict], ga_runs: List[dict],
+                     meta: dict, api_log: Optional[ApiLog] = None) -> None:
+    """打印 GA 训练摘要，写出训练结果，并汇总接口调用日志（四个产物路径并列在尾部）。"""
     print_ga_summary(ga_runs)
     paths = save_training_results(Path(args.save_dir), episodes, ga_runs, meta)
     print("训练结果已保存：" + "，".join(str(p) for p in paths))
+    if api_log is not None:
+        api_log.report()
 
 
 def run_official(args: argparse.Namespace) -> int:
     sim = sim_api.Simulator(robot_id=args.robot_id, base_url=args.base_url, timeout=args.timeout)
     print(f"连接模拟器 {args.base_url}（robot_id={args.robot_id}）")
-    dog = RobotDog(sim, verbose=not args.quiet, logfile=args.log, seed=args.seed, episode=1)
-    stats = dog.run()
-    print(f"完成：清除 {stats['cleared']} 个，虚拟总时间 {stats['total_time_s']:.1f} s，"
-          f"平均 {stats['avg_time_s']:.1f} s/个，测向 {stats['n_measure']} 次，"
-          f"清除动作 {stats['n_clear']} 次")
-    row = _episode_row(1, args.seed, None, dog, stats)
-    meta = {"mode": "official", "base_url": args.base_url, "robot_id": args.robot_id,
-            "seed": args.seed, **_ga_meta()}
-    _save_and_report(args, [row], dog.ga_runs, meta)
+    with _api_log(args, not args.quiet) as api_log:
+        dog = RobotDog(sim, verbose=not args.quiet, logfile=args.log, seed=args.seed,
+                       episode=1, api_log=api_log)
+        stats = dog.run()
+        print(f"完成：清除 {stats['cleared']} 个，虚拟总时间 {stats['total_time_s']:.1f} s，"
+              f"平均 {stats['avg_time_s']:.1f} s/个，测向 {stats['n_measure']} 次，"
+              f"清除动作 {stats['n_clear']} 次")
+        row = _episode_row(1, args.seed, None, dog, stats)
+        meta = {"mode": "official", "base_url": args.base_url, "robot_id": args.robot_id,
+                "seed": args.seed, **_ga_meta()}
+        _save_and_report(args, [row], dog.ga_runs, meta, api_log)
     return 0
 
 
@@ -1059,8 +1216,9 @@ def run_practice(args: argparse.Namespace) -> int:
     jammers_dir = Path(args.jammers_dir) if args.jammers_dir else Path(__file__).parent / "jammers-py"
     rows: List[dict] = []
     ga_runs: List[dict] = []
-    with PracticeArena(jammers_dir, robot_id=args.robot_id,
-                       console_port=args.console_port) as arena:
+    with _api_log(args, not args.quiet) as api_log, \
+            PracticeArena(jammers_dir, robot_id=args.robot_id,
+                          console_port=args.console_port) as arena:
         print(f"jammers-py 已就绪：机器狗接口 {arena.robot_url}，控制台 {arena.console_url}")
         for ep in range(args.practice):
             seed = args.seed + ep
@@ -1069,7 +1227,8 @@ def run_practice(args: argparse.Namespace) -> int:
                   f"干扰源 {len(truth)} 个）-----")
             dog = RobotDog(sim_api.Simulator(robot_id=args.robot_id, base_url=arena.robot_url,
                                              timeout=args.timeout),
-                           verbose=not args.quiet, logfile=args.log, seed=seed, episode=ep + 1)
+                           verbose=not args.quiet, logfile=args.log, seed=seed, episode=ep + 1,
+                           api_log=api_log)
             stats = dog.run()
             ga_runs.extend(dog.ga_runs)
             engine = arena.finish_episode()
@@ -1092,7 +1251,7 @@ def run_practice(args: argparse.Namespace) -> int:
     meta = {"mode": "practice", "robot_id": args.robot_id, "seed0": args.seed,
             "episodes": args.practice, **_ga_meta(),
             "coverage_waypoints": len(covering_waypoints())}
-    _save_and_report(args, rows, ga_runs, meta)
+    _save_and_report(args, rows, ga_runs, meta, api_log)
     return 0
 
 
@@ -1111,7 +1270,10 @@ def build_parser() -> argparse.ArgumentParser:
                    help="随机种子（演练第 1 局的场景布局、示向度噪声与 GA 都由它确定）")
     p.add_argument("--save-dir", default=RESULTS_DIR,
                    help=f"训练结果输出目录（缺省 {RESULTS_DIR}/；写入 GA 训练记录与逐局统计）")
-    p.add_argument("--log", default=None, help="过程日志文件（追加写入）")
+    p.add_argument("--log", default=None, help="过程日志文件（阶段/清除等文字过程，追加写入）")
+    p.add_argument("--api-log", default=None,
+                   help=f"接口调用日志（逐条记录 /enter /measure /clear /exit 的请求与"
+                        f"原始响应；缺省 <save-dir>/{API_LOG_NAME}，传空字符串则关闭）")
     p.add_argument("--quiet", action="store_true", help="只输出汇总，不打印过程")
     return p
 

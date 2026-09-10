@@ -24,25 +24,25 @@ import numpy as np
 import shapely
 from shapely import Point, Polygon
 
-RADIUS = 1800.0  # 目标圆域半径（米），题目给定（直径 3600 m）
-SIDES = 64       # 目标圆域的内接正多边形边数，须为 4 的倍数
-_TOUCH = 1.0     # 顶点贴合圆域边界的判定阈值（米）
-
 
 class TriangulationRegion:
     """交会定位区域：累积检测点（坐标 + 示向度），求定位区域凸多边形及其几何量。"""
 
-    def __init__(self, err=1.0, radius=RADIUS, sides=SIDES):
+    RADIUS = 1800.0  # 目标圆域半径（米），题目给定（直径 3600 m）
+    SIDES = 64       # 目标圆域的内接正多边形边数，须为 4 的倍数
+    TOUCH = 1.0      # 顶点贴合圆域边界的判定阈值（米）
+
+    def __init__(self, err=1.0, radius=None, sides=None):
         """err：示向度误差半宽（度），对所有检测点相同。
 
-        radius：目标圆域半径（米），题目为 1800。
-        sides ：目标圆域的内接正多边形边数，须为 4 的倍数（默认 64，即 quad_segs=16）。
+        radius：目标圆域半径（米），缺省取 RADIUS（题目为 1800）。
+        sides ：目标圆域的内接正多边形边数，缺省取 SIDES，须为 4 的倍数。
         """
-        if sides % 4:
-            raise ValueError("sides 必须是 4 的倍数")
         self.err = float(err)
-        self.radius = float(radius)
-        self.sides = int(sides)
+        self.radius = self.RADIUS if radius is None else float(radius)
+        self.sides = self.SIDES if sides is None else int(sides)
+        if self.sides % 4:
+            raise ValueError("sides 必须是 4 的倍数")
         self._nodes = []
         self._clip = None    # 目标圆域的内接正多边形（惰性生成）
         self._region = None  # 已并入前 _done 个检测点的交集；None 表示尚未求解
@@ -56,7 +56,7 @@ class TriangulationRegion:
         return self
 
     @classmethod
-    def from_nodes(cls, nodes, err=1.0, radius=RADIUS, sides=SIDES):
+    def from_nodes(cls, nodes, err=1.0, radius=None, sides=None):
         """由检测点列表 [(x, y, theta), ...] 构造定位区域。"""
         region = cls(err, radius, sides)
         for x, y, theta in nodes:
@@ -123,7 +123,7 @@ class TriangulationRegion:
         有顶点落在圆域边界上即说明该方向约束不足（例如只测一次示向度、或检测点与干扰源近似
         共线），此时返回 False；区域为空同样返回 False。"""
         pts = self.vertices
-        return bool(pts) and all(self.clip.exterior.distance(Point(*p)) > _TOUCH for p in pts)
+        return bool(pts) and all(self.clip.exterior.distance(Point(*p)) > self.TOUCH for p in pts)
 
     @property
     def enclosing_circle(self):

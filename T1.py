@@ -191,36 +191,14 @@ class TriangulationRegion:
 
 
 if __name__ == "__main__":
-    # 目标区域：半径 1800 m 的圆域（内接正 64 边形）
-    probe = TriangulationRegion()
-    ring = np.array(probe.clip.exterior.coords[:-1])
-    clip_diam = np.linalg.norm(ring[:, None, :] - ring[None, :, :], axis=-1).max()
-    print(f"目标圆域：半径 {probe.radius:.0f} m（直径 {2 * probe.radius:.0f} m），"
-          f"内接正 {probe.sides} 边形，顶点数 {len(ring)}，"
-          f"顶点半径 {np.hypot(ring[:, 0], ring[:, 1]).min():.3f}~{np.hypot(ring[:, 0], ring[:, 1]).max():.3f} m，"
-          f"直径 {clip_diam:.1f} m")
-
-    # 自测：先假定干扰源真值 G，反推各检测点示向度，保证定位区域非空
+    # 示例：4 个检测点对同一干扰源交会定位。
+    # 无实测数据时，先假定干扰源真值 G，再由几何关系反推各点示向度，保证区域非空。
     G = (500.0, 400.0)
     sites = [(0.0, 0.0), (1000.0, 0.0), (200.0, 900.0), (800.0, 900.0)]
     region = TriangulationRegion.from_nodes(
         [(x, y, TriangulationRegion.bearing((x, y), G)) for x, y in sites])
 
-    print(region)
-    for i, (x, y) in enumerate(region.vertices, 1):
-        print(f"  P{i} = ({x:.6f}, {y:.6f})")
-    print(f"  面积 {region.area:.4f} m²，示向度误差 ±{region.err}°")
-    print(f"两点交会：{TriangulationRegion.from_nodes(region.nodes[:2])}")
+    print(f"定位区域直径：{region.diameter:.4f} m")
+    cx, cy, r = region.enclosing_circle
+    print(f"最小覆盖圆：圆心 ({cx:.4f}, {cy:.4f})，半径 {r:.4f} m")
 
-    circle = region.enclosing_circle
-    if circle:
-        cx, cy, r = circle
-        print(f"最小覆盖圆：圆心 ({cx:.4f}, {cy:.4f})，半径 {r:.4f} m；"
-              f"直径的一半 {region.diameter / 2:.4f} m")
-        print(f"以定位区域直径为直径的圆能否覆盖定位区域："
-              f"{'能' if r <= region.diameter / 2 + 1e-6 else '否'}")
-    print(f"真值 G 是否落在定位区域内：{region.contains(G)}")
-
-    # 只测一个检测点：区域被目标圆域截断，直径反映的是圆域内的可见范围
-    one = TriangulationRegion.from_nodes([(0.0, 0.0, TriangulationRegion.bearing((0.0, 0.0), G))])
-    print(f"仅一个检测点：{one}；其最远点即目标圆域边界上的点")

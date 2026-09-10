@@ -1,0 +1,1957 @@
+{
+  "meta": {
+    "mode": "practice",
+    "robot_id": "202614023005",
+    "seed0": 0,
+    "episodes": 5,
+    "ga_loc": {
+      "pop": 80,
+      "gens": 150,
+      "pc": 0.9,
+      "pm": 0.35,
+      "domain_m": 2200.0,
+      "record_stride": 5
+    },
+    "ga_route": {
+      "pop": 100,
+      "gens": 300,
+      "pc": 0.9,
+      "pm": 0.35,
+      "record_stride": 5
+    },
+    "coverage_waypoints": 8
+  },
+  "episodes": [
+    {
+      "episode": 1,
+      "seed": 0,
+      "n_sources": 16,
+      "cleared": 16,
+      "clear_ratio": 1.0,
+      "virtual_time_s": 4793.564978,
+      "avg_time_s": 299.597811125,
+      "n_measure": 155,
+      "n_clear": 20,
+      "ga_runs": 18,
+      "localize_rms_deg": 0.20481524708867932,
+      "n_located": 16,
+      "localize_err_mean_m": 8.615093902192452,
+      "localize_err_max_m": 13.661606487588417,
+      "truth": [
+        {
+          "channel": 1,
+          "x": -425.37,
+          "y": 963.04,
+          "receive_m": 1320.21
+        },
+        {
+          "channel": 2,
+          "x": -757.19,
+          "y": -259.37,
+          "receive_m": 1221.35
+        },
+        {
+          "channel": 3,
+          "x": 1181.42,
+          "y": 487.44,
+          "receive_m": 1459.23
+        },
+        {
+          "channel": 4,
+          "x": 1411.35,
+          "y": 936.91,
+          "receive_m": 1420.05
+        },
+        {
+          "channel": 5,
+          "x": 325.84,
+          "y": -1455.67,
+          "receive_m": 1312.63
+        },
+        {
+          "channel": 6,
+          "x": 652.2,
+          "y": -1221.33,
+          "receive_m": 1166.57
+        },
+        {
+          "channel": 7,
+          "x": -434.37,
+          "y": -1448.87,
+          "receive_m": 1031.49
+        },
+        {
+          "channel": 8,
+          "x": 299.76,
+          "y": 1668.25,
+          "receive_m": 1401.67
+        },
+        {
+          "channel": 9,
+          "x": -643.92,
+          "y": -178.29,
+          "receive_m": 1045.61
+        },
+        {
+          "channel": 10,
+          "x": 1248.01,
+          "y": -1246.65,
+          "receive_m": 1498.99
+        },
+        {
+          "channel": 12,
+          "x": -393.28,
+          "y": 1173.97,
+          "receive_m": 1145.55
+        },
+        {
+          "channel": 13,
+          "x": -310.67,
+          "y": 542.68,
+          "receive_m": 1461.12
+        },
+        {
+          "channel": 14,
+          "x": 243.83,
+          "y": -759.71,
+          "receive_m": 1273.62
+        },
+        {
+          "channel": 16,
+          "x": 796.28,
+          "y": 516.86,
+          "receive_m": 1398.97
+        },
+        {
+          "channel": 18,
+          "x": 49.4,
+          "y": 995.41,
+          "receive_m": 1091.93
+        },
+        {
+          "channel": 20,
+          "x": 1569.93,
+          "y": 329.98,
+          "receive_m": 1490.65
+        }
+      ]
+    },
+    {
+      "episode": 2,
+      "seed": 1,
+      "n_sources": 11,
+      "cleared": 11,
+      "clear_ratio": 1.0,
+      "virtual_time_s": 5379.440601,
+      "avg_time_s": 489.04005463636366,
+      "n_measure": 164,
+      "n_clear": 12,
+      "ga_runs": 13,
+      "localize_rms_deg": 0.17251473435837575,
+      "n_located": 11,
+      "localize_err_mean_m": 7.299820867713365,
+      "localize_err_max_m": 12.798251448817796,
+      "truth": [
+        {
+          "channel": 3,
+          "x": 1089.68,
+          "y": 815.24,
+          "receive_m": 1158.71
+        },
+        {
+          "channel": 4,
+          "x": -156.05,
+          "y": -213.5,
+          "receive_m": 1004.6
+        },
+        {
+          "channel": 7,
+          "x": -645.64,
+          "y": -1531.0,
+          "receive_m": 1484.52
+        },
+        {
+          "channel": 8,
+          "x": -1485.32,
+          "y": -260.47,
+          "receive_m": 1381.85
+        },
+        {
+          "channel": 9,
+          "x": -1621.58,
+          "y": -559.29,
+          "receive_m": 1172.85
+        },
+        {
+          "channel": 11,
+          "x": 100.09,
+          "y": -1452.75,
+          "receive_m": 1476.12
+        },
+        {
+          "channel": 13,
+          "x": -1472.85,
+          "y": 856.37,
+          "receive_m": 1458.13
+        },
+        {
+          "channel": 14,
+          "x": 1375.12,
+          "y": 999.09,
+          "receive_m": 1314.68
+        },
+        {
+          "channel": 16,
+          "x": -432.69,
+          "y": 1442.18,
+          "receive_m": 1371.57
+        },
+        {
+          "channel": 17,
+          "x": 1651.44,
+          "y": -280.19,
+          "receive_m": 1250.4
+        },
+        {
+          "channel": 19,
+          "x": -1738.69,
+          "y": -84.37,
+          "receive_m": 1455.09
+        }
+      ]
+    },
+    {
+      "episode": 3,
+      "seed": 2,
+      "n_sources": 16,
+      "cleared": 16,
+      "clear_ratio": 1.0,
+      "virtual_time_s": 4793.543876,
+      "avg_time_s": 299.59649225,
+      "n_measure": 160,
+      "n_clear": 19,
+      "ga_runs": 18,
+      "localize_rms_deg": 0.09112030910277616,
+      "n_located": 16,
+      "localize_err_mean_m": 8.406566108774987,
+      "localize_err_max_m": 18.22963772669929,
+      "truth": [
+        {
+          "channel": 1,
+          "x": 1429.55,
+          "y": -935.83,
+          "receive_m": 1211.81
+        },
+        {
+          "channel": 2,
+          "x": 851.77,
+          "y": 1429.75,
+          "receive_m": 1088.72
+        },
+        {
+          "channel": 3,
+          "x": 377.67,
+          "y": 761.46,
+          "receive_m": 1086.79
+        },
+        {
+          "channel": 4,
+          "x": -803.97,
+          "y": 975.67,
+          "receive_m": 1256.87
+        },
+        {
+          "channel": 5,
+          "x": 1323.81,
+          "y": -40.12,
+          "receive_m": 1222.82
+        },
+        {
+          "channel": 6,
+          "x": -1125.35,
+          "y": -180.89,
+          "receive_m": 1454.24
+        },
+        {
+          "channel": 10,
+          "x": -889.21,
+          "y": -592.02,
+          "receive_m": 1180.94
+        },
+        {
+          "channel": 11,
+          "x": -1546.13,
+          "y": 548.22,
+          "receive_m": 1477.47
+        },
+        {
+          "channel": 12,
+          "x": -80.17,
+          "y": -1116.38,
+          "receive_m": 1327.46
+        },
+        {
+          "channel": 13,
+          "x": -160.89,
+          "y": 870.07,
+          "receive_m": 1249.03
+        },
+        {
+          "channel": 14,
+          "x": 363.83,
+          "y": -1217.5,
+          "receive_m": 1330.84
+        },
+        {
+          "channel": 15,
+          "x": 979.39,
+          "y": -682.12,
+          "receive_m": 1175.39
+        },
+        {
+          "channel": 16,
+          "x": -1410.39,
+          "y": -533.78,
+          "receive_m": 1228.28
+        },
+        {
+          "channel": 17,
+          "x": 1337.82,
+          "y": -523.89,
+          "receive_m": 1407.34
+        },
+        {
+          "channel": 19,
+          "x": 1155.81,
+          "y": -1131.44,
+          "receive_m": 1308.17
+        },
+        {
+          "channel": 20,
+          "x": -1543.62,
+          "y": 197.31,
+          "receive_m": 1151.65
+        }
+      ]
+    },
+    {
+      "episode": 4,
+      "seed": 3,
+      "n_sources": 11,
+      "cleared": 11,
+      "clear_ratio": 1.0,
+      "virtual_time_s": 5200.80498,
+      "avg_time_s": 472.8004527272727,
+      "n_measure": 161,
+      "n_clear": 11,
+      "ga_runs": 16,
+      "localize_rms_deg": 0.12966093271393012,
+      "n_located": 11,
+      "localize_err_mean_m": 7.078950039949797,
+      "localize_err_max_m": 14.958601671618004,
+      "truth": [
+        {
+          "channel": 1,
+          "x": 493.97,
+          "y": 694.68,
+          "receive_m": 1462.92
+        },
+        {
+          "channel": 2,
+          "x": 1100.27,
+          "y": 105.03,
+          "receive_m": 1388.62
+        },
+        {
+          "channel": 5,
+          "x": 681.62,
+          "y": -186.48,
+          "receive_m": 1021.39
+        },
+        {
+          "channel": 8,
+          "x": 697.18,
+          "y": -1399.23,
+          "receive_m": 1134.72
+        },
+        {
+          "channel": 10,
+          "x": 1196.83,
+          "y": -656.43,
+          "receive_m": 1193.8
+        },
+        {
+          "channel": 11,
+          "x": -1408.63,
+          "y": 696.29,
+          "receive_m": 1364.06
+        },
+        {
+          "channel": 12,
+          "x": 1310.33,
+          "y": -300.74,
+          "receive_m": 1067.07
+        },
+        {
+          "channel": 14,
+          "x": 1043.02,
+          "y": 239.25,
+          "receive_m": 1247.44
+        },
+        {
+          "channel": 16,
+          "x": -422.96,
+          "y": -793.3,
+          "receive_m": 1389.49
+        },
+        {
+          "channel": 18,
+          "x": -1440.05,
+          "y": 778.2,
+          "receive_m": 1416.74
+        },
+        {
+          "channel": 19,
+          "x": -1310.36,
+          "y": -285.16,
+          "receive_m": 1203.79
+        }
+      ]
+    },
+    {
+      "episode": 5,
+      "seed": 4,
+      "n_sources": 11,
+      "cleared": 11,
+      "clear_ratio": 1.0,
+      "virtual_time_s": 4296.948097,
+      "avg_time_s": 390.6316451818182,
+      "n_measure": 157,
+      "n_clear": 11,
+      "ga_runs": 13,
+      "localize_rms_deg": 0.14887827178684107,
+      "n_located": 11,
+      "localize_err_mean_m": 6.160358961174898,
+      "localize_err_max_m": 16.945183356460554,
+      "truth": [
+        {
+          "channel": 1,
+          "x": 561.59,
+          "y": -1510.48,
+          "receive_m": 1400.22
+        },
+        {
+          "channel": 2,
+          "x": -285.89,
+          "y": 724.07,
+          "receive_m": 1313.49
+        },
+        {
+          "channel": 4,
+          "x": 925.45,
+          "y": -1198.54,
+          "receive_m": 1440.03
+        },
+        {
+          "channel": 5,
+          "x": -410.14,
+          "y": -321.66,
+          "receive_m": 1335.85
+        },
+        {
+          "channel": 7,
+          "x": 551.82,
+          "y": 1131.63,
+          "receive_m": 1236.79
+        },
+        {
+          "channel": 9,
+          "x": 485.01,
+          "y": -211.37,
+          "receive_m": 1432.74
+        },
+        {
+          "channel": 10,
+          "x": -406.69,
+          "y": 1245.11,
+          "receive_m": 1454.44
+        },
+        {
+          "channel": 13,
+          "x": 989.4,
+          "y": -902.36,
+          "receive_m": 1424.02
+        },
+        {
+          "channel": 15,
+          "x": -1081.99,
+          "y": 649.6,
+          "receive_m": 1299.46
+        },
+        {
+          "channel": 16,
+          "x": 614.51,
+          "y": 986.3,
+          "receive_m": 1152.56
+        },
+        {
+          "channel": 17,
+          "x": 1537.03,
+          "y": 428.16,
+          "receive_m": 1023.16
+        }
+      ]
+    }
+  ],
+  "ga_runs": [
+    {
+      "episode": 1,
+      "ga": "route",
+      "label": "覆盖路点巡回",
+      "seed": 1826701615,
+      "n_points": 8,
+      "initial_best_g0": 8599.13726460967,
+      "generations": 300,
+      "final_length_m": 8599.13726460967,
+      "solution": [
+        0,
+        7,
+        3,
+        5,
+        1,
+        4,
+        2,
+        6
+      ]
+    },
+    {
+      "episode": 1,
+      "ga": "localize",
+      "label": "频道1",
+      "seed": 0,
+      "channel": 1,
+      "n_obs": 3,
+      "generations": 150,
+      "converged": false,
+      "initial_best_g0": 0.37598879853221023,
+      "final_fitness": 0.2744930218854557,
+      "residual_rms_deg": 0.2744930218854677,
+      "sigma_m": 1.405694211610656,
+      "solution": [
+        -437.2195594770843,
+        956.2409241789226
+      ]
+    },
+    {
+      "episode": 1,
+      "ga": "localize",
+      "label": "频道2",
+      "seed": 0,
+      "channel": 2,
+      "n_obs": 3,
+      "generations": 150,
+      "converged": false,
+      "initial_best_g0": 0.470215105035744,
+      "final_fitness": 0.3542090431258262,
+      "residual_rms_deg": 0.3542090431258262,
+      "sigma_m": 1.4028575258237868,
+      "solution": [
+        -757.8996352353075,
+        -262.69019466677895
+      ]
+    },
+    {
+      "episode": 1,
+      "ga": "localize",
+      "label": "频道3",
+      "seed": 0,
+      "channel": 3,
+      "n_obs": 3,
+      "generations": 150,
+      "converged": false,
+      "initial_best_g0": 0.47997660360713346,
+      "final_fitness": 0.3503254459778036,
+      "residual_rms_deg": 0.3503254459778036,
+      "sigma_m": 1.409335027435259,
+      "solution": [
+        1173.3797544640468,
+        494.77699904659
+      ]
+    },
+    {
+      "episode": 1,
+      "ga": "localize",
+      "label": "频道4",
+      "seed": 0,
+      "channel": 4,
+      "n_obs": 3,
+      "generations": 150,
+      "converged": false,
+      "initial_best_g0": 0.49743700706141736,
+      "final_fitness": 0.3824272015738093,
+      "residual_rms_deg": 0.3824272015738093,
+      "sigma_m": 1.4110273136786022,
+      "solution": [
+        1416.0083399789933,
+        940.6183776070459
+      ]
+    },
+    {
+      "episode": 1,
+      "ga": "localize",
+      "label": "频道5",
+      "seed": 0,
+      "channel": 5,
+      "n_obs": 3,
+      "generations": 150,
+      "converged": false,
+      "initial_best_g0": 0.016690021967588873,
+      "final_fitness": 0.013988452282880114,
+      "residual_rms_deg": 0.013988452282880114,
+      "sigma_m": 1.4061595360500105,
+      "solution": [
+        330.066697911691,
+        -1461.8216192379148
+      ]
+    },
+    {
+      "episode": 1,
+      "ga": "localize",
+      "label": "频道6",
+      "seed": 0,
+      "channel": 6,
+      "n_obs": 2,
+      "generations": 1,
+      "converged": true,
+      "initial_best_g0": 0.0,
+      "final_fitness": 0.0,
+      "residual_rms_deg": 2.0097183471152322e-14,
+      "sigma_m": 1.4047634942932572,
+      "solution": [
+        613.2691235873466,
+        -1268.7696208532664
+      ]
+    },
+    {
+      "episode": 1,
+      "ga": "localize",
+      "label": "频道7",
+      "seed": 0,
+      "channel": 7,
+      "n_obs": 2,
+      "generations": 1,
+      "converged": true,
+      "initial_best_g0": 0.0,
+      "final_fitness": 0.0,
+      "residual_rms_deg": 0.0,
+      "sigma_m": 1.409057768181766,
+      "solution": [
+        -442.6523894399601,
+        -1452.2919827519352
+      ]
+    },
+    {
+      "episode": 1,
+      "ga": "localize",
+      "label": "频道8",
+      "seed": 0,
+      "channel": 8,
+      "n_obs": 2,
+      "generations": 1,
+      "converged": true,
+      "initial_best_g0": 0.0,
+      "final_fitness": 0.0,
+      "residual_rms_deg": 0.0,
+      "sigma_m": 1.40992460253841,
+      "solution": [
+        288.62165248684477,
+        1643.8324324117348
+      ]
+    },
+    {
+      "episode": 1,
+      "ga": "localize",
+      "label": "频道9",
+      "seed": 0,
+      "channel": 9,
+      "n_obs": 2,
+      "generations": 1,
+      "converged": true,
+      "initial_best_g0": 0.0,
+      "final_fitness": 0.0,
+      "residual_rms_deg": 2.0097183471152322e-14,
+      "sigma_m": 1.4055269538121629,
+      "solution": [
+        -649.3053718728981,
+        -170.58434722697106
+      ]
+    },
+    {
+      "episode": 1,
+      "ga": "localize",
+      "label": "频道10",
+      "seed": 0,
+      "channel": 10,
+      "n_obs": 3,
+      "generations": 150,
+      "converged": false,
+      "initial_best_g0": 0.49455875574314173,
+      "final_fitness": 0.3733213903116753,
+      "residual_rms_deg": 0.3733213903116753,
+      "sigma_m": 1.4082542774423623,
+      "solution": [
+        1253.349375922192,
+        -1253.5208549489205
+      ]
+    },
+    {
+      "episode": 1,
+      "ga": "localize",
+      "label": "频道12",
+      "seed": 0,
+      "channel": 12,
+      "n_obs": 2,
+      "generations": 1,
+      "converged": true,
+      "initial_best_g0": 2.0097183471152322e-14,
+      "final_fitness": 2.0097183471152322e-14,
+      "residual_rms_deg": 2.0097183471152322e-14,
+      "sigma_m": 1.4072891677308812,
+      "solution": [
+        -386.90487413661026,
+        1172.2116246945284
+      ]
+    },
+    {
+      "episode": 1,
+      "ga": "localize",
+      "label": "频道13",
+      "seed": 0,
+      "channel": 13,
+      "n_obs": 3,
+      "generations": 150,
+      "converged": false,
+      "initial_best_g0": 0.2929021682136313,
+      "final_fitness": 0.19340503007489565,
+      "residual_rms_deg": 0.19340503007489565,
+      "sigma_m": 1.4081951846961318,
+      "solution": [
+        -305.5891840926576,
+        541.7843810933764
+      ]
+    },
+    {
+      "episode": 1,
+      "ga": "localize",
+      "label": "频道14",
+      "seed": 0,
+      "channel": 14,
+      "n_obs": 3,
+      "generations": 150,
+      "converged": false,
+      "initial_best_g0": 0.5895892935353753,
+      "final_fitness": 0.459684293795766,
+      "residual_rms_deg": 0.459684293795766,
+      "sigma_m": 1.4079089235548874,
+      "solution": [
+        251.92144763164802,
+        -755.5390381792241
+      ]
+    },
+    {
+      "episode": 1,
+      "ga": "localize",
+      "label": "频道16",
+      "seed": 0,
+      "channel": 16,
+      "n_obs": 3,
+      "generations": 150,
+      "converged": false,
+      "initial_best_g0": 0.12674344879709235,
+      "final_fitness": 0.11501254637197207,
+      "residual_rms_deg": 0.11501254637197207,
+      "sigma_m": 1.385805732682817,
+      "solution": [
+        788.7203910519378,
+        519.2790264558272
+      ]
+    },
+    {
+      "episode": 1,
+      "ga": "localize",
+      "label": "频道18",
+      "seed": 0,
+      "channel": 18,
+      "n_obs": 3,
+      "generations": 150,
+      "converged": false,
+      "initial_best_g0": 0.41783201809701326,
+      "final_fitness": 0.299875315664798,
+      "residual_rms_deg": 0.299875315664798,
+      "sigma_m": 1.3426525144954358,
+      "solution": [
+        44.061281581825206,
+        990.3493957073332
+      ]
+    },
+    {
+      "episode": 1,
+      "ga": "localize",
+      "label": "频道20",
+      "seed": 0,
+      "channel": 20,
+      "n_obs": 3,
+      "generations": 150,
+      "converged": false,
+      "initial_best_g0": 0.4863918646352689,
+      "final_fitness": 0.4603022123539151,
+      "residual_rms_deg": 0.4603022123539151,
+      "sigma_m": 1.4071209254149313,
+      "solution": [
+        1567.9478519593404,
+        321.1618382880644
+      ]
+    },
+    {
+      "episode": 1,
+      "ga": "route",
+      "label": "清除顺序",
+      "seed": 1367864807,
+      "n_points": 16,
+      "initial_best_g0": 11298.162574409214,
+      "generations": 300,
+      "final_length_m": 10228.999026301717,
+      "solution": [
+        4,
+        5,
+        9,
+        12,
+        6,
+        1,
+        8,
+        11,
+        0,
+        10,
+        14,
+        7,
+        13,
+        2,
+        15,
+        3
+      ]
+    },
+    {
+      "episode": 2,
+      "ga": "route",
+      "label": "覆盖路点巡回",
+      "seed": 1016164991,
+      "n_points": 8,
+      "initial_best_g0": 8599.13726460967,
+      "generations": 300,
+      "final_length_m": 8599.13726460967,
+      "solution": [
+        0,
+        7,
+        3,
+        5,
+        1,
+        4,
+        2,
+        6
+      ]
+    },
+    {
+      "episode": 2,
+      "ga": "localize",
+      "label": "频道3",
+      "seed": 1,
+      "channel": 3,
+      "n_obs": 3,
+      "generations": 150,
+      "converged": false,
+      "initial_best_g0": 0.5128290866958355,
+      "final_fitness": 0.40709898658677024,
+      "residual_rms_deg": 0.40709898658677024,
+      "sigma_m": 1.4079118217570565,
+      "solution": [
+        1088.5549434524949,
+        818.6853582647504
+      ]
+    },
+    {
+      "episode": 2,
+      "ga": "localize",
+      "label": "频道4",
+      "seed": 1,
+      "channel": 4,
+      "n_obs": 2,
+      "generations": 1,
+      "converged": true,
+      "initial_best_g0": 0.0,
+      "final_fitness": 0.0,
+      "residual_rms_deg": 2.0097183471152322e-14,
+      "sigma_m": 1.391590179730537,
+      "solution": [
+        -138.22644650225885,
+        -190.8821983120292
+      ]
+    },
+    {
+      "episode": 2,
+      "ga": "localize",
+      "label": "频道7",
+      "seed": 1,
+      "channel": 7,
+      "n_obs": 3,
+      "generations": 150,
+      "converged": false,
+      "initial_best_g0": 0.21804026355043235,
+      "final_fitness": 0.1927513723566356,
+      "residual_rms_deg": 0.1927513723566356,
+      "sigma_m": 1.4097022931759502,
+      "solution": [
+        -634.7698232699917,
+        -1535.8400045842875
+      ]
+    },
+    {
+      "episode": 2,
+      "ga": "localize",
+      "label": "频道8",
+      "seed": 1,
+      "channel": 8,
+      "n_obs": 3,
+      "generations": 150,
+      "converged": false,
+      "initial_best_g0": 0.26109370767882656,
+      "final_fitness": 0.23705256192361604,
+      "residual_rms_deg": 0.23705256192361604,
+      "sigma_m": 1.4070956492259956,
+      "solution": [
+        -1481.728644992596,
+        -250.2413426661746
+      ]
+    },
+    {
+      "episode": 2,
+      "ga": "localize",
+      "label": "频道9",
+      "seed": 1,
+      "channel": 9,
+      "n_obs": 2,
+      "generations": 1,
+      "converged": true,
+      "initial_best_g0": 2.0097183471152322e-14,
+      "final_fitness": 2.0097183471152322e-14,
+      "residual_rms_deg": 2.0097183471152322e-14,
+      "sigma_m": 1.3783269898666284,
+      "solution": [
+        -1623.8016382538697,
+        -557.4479944947856
+      ]
+    },
+    {
+      "episode": 2,
+      "ga": "localize",
+      "label": "频道11",
+      "seed": 1,
+      "channel": 11,
+      "n_obs": 3,
+      "generations": 150,
+      "converged": false,
+      "initial_best_g0": 0.13953103943470657,
+      "final_fitness": 0.11156850050142843,
+      "residual_rms_deg": 0.11156850050145463,
+      "sigma_m": 1.411254875962799,
+      "solution": [
+        100.19041763456829,
+        -1453.1144982079045
+      ]
+    },
+    {
+      "episode": 2,
+      "ga": "localize",
+      "label": "频道13",
+      "seed": 1,
+      "channel": 13,
+      "n_obs": 2,
+      "generations": 1,
+      "converged": true,
+      "initial_best_g0": 0.0,
+      "final_fitness": 0.0,
+      "residual_rms_deg": 0.0,
+      "sigma_m": 1.4002567486004596,
+      "solution": [
+        -1471.127644821156,
+        854.5449264215501
+      ]
+    },
+    {
+      "episode": 2,
+      "ga": "localize",
+      "label": "频道14",
+      "seed": 1,
+      "channel": 14,
+      "n_obs": 3,
+      "generations": 150,
+      "converged": false,
+      "initial_best_g0": 0.5072849198808581,
+      "final_fitness": 0.3750595367040029,
+      "residual_rms_deg": 0.3750595367040029,
+      "sigma_m": 1.4110864611903704,
+      "solution": [
+        1384.1938660980095,
+        1001.3972998966075
+      ]
+    },
+    {
+      "episode": 2,
+      "ga": "localize",
+      "label": "频道16",
+      "seed": 1,
+      "channel": 16,
+      "n_obs": 3,
+      "generations": 150,
+      "converged": false,
+      "initial_best_g0": 0.3393249441378124,
+      "final_fitness": 0.3030949675486127,
+      "residual_rms_deg": 0.3030949675486127,
+      "sigma_m": 1.4091583090694546,
+      "solution": [
+        -428.56107695857355,
+        1448.8132469803215
+      ]
+    },
+    {
+      "episode": 2,
+      "ga": "localize",
+      "label": "频道17",
+      "seed": 1,
+      "channel": 17,
+      "n_obs": 2,
+      "generations": 1,
+      "converged": true,
+      "initial_best_g0": 4.0194366942304644e-14,
+      "final_fitness": 4.0194366942304644e-14,
+      "residual_rms_deg": 4.0194366942304644e-14,
+      "sigma_m": 1.3960887021724402,
+      "solution": [
+        1642.7656244621471,
+        -274.8578649772189
+      ]
+    },
+    {
+      "episode": 2,
+      "ga": "localize",
+      "label": "频道19",
+      "seed": 1,
+      "channel": 19,
+      "n_obs": 3,
+      "generations": 150,
+      "converged": false,
+      "initial_best_g0": 0.4034120312019188,
+      "final_fitness": 0.27103615232096084,
+      "residual_rms_deg": 0.27103615232096084,
+      "sigma_m": 1.4099796256798027,
+      "solution": [
+        -1732.1138885056891,
+        -88.93271199113995
+      ]
+    },
+    {
+      "episode": 2,
+      "ga": "route",
+      "label": "清除顺序",
+      "seed": 1099128569,
+      "n_points": 11,
+      "initial_best_g0": 11308.507397229521,
+      "generations": 300,
+      "final_length_m": 10332.996983845618,
+      "solution": [
+        6,
+        10,
+        3,
+        4,
+        2,
+        5,
+        1,
+        8,
+        0,
+        7,
+        9
+      ]
+    },
+    {
+      "episode": 3,
+      "ga": "route",
+      "label": "覆盖路点巡回",
+      "seed": 1798679648,
+      "n_points": 8,
+      "initial_best_g0": 8599.13726460967,
+      "generations": 300,
+      "final_length_m": 8599.13726460967,
+      "solution": [
+        0,
+        7,
+        3,
+        5,
+        1,
+        4,
+        2,
+        6
+      ]
+    },
+    {
+      "episode": 3,
+      "ga": "localize",
+      "label": "频道1",
+      "seed": 2,
+      "channel": 1,
+      "n_obs": 2,
+      "generations": 1,
+      "converged": true,
+      "initial_best_g0": 0.0,
+      "final_fitness": 0.0,
+      "residual_rms_deg": 4.0194366942304644e-14,
+      "sigma_m": 1.4091907628974605,
+      "solution": [
+        1429.9710367644773,
+        -940.8409662753337
+      ]
+    },
+    {
+      "episode": 3,
+      "ga": "localize",
+      "label": "频道2",
+      "seed": 2,
+      "channel": 2,
+      "n_obs": 2,
+      "generations": 1,
+      "converged": true,
+      "initial_best_g0": 0.0,
+      "final_fitness": 0.0,
+      "residual_rms_deg": 0.0,
+      "sigma_m": 1.4107921208551246,
+      "solution": [
+        836.9113931334688,
+        1419.1886793613407
+      ]
+    },
+    {
+      "episode": 3,
+      "ga": "localize",
+      "label": "频道3",
+      "seed": 2,
+      "channel": 3,
+      "n_obs": 3,
+      "generations": 150,
+      "converged": false,
+      "initial_best_g0": 0.3490780172804234,
+      "final_fitness": 0.27322621603496816,
+      "residual_rms_deg": 0.27322621603496816,
+      "sigma_m": 1.391375780989358,
+      "solution": [
+        379.9904434317045,
+        763.2327594281765
+      ]
+    },
+    {
+      "episode": 3,
+      "ga": "localize",
+      "label": "频道4",
+      "seed": 2,
+      "channel": 4,
+      "n_obs": 2,
+      "generations": 1,
+      "converged": true,
+      "initial_best_g0": 0.0,
+      "final_fitness": 0.0,
+      "residual_rms_deg": 2.0097183471152322e-14,
+      "sigma_m": 1.3895286874728165,
+      "solution": [
+        -796.4783629549225,
+        981.2477293404255
+      ]
+    },
+    {
+      "episode": 3,
+      "ga": "localize",
+      "label": "频道5",
+      "seed": 2,
+      "channel": 5,
+      "n_obs": 3,
+      "generations": 150,
+      "converged": false,
+      "initial_best_g0": 0.12896869187590576,
+      "final_fitness": 0.12691821640563775,
+      "residual_rms_deg": 0.12691821640563775,
+      "sigma_m": 1.3561625601106186,
+      "solution": [
+        1330.3822367002583,
+        -43.60910304759275
+      ]
+    },
+    {
+      "episode": 3,
+      "ga": "localize",
+      "label": "频道6",
+      "seed": 2,
+      "channel": 6,
+      "n_obs": 3,
+      "generations": 150,
+      "converged": false,
+      "initial_best_g0": 0.26243380711472525,
+      "final_fitness": 0.22378356253876522,
+      "residual_rms_deg": 0.22378356253877923,
+      "sigma_m": 1.4084335603670266,
+      "solution": [
+        -1117.741076442168,
+        -171.65018235606183
+      ]
+    },
+    {
+      "episode": 3,
+      "ga": "localize",
+      "label": "频道10",
+      "seed": 2,
+      "channel": 10,
+      "n_obs": 3,
+      "generations": 150,
+      "converged": false,
+      "initial_best_g0": 0.01131604356302532,
+      "final_fitness": 0.009205748242973929,
+      "residual_rms_deg": 0.009205748242965673,
+      "sigma_m": 1.3990330209980504,
+      "solution": [
+        -909.3734745607453,
+        -590.147458064906
+      ]
+    },
+    {
+      "episode": 3,
+      "ga": "localize",
+      "label": "频道11",
+      "seed": 2,
+      "channel": 11,
+      "n_obs": 2,
+      "generations": 1,
+      "converged": true,
+      "initial_best_g0": 0.0,
+      "final_fitness": 0.0,
+      "residual_rms_deg": 2.0097183471152322e-14,
+      "sigma_m": 1.410622933926723,
+      "solution": [
+        -1527.1158258120593,
+        561.4360331278674
+      ]
+    },
+    {
+      "episode": 3,
+      "ga": "localize",
+      "label": "频道12",
+      "seed": 2,
+      "channel": 12,
+      "n_obs": 3,
+      "generations": 150,
+      "converged": false,
+      "initial_best_g0": 0.04533104409318664,
+      "final_fitness": 0.0304629830655824,
+      "residual_rms_deg": 0.03046298306557374,
+      "sigma_m": 1.4097944288290385,
+      "solution": [
+        -87.19764373591214,
+        -1114.1975115909017
+      ]
+    },
+    {
+      "episode": 3,
+      "ga": "localize",
+      "label": "频道13",
+      "seed": 2,
+      "channel": 13,
+      "n_obs": 3,
+      "generations": 150,
+      "converged": false,
+      "initial_best_g0": 0.4161626098873789,
+      "final_fitness": 0.31802650343673705,
+      "residual_rms_deg": 0.31802650343673705,
+      "sigma_m": 1.4021496403630882,
+      "solution": [
+        -170.5251067828838,
+        868.3876777009364
+      ]
+    },
+    {
+      "episode": 3,
+      "ga": "localize",
+      "label": "频道14",
+      "seed": 2,
+      "channel": 14,
+      "n_obs": 3,
+      "generations": 150,
+      "converged": false,
+      "initial_best_g0": 0.6723899249291201,
+      "final_fitness": 0.4625809649646871,
+      "residual_rms_deg": 0.4625809649646871,
+      "sigma_m": 1.4088178984985937,
+      "solution": [
+        354.7112794094591,
+        -1220.775699544208
+      ]
+    },
+    {
+      "episode": 3,
+      "ga": "localize",
+      "label": "频道15",
+      "seed": 2,
+      "channel": 15,
+      "n_obs": 2,
+      "generations": 1,
+      "converged": true,
+      "initial_best_g0": 0.0,
+      "final_fitness": 0.0,
+      "residual_rms_deg": 0.0,
+      "sigma_m": 1.4018012871980747,
+      "solution": [
+        989.0698477126646,
+        -662.1845763988697
+      ]
+    },
+    {
+      "episode": 3,
+      "ga": "localize",
+      "label": "频道16",
+      "seed": 2,
+      "channel": 16,
+      "n_obs": 2,
+      "generations": 1,
+      "converged": true,
+      "initial_best_g0": 2.0097183471152322e-14,
+      "final_fitness": 2.0097183471152322e-14,
+      "residual_rms_deg": 2.0097183471152322e-14,
+      "sigma_m": 1.3945543623404275,
+      "solution": [
+        -1402.825167451293,
+        -527.0784639017022
+      ]
+    },
+    {
+      "episode": 3,
+      "ga": "localize",
+      "label": "频道17",
+      "seed": 2,
+      "channel": 17,
+      "n_obs": 3,
+      "generations": 150,
+      "converged": false,
+      "initial_best_g0": 0.017709439522106775,
+      "final_fitness": 0.01372075095491254,
+      "residual_rms_deg": 0.01372075095491254,
+      "sigma_m": 1.4042619301786525,
+      "solution": [
+        1344.11987168439,
+        -518.1845873487422
+      ]
+    },
+    {
+      "episode": 3,
+      "ga": "localize",
+      "label": "频道19",
+      "seed": 2,
+      "channel": 19,
+      "n_obs": 2,
+      "generations": 1,
+      "converged": true,
+      "initial_best_g0": 5.684341886080802e-14,
+      "final_fitness": 5.684341886080802e-14,
+      "residual_rms_deg": 5.684341886080802e-14,
+      "sigma_m": 1.403862065387803,
+      "solution": [
+        1148.458025616804,
+        -1124.1481798263894
+      ]
+    },
+    {
+      "episode": 3,
+      "ga": "localize",
+      "label": "频道20",
+      "seed": 2,
+      "channel": 20,
+      "n_obs": 2,
+      "generations": 1,
+      "converged": true,
+      "initial_best_g0": 0.0,
+      "final_fitness": 0.0,
+      "residual_rms_deg": 0.0,
+      "sigma_m": 1.4113190811578722,
+      "solution": [
+        -1548.206045855169,
+        193.11651700314815
+      ]
+    },
+    {
+      "episode": 3,
+      "ga": "route",
+      "label": "清除顺序",
+      "seed": 561807780,
+      "n_points": 16,
+      "initial_best_g0": 10200.460920203137,
+      "generations": 300,
+      "final_length_m": 10059.933359797555,
+      "solution": [
+        10,
+        8,
+        6,
+        12,
+        5,
+        15,
+        7,
+        3,
+        9,
+        2,
+        1,
+        4,
+        13,
+        11,
+        14,
+        0
+      ]
+    },
+    {
+      "episode": 4,
+      "ga": "route",
+      "label": "覆盖路点巡回",
+      "seed": 1742692732,
+      "n_points": 8,
+      "initial_best_g0": 8599.13726460967,
+      "generations": 300,
+      "final_length_m": 8599.13726460967,
+      "solution": [
+        0,
+        7,
+        3,
+        5,
+        1,
+        4,
+        2,
+        6
+      ]
+    },
+    {
+      "episode": 4,
+      "ga": "localize",
+      "label": "频道1",
+      "seed": 3,
+      "channel": 1,
+      "n_obs": 3,
+      "generations": 150,
+      "converged": false,
+      "initial_best_g0": 0.35483782068121567,
+      "final_fitness": 0.31733952433875695,
+      "residual_rms_deg": 0.31733952433875695,
+      "sigma_m": 1.4081025090695993,
+      "solution": [
+        495.35239890932553,
+        696.3167767103689
+      ]
+    },
+    {
+      "episode": 4,
+      "ga": "localize",
+      "label": "频道2",
+      "seed": 3,
+      "channel": 2,
+      "n_obs": 3,
+      "generations": 150,
+      "converged": false,
+      "initial_best_g0": 0.36994313477525453,
+      "final_fitness": 0.330502791113405,
+      "residual_rms_deg": 0.330502791113405,
+      "sigma_m": 1.4102090631008124,
+      "solution": [
+        1087.3663530901754,
+        112.59674701550851
+      ]
+    },
+    {
+      "episode": 4,
+      "ga": "localize",
+      "label": "频道5",
+      "seed": 3,
+      "channel": 5,
+      "n_obs": 3,
+      "generations": 150,
+      "converged": false,
+      "initial_best_g0": 0.19968798672435126,
+      "final_fitness": 0.13923817698216556,
+      "residual_rms_deg": 0.13923817698217694,
+      "sigma_m": 1.4080215120547854,
+      "solution": [
+        673.0871100171125,
+        -180.26162286172953
+      ]
+    },
+    {
+      "episode": 4,
+      "ga": "localize",
+      "label": "频道8",
+      "seed": 3,
+      "channel": 8,
+      "n_obs": 2,
+      "generations": 1,
+      "converged": true,
+      "initial_best_g0": 0.0,
+      "final_fitness": 0.0,
+      "residual_rms_deg": 0.0,
+      "sigma_m": 1.4068601672554444,
+      "solution": [
+        699.7661003894183,
+        -1388.7927113891305
+      ]
+    },
+    {
+      "episode": 4,
+      "ga": "localize",
+      "label": "频道10",
+      "seed": 3,
+      "channel": 10,
+      "n_obs": 2,
+      "generations": 1,
+      "converged": true,
+      "initial_best_g0": 0.0,
+      "final_fitness": 0.0,
+      "residual_rms_deg": 0.0,
+      "sigma_m": 1.405598392264094,
+      "solution": [
+        1189.1214992615805,
+        -665.6998395342222
+      ]
+    },
+    {
+      "episode": 4,
+      "ga": "localize",
+      "label": "频道11",
+      "seed": 3,
+      "channel": 11,
+      "n_obs": 2,
+      "generations": 1,
+      "converged": true,
+      "initial_best_g0": 0.0,
+      "final_fitness": 0.0,
+      "residual_rms_deg": 0.0,
+      "sigma_m": 1.3994725403607884,
+      "solution": [
+        -1407.283715853587,
+        693.632315870688
+      ]
+    },
+    {
+      "episode": 4,
+      "ga": "localize",
+      "label": "频道12",
+      "seed": 3,
+      "channel": 12,
+      "n_obs": 2,
+      "generations": 1,
+      "converged": true,
+      "initial_best_g0": 0.0,
+      "final_fitness": 0.0,
+      "residual_rms_deg": 0.0,
+      "sigma_m": 1.402101365115018,
+      "solution": [
+        1034.164363924,
+        -681.464763505717
+      ]
+    },
+    {
+      "episode": 4,
+      "ga": "localize",
+      "label": "频道12",
+      "seed": 3,
+      "channel": 12,
+      "n_obs": 2,
+      "generations": 1,
+      "converged": true,
+      "initial_best_g0": 0.0,
+      "final_fitness": 0.0,
+      "residual_rms_deg": 0.0,
+      "sigma_m": 1.402101365115018,
+      "solution": [
+        1034.164363924,
+        -681.464763505717
+      ]
+    },
+    {
+      "episode": 4,
+      "ga": "localize",
+      "label": "频道12",
+      "seed": 3,
+      "channel": 12,
+      "n_obs": 3,
+      "generations": 150,
+      "converged": false,
+      "initial_best_g0": 0.3289094759702952,
+      "final_fitness": 0.3168263286315025,
+      "residual_rms_deg": 0.3168263286315025,
+      "sigma_m": 1.3868163408893563,
+      "solution": [
+        1309.111797314751,
+        -300.09960248742686
+      ]
+    },
+    {
+      "episode": 4,
+      "ga": "localize",
+      "label": "频道12",
+      "seed": 3,
+      "channel": 12,
+      "n_obs": 3,
+      "generations": 150,
+      "converged": false,
+      "initial_best_g0": 0.3289094759702952,
+      "final_fitness": 0.3168263286315025,
+      "residual_rms_deg": 0.3168263286315025,
+      "sigma_m": 1.3868163408893563,
+      "solution": [
+        1309.111797314751,
+        -300.09960248742686
+      ]
+    },
+    {
+      "episode": 4,
+      "ga": "localize",
+      "label": "频道14",
+      "seed": 3,
+      "channel": 14,
+      "n_obs": 3,
+      "generations": 150,
+      "converged": false,
+      "initial_best_g0": 0.3917950701514591,
+      "final_fitness": 0.28626239558514577,
+      "residual_rms_deg": 0.28626239558514577,
+      "sigma_m": 1.4057421098081273,
+      "solution": [
+        1034.382157901622,
+        239.25772947567197
+      ]
+    },
+    {
+      "episode": 4,
+      "ga": "localize",
+      "label": "频道16",
+      "seed": 3,
+      "channel": 16,
+      "n_obs": 3,
+      "generations": 150,
+      "converged": false,
+      "initial_best_g0": 0.07888293073598919,
+      "final_fitness": 0.06704563464650636,
+      "residual_rms_deg": 0.06704563464650636,
+      "sigma_m": 1.3945461010917464,
+      "solution": [
+        -429.14685087021564,
+        -786.5882810513874
+      ]
+    },
+    {
+      "episode": 4,
+      "ga": "localize",
+      "label": "频道18",
+      "seed": 3,
+      "channel": 18,
+      "n_obs": 2,
+      "generations": 1,
+      "converged": true,
+      "initial_best_g0": 0.0,
+      "final_fitness": 0.0,
+      "residual_rms_deg": 0.0,
+      "sigma_m": 1.399706016319811,
+      "solution": [
+        -1439.3519834531446,
+        779.6137501569831
+      ]
+    },
+    {
+      "episode": 4,
+      "ga": "localize",
+      "label": "频道19",
+      "seed": 3,
+      "channel": 19,
+      "n_obs": 3,
+      "generations": 150,
+      "converged": false,
+      "initial_best_g0": 0.04522031262724042,
+      "final_fitness": 0.04121187806604079,
+      "residual_rms_deg": 0.04121187806602587,
+      "sigma_m": 1.4069733170545415,
+      "solution": [
+        -1310.053763308515,
+        -281.4709107576837
+      ]
+    },
+    {
+      "episode": 4,
+      "ga": "route",
+      "label": "清除顺序",
+      "seed": 183930185,
+      "n_points": 11,
+      "initial_best_g0": 9700.522742481116,
+      "generations": 300,
+      "final_length_m": 7221.099945895484,
+      "solution": [
+        2,
+        0,
+        7,
+        1,
+        6,
+        4,
+        3,
+        8,
+        10,
+        5,
+        9
+      ]
+    },
+    {
+      "episode": 5,
+      "ga": "route",
+      "label": "覆盖路点巡回",
+      "seed": 1560023975,
+      "n_points": 8,
+      "initial_best_g0": 8599.13726460967,
+      "generations": 300,
+      "final_length_m": 8599.13726460967,
+      "solution": [
+        0,
+        7,
+        3,
+        5,
+        1,
+        4,
+        2,
+        6
+      ]
+    },
+    {
+      "episode": 5,
+      "ga": "localize",
+      "label": "频道1",
+      "seed": 4,
+      "channel": 1,
+      "n_obs": 2,
+      "generations": 1,
+      "converged": true,
+      "initial_best_g0": 0.0,
+      "final_fitness": 0.0,
+      "residual_rms_deg": 0.0,
+      "sigma_m": 1.4082841847490548,
+      "solution": [
+        570.6812064569231,
+        -1496.1800278272415
+      ]
+    },
+    {
+      "episode": 5,
+      "ga": "localize",
+      "label": "频道2",
+      "seed": 4,
+      "channel": 2,
+      "n_obs": 3,
+      "generations": 150,
+      "converged": false,
+      "initial_best_g0": 0.2966561883431127,
+      "final_fitness": 0.1916230707642115,
+      "residual_rms_deg": 0.1916230707642115,
+      "sigma_m": 1.4059361636533563,
+      "solution": [
+        -289.2382526239192,
+        723.8286963667819
+      ]
+    },
+    {
+      "episode": 5,
+      "ga": "localize",
+      "label": "频道4",
+      "seed": 4,
+      "channel": 4,
+      "n_obs": 3,
+      "generations": 150,
+      "converged": false,
+      "initial_best_g0": 0.015393429456342565,
+      "final_fitness": 0.012671563687857814,
+      "residual_rms_deg": 0.012671563687857814,
+      "sigma_m": 1.3950463106947695,
+      "solution": [
+        927.2366909245413,
+        -1196.8720481388946
+      ]
+    },
+    {
+      "episode": 5,
+      "ga": "localize",
+      "label": "频道5",
+      "seed": 4,
+      "channel": 5,
+      "n_obs": 3,
+      "generations": 150,
+      "converged": false,
+      "initial_best_g0": 0.14749063547933985,
+      "final_fitness": 0.10636237369019523,
+      "residual_rms_deg": 0.10636237369019523,
+      "sigma_m": 1.3989362989275325,
+      "solution": [
+        -415.8258226415317,
+        -331.2326324178853
+      ]
+    },
+    {
+      "episode": 5,
+      "ga": "localize",
+      "label": "频道7",
+      "seed": 4,
+      "channel": 7,
+      "n_obs": 2,
+      "generations": 1,
+      "converged": true,
+      "initial_best_g0": 0.0,
+      "final_fitness": 0.0,
+      "residual_rms_deg": 0.0,
+      "sigma_m": 1.4042910170390372,
+      "solution": [
+        557.266466109972,
+        1133.4571820773854
+      ]
+    },
+    {
+      "episode": 5,
+      "ga": "localize",
+      "label": "频道9",
+      "seed": 4,
+      "channel": 9,
+      "n_obs": 3,
+      "generations": 150,
+      "converged": false,
+      "initial_best_g0": 0.813793231306853,
+      "final_fitness": 0.5312450586749601,
+      "residual_rms_deg": 0.5312450586749601,
+      "sigma_m": 1.408669730683588,
+      "solution": [
+        490.0253495364149,
+        -209.14968309085253
+      ]
+    },
+    {
+      "episode": 5,
+      "ga": "localize",
+      "label": "频道10",
+      "seed": 4,
+      "channel": 10,
+      "n_obs": 3,
+      "generations": 150,
+      "converged": false,
+      "initial_best_g0": 0.2591040996723047,
+      "final_fitness": 0.2102700952394077,
+      "residual_rms_deg": 0.2102700952394077,
+      "sigma_m": 1.4073116696248282,
+      "solution": [
+        -400.1814167906022,
+        1249.0723306238049
+      ]
+    },
+    {
+      "episode": 5,
+      "ga": "localize",
+      "label": "频道13",
+      "seed": 4,
+      "channel": 13,
+      "n_obs": 3,
+      "generations": 150,
+      "converged": false,
+      "initial_best_g0": 0.29404964673444645,
+      "final_fitness": 0.20942492458167014,
+      "residual_rms_deg": 0.20942492458167014,
+      "sigma_m": 1.3724834499057268,
+      "solution": [
+        991.0400620309416,
+        -901.0805547221499
+      ]
+    },
+    {
+      "episode": 5,
+      "ga": "localize",
+      "label": "频道15",
+      "seed": 4,
+      "channel": 15,
+      "n_obs": 3,
+      "generations": 150,
+      "converged": false,
+      "initial_best_g0": 0.44270090983377813,
+      "final_fitness": 0.37606390301695125,
+      "residual_rms_deg": 0.3760639030169493,
+      "sigma_m": 1.3914404728658794,
+      "solution": [
+        -1082.250439242672,
+        648.9400030033025
+      ]
+    },
+    {
+      "episode": 5,
+      "ga": "localize",
+      "label": "频道16",
+      "seed": 4,
+      "channel": 16,
+      "n_obs": 2,
+      "generations": 1,
+      "converged": true,
+      "initial_best_g0": 0.0,
+      "final_fitness": 0.0,
+      "residual_rms_deg": 0.0,
+      "sigma_m": 1.4018841106308322,
+      "solution": [
+        620.0000369226428,
+        979.0914902259823
+      ]
+    },
+    {
+      "episode": 5,
+      "ga": "localize",
+      "label": "频道17",
+      "seed": 4,
+      "channel": 17,
+      "n_obs": 2,
+      "generations": 1,
+      "converged": true,
+      "initial_best_g0": 0.0,
+      "final_fitness": 0.0,
+      "residual_rms_deg": 0.0,
+      "sigma_m": 1.4092195404796357,
+      "solution": [
+        1539.8377640995232,
+        426.659565676175
+      ]
+    },
+    {
+      "episode": 5,
+      "ga": "route",
+      "label": "清除顺序",
+      "seed": 2025197565,
+      "n_points": 11,
+      "initial_best_g0": 8640.134472231319,
+      "generations": 300,
+      "final_length_m": 7905.603276387348,
+      "solution": [
+        0,
+        2,
+        7,
+        5,
+        3,
+        8,
+        1,
+        6,
+        4,
+        9,
+        10
+      ]
+    }
+  ]
+}

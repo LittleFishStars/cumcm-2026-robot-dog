@@ -1,0 +1,935 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+"""T3_ga.py —— 2026 全国大学生数学建模竞赛 B 题 · 问题三
+机器狗自动定位并清除无线电干扰源（遗传算法求解）
+
+策略（三个阶段，定位与路线全用遗传算法）
+======================================
+1. 覆盖观测：贪心集合覆盖挑出尽量少的路点，使半径 1800 m 圆域内任意点都落在某个路点
+   950 m 内（< 有效接收半径下界 1000 m），再用路线 GA 定序依次访问；每个路点对尚未
+   确认的频道测向。既不漏源，又天然形成多视角交会。
+2. 测向定位（实数编码 GA）：个体是干扰源位置 (x, y)，适应度为示向度残差 RMS（度）+
+   越界惩罚（距离超过有效接收半径上界、位置越出圆域）；初始种子用射线两两交点加速收敛。
+   若交会几何病态（位置 1σ 过大或射线近共线），或某频道只有单条射线，则补测"垂直视角"。
+3. 定点清除：路线 GA 规划已定位源的访问顺序，逐个靠近后先 /clear；未成功则沿最新实测
+   示向度以 16 m 步长末端逼近（±1° 的横向偏差约 0.3 m），直到返回 success。
+
+运行
+====
+    # 正式测试：先在模拟器中开始演练/测试，再运行本程序
+    python T3_ga.py --robot-id 202614023005
+
+    # 本地演练：自动拉起同目录 jammers-py 模拟器，跑 5 局固定场景并汇总
+    python T3_ga.py --practice 5 --seed 100
+
+依赖：numpy；HTTP 层复用同目录 sim_api.py；本地演练用同目录 jammers-py/（纯标准库）。
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import math
+import socket
+import subprocess
+import sys
+import time
+import urllib.request
+from collections import defaultdict
+from dataclasses import dataclass
+from functools import lru_cache
+from pathlib import Path
+from typing import Dict, List, NamedTuple, Optional, Sequence, Tuple
+
+import numpy as np
+
+import sim_api
+
+# ----------------------------------------------------------------------------
+# 常量（与附件 1 / 附件 2 一致）
+# ----------------------------------------------------------------------------
+REGION_RADIUS = 1800.0          # 目标圆域半径 / m
+MAX_RECEPTION = 1500.0          # 有效接收半径上界 / m（下界 1000 m，见 COVER_RADIUS）
+BEARING_ERROR_DEG = 1.0         # 示向度误差半宽 / 度
+CHANNELS: Tuple[int, ...] = tuple(range(1, 21))
+COORD_LIMIT = 2.0e6             # 坐标分量绝对值上限 / m
+
+COVER_RADIUS = 950.0            # 覆盖路点设计半径（<1000 下界，留网格离散余量）/ m
+COVER_GRID = 100.0              # 目标圆域离散网格 / m
+COVER_STEP = 120.0              # 候选路点网格 / m
+OBS_PER_SOURCE = 3              # 每个频道尽量采集的示向度条数
+
+GEOM_SIGMA = 15.0               # 位置 1σ 超过该值视为交会几何病态 / m
+GEOM_SIN_MIN = 0.20             # 两射线夹角 |sin| 小于该值视为近共线
+PERP_STEPS = (250.0, 500.0, 800.0)      # 补测垂直视角时外移的距离 / m
+SINGLE_PROBES = ((600.0, 35.0), (400.0, 45.0), (800.0, 25.0))   # 单射线补测：前移距离/侧偏角
+HOMING_STEP = 16.0              # 末端沿示向度逼近的步长 / m
+HOMING_MAX = 24                 # 末端逼近最大迭代次数
+SAFETY_MARGIN = 30.0            # 现实时限预留余量 / s
+
+# 定位 GA（实数编码）
+GA_LOC_POP = 80
+GA_LOC_GENS = 150
+GA_LOC_PC = 0.90
+GA_LOC_PM = 0.35
+GA_LOC_DOMAIN = 2200.0
+# 路线 GA（排列编码，开路径 TSP）
+GA_ROUTE_POP = 100
+GA_ROUTE_GENS = 300
+GA_ROUTE_PC = 0.90
+GA_ROUTE_PM = 0.35
+
+SEED = 2026
+
+
+# ----------------------------------------------------------------------------
+# 基础数学工具
+# ----------------------------------------------------------------------------
+def bearing(a: Sequence[float], b: Sequence[float]) -> float:
+    """a → b 的方位角（度，x 轴正向逆时针，[0,360)）。"""
+    return math.degrees(math.atan2(b[1] - a[1], b[0] - a[0])) % 360.0
+
+
+def ang_diff(a: float, b: float) -> float:
+    """两角的最小绝对差（度）。"""
+    return abs(((a - b + 180.0) % 360.0) - 180.0)
+
+
+def dist(a: Sequence[float], b: Sequence[float]) -> float:
+    return math.hypot(a[0] - b[0], a[1] - b[1])
+
+
+@dataclass(frozen=True)
+class Obs:
+    """一次 direction 检测：在 (x, y) 处测得频道 channel 的示向度 theta（度）。"""
+
+    channel: int
+    x: float
+    y: float
+    theta: float
+
+    @property
+    def point(self) -> np.ndarray:
+        return np.array([self.x, self.y], dtype=float)
+
+    @property
+    def direction(self) -> np.ndarray:
+        """示向度单位向量。"""
+        t = math.radians(self.theta)
+        return np.array([math.cos(t), math.sin(t)], dtype=float)
+
+    @property
+    def normal(self) -> np.ndarray:
+        """射线的单位法向量。"""
+        t = math.radians(self.theta)
+        return np.array([-math.sin(t), math.cos(t)], dtype=float)
+
+
+class Estimate(NamedTuple):
+    """单频道源的位置估计：坐标与位置 1σ 不确定度（米）。"""
+
+    x: float
+    y: float
+    sigma: float
+
+    @property
+    def point(self) -> np.ndarray:
+        return np.array([self.x, self.y], dtype=float)
+
+
+def ray_intersection(o1: Obs, o2: Obs) -> Optional[np.ndarray]:
+    """两条射线所在直线的交点；近共线（行列式≈0）时返回 None。"""
+    d1, d2 = o1.direction, o2.direction
+    cross = d1[0] * d2[1] - d1[1] * d2[0]
+    if abs(cross) < 1e-9:
+        return None
+    ex, ey = o2.x - o1.x, o2.y - o1.y
+    t = (ex * d2[1] - ey * d2[0]) / cross
+    return o1.point + t * d1
+
+
+def max_ray_sine(obs_list: Sequence[Obs]) -> float:
+    """所有射线两两夹角的正弦最大值：接近 0 表示近共线（无法定距）。"""
+    dirs = np.array([o.direction for o in obs_list])
+    cross = np.abs(dirs[:, None, 0] * dirs[None, :, 1] - dirs[:, None, 1] * dirs[None, :, 0])
+    return float(cross.max()) if len(dirs) > 1 else 0.0
+
+
+def position_sigma(cov: np.ndarray) -> float:
+    """位置 1σ 近似：协方差阵迹的平方根。"""
+    return float(math.sqrt(max(float(np.trace(cov)), 0.0)))
+
+
+def _pick(pop: np.ndarray, cost: np.ndarray, rng, k: int = 3) -> np.ndarray:
+    """锦标赛选择单个个体：抽 k 个候选，取代价最小者，返回副本。"""
+    idx = rng.integers(0, len(pop), size=k)
+    return pop[idx[int(np.argmin(cost[idx]))]].copy()
+
+
+def _tournament(pop: np.ndarray, cost: np.ndarray, rng, k: int = 3) -> np.ndarray:
+    """锦标赛选择整群（向量化）：每个子代抽 k 个候选，取代价最小者。"""
+    idx = rng.integers(0, len(pop), size=(len(pop), k))
+    winners = np.argmin(cost[idx], axis=1)
+    return pop[idx[np.arange(len(pop)), winners]].copy()
+
+
+# ----------------------------------------------------------------------------
+# 遗传算法一：测向定位（实数编码）
+# ----------------------------------------------------------------------------
+class GeneticLocalizer:
+    """极小化示向度残差的定位 GA。
+
+    适应度 = RMS 示向度残差(度)
+             + PENALTY_DIST   × Σ max(0, 观测点到源的距离 − 有效接收半径上界)
+             + PENALTY_REGION × max(0, |G| − 圆域半径)
+
+    后两项把"远处无信号"的区域排除掉，避免近共线时残差谷延伸到无穷远而不唯一。
+    """
+
+    PENALTY_DIST = 0.02
+    PENALTY_REGION = 0.02
+
+    def __init__(
+        self,
+        pop: int = GA_LOC_POP,
+        gens: int = GA_LOC_GENS,
+        pc: float = GA_LOC_PC,
+        pm: float = GA_LOC_PM,
+        domain: float = GA_LOC_DOMAIN,
+        seed: int = SEED,
+    ) -> None:
+        self.pop = pop
+        self.gens = gens
+        self.pc = pc
+        self.pm = pm
+        self.domain = domain
+        self.seed = seed
+
+    def _fitness(self, P: np.ndarray, S: np.ndarray, theta: np.ndarray) -> np.ndarray:
+        """整种群向量化适应度：P 形状 (n,2)，S/(theta) 为观测点与示向度。"""
+        dx = P[:, 0, None] - S[None, :, 0]
+        dy = P[:, 1, None] - S[None, :, 1]
+        d = np.hypot(dx, dy)
+        diff = (((np.degrees(np.arctan2(dy, dx))) - theta[None, :] + 180.0) % 360.0) - 180.0
+        rms = np.sqrt(np.mean(diff * diff, axis=1))
+        excess = np.maximum(d - MAX_RECEPTION, 0.0).sum(axis=1)
+        outside = np.maximum(np.hypot(P[:, 0], P[:, 1]) - REGION_RADIUS, 0.0)
+        return rms + self.PENALTY_DIST * excess + self.PENALTY_REGION * outside
+
+    @staticmethod
+    def _blx(A: np.ndarray, B: np.ndarray, rng, alpha: float = 0.30) -> Tuple[np.ndarray, np.ndarray]:
+        """BLX-α 交叉（整群向量化）：子代取自两父代区间外扩 alpha 倍的范围内。"""
+        lo, hi = np.minimum(A, B), np.maximum(A, B)
+        span = (hi - lo) * (1.0 + 2.0 * alpha)
+        return (lo - alpha * (hi - lo) + rng.random(A.shape) * span,
+                lo - alpha * (hi - lo) + rng.random(A.shape) * span)
+
+    def localize(self, obs_list: Sequence[Obs]) -> Optional[np.ndarray]:
+        """求该频道干扰源位置；少于 2 条射线时无法定距，返回 None。"""
+        m = len(obs_list)
+        if m < 2:
+            return None
+
+        S = np.array([o.point for o in obs_list])
+        theta = np.array([o.theta for o in obs_list])
+        rng = np.random.default_rng(self.seed)
+        n, dom = self.pop, self.domain
+
+        # 初始种群：射线两两交点 + 观测点质心作种子，其余随机撒点
+        seeds = [p for i in range(m) for j in range(i + 1, m)
+                 if (p := ray_intersection(obs_list[i], obs_list[j])) is not None][: n - 1]
+        seeds.append(S.mean(axis=0))
+        P = rng.uniform(-dom, dom, size=(n, 2))
+        P[: len(seeds)] = np.clip(np.array(seeds), -dom, dom)
+        cost = self._fitness(P, S, theta)
+
+        for gen in range(self.gens):
+            order = np.argsort(cost)
+            P, cost = P[order], cost[order]
+            sigma = 220.0 * (1.0 - gen / self.gens) + 25.0        # 变异强度随代数线性降温
+            A, B = _tournament(P, cost, rng), _tournament(P, cost, rng)
+            cross = (rng.random(len(A)) < self.pc)[:, None]
+            c1, c2 = self._blx(A, B, rng)
+            C = np.vstack((np.where(cross, c1, A), np.where(cross, c2, B)))
+            C += (rng.random(C.shape) < self.pm) * rng.normal(0.0, sigma, size=C.shape)
+            np.clip(C, -dom, dom, out=C)
+            P = np.vstack((P[0], P[1], C))[:n]                    # 精英保留：最优两个个体
+            cost = self._fitness(P, S, theta)
+            if cost[0] < 1e-4:
+                break
+
+        return P[int(cost.argmin())].copy()
+
+    @staticmethod
+    def covariance(obs_list: Sequence[Obs], G: Sequence[float]) -> np.ndarray:
+        """位置协方差近似：射线法向信息矩阵的逆（每条射线给出一个法向约束）。
+
+        权重 ∝ 1/(d·σ_θ)²，d 取 50 m 下限以免近距时权重爆炸；信息矩阵退化（近共线）时
+        返回大方差矩阵，交由调用方补测视角。
+        """
+        A = np.eye(2)
+        for o in obs_list:
+            d = max(float(np.linalg.norm(np.asarray(G, dtype=float) - o.point)), 50.0)
+            w = 1.0 / (d * math.radians(BEARING_ERROR_DEG)) ** 2
+            A += w * np.outer(o.normal, o.normal)
+        try:
+            return np.linalg.inv(A)
+        except np.linalg.LinAlgError:
+            return np.eye(2) * 1e6
+
+
+# ----------------------------------------------------------------------------
+# 遗传算法二：访问顺序（排列编码，开路径 TSP）
+# ----------------------------------------------------------------------------
+def _dist_matrix(pts: np.ndarray, start: Sequence[float]) -> np.ndarray:
+    """距离矩阵 D，形状 (n+1, n)：D[0, j] 为起点到点 j，D[1+i, j] 为点 i 到点 j。"""
+    nodes = np.vstack((np.asarray(start, dtype=float)[None, :], np.asarray(pts, dtype=float)))
+    pts = np.asarray(pts, dtype=float)
+    return np.linalg.norm(nodes[:, None, :] - pts[None, :, :], axis=2)
+
+
+def _path_len(order: Sequence[int], D: np.ndarray) -> float:
+    o = np.asarray(order, dtype=int)
+    return 0.0 if len(o) == 0 else float(D[0, o[0]] + D[1 + o[:-1], o[1:]].sum())
+
+
+def _path_len_vec(orders: np.ndarray, D: np.ndarray) -> np.ndarray:
+    """整种群路径长度（向量化），orders 形状 (pop, n)。"""
+    return D[0, orders[:, 0]] + D[1 + orders[:, :-1], orders[:, 1:]].sum(axis=1)
+
+
+def _nearest_order(n: int, D: np.ndarray) -> List[int]:
+    """最近邻构造初始个体（0 行代表起点）。"""
+    remaining, cur, order = list(range(n)), 0, []
+    while remaining:
+        j = min(remaining, key=lambda i: D[cur, i])
+        order.append(j)
+        cur = 1 + j
+        remaining.remove(j)
+    return order
+
+
+def _ox(p1: np.ndarray, p2: np.ndarray, rng) -> np.ndarray:
+    """顺序交叉（OX）：保留 p1 的一段，其余按 p2 的相对顺序补全。"""
+    n = len(p1)
+    a, b = sorted(rng.choice(n, 2, replace=False))
+    child = np.empty(n, dtype=int)
+    child[a:b + 1] = p1[a:b + 1]
+    used = set(p1[a:b + 1].tolist())
+    fill = (int(v) for v in p2 if int(v) not in used)
+    for i in list(range(a)) + list(range(b + 1, n)):
+        child[i] = next(fill)
+    return child
+
+
+def _mutate(order: np.ndarray, rng, pm: float) -> None:
+    """倒位变异（等价一次 2-opt 走子）与交换变异，各自以概率 pm 触发。"""
+    n = len(order)
+    if n < 2:
+        return
+    if rng.random() < pm:
+        i, j = sorted(rng.choice(n, 2, replace=False))
+        order[i:j + 1] = order[i:j + 1][::-1]
+    if rng.random() < pm:
+        i, j = rng.choice(n, 2, replace=False)
+        order[i], order[j] = order[j], order[i]
+
+
+def two_opt(order: Sequence[int], D: np.ndarray) -> List[int]:
+    """2-opt 精修（起点固定、终点自由的开路径），按增量代价翻转段，不重算整条路径。"""
+    order = [int(v) for v in order]
+
+    def d(a: int, b: int) -> float:
+        return float(D[0, b] if a < 0 else D[1 + a, b])       # a<0 表示起点
+
+    improved = True
+    while improved:
+        improved = False
+        for i in range(len(order) - 1):
+            prev = order[i - 1] if i else -1
+            for j in range(i + 1, len(order)):
+                nxt = order[j + 1] if j + 1 < len(order) else -1
+                old = d(prev, order[i]) + (0.0 if nxt < 0 else d(order[j], nxt))
+                new = d(prev, order[j]) + (0.0 if nxt < 0 else d(order[i], nxt))
+                if new < old - 1e-9:
+                    order[i:j + 1] = reversed(order[i:j + 1])
+                    improved = True
+                    break
+            if improved:
+                break
+    return order
+
+
+def route_ga(
+    pts: np.ndarray,
+    start: Sequence[float],
+    pop: int = GA_ROUTE_POP,
+    gens: int = GA_ROUTE_GENS,
+    pc: float = GA_ROUTE_PC,
+    pm: float = GA_ROUTE_PM,
+    seed: int = SEED,
+) -> List[int]:
+    """GA 求从 start 出发访问全部 pts 的近似最短开路径，返回访问顺序的下标。"""
+    n = len(pts)
+    if n == 0:
+        return []
+    if n == 1:
+        return [0]
+
+    pop = max(pop, 4)
+    rng = np.random.default_rng(seed)
+    D = _dist_matrix(pts, start)
+    # 初始种群：一个最近邻个体 + 若干随机排列
+    population = np.array([_nearest_order(n, D)] + [rng.permutation(n) for _ in range(pop - 1)])
+    cost = _path_len_vec(population, D)
+
+    for gen in range(gens):
+        order = np.argsort(cost)
+        population, cost = population[order], cost[order]
+        pm_gen = pm * (1.0 - 0.5 * gen / gens) + 1e-3
+        newpop = [population[0], population[1]]   # 精英保留
+        while len(newpop) < pop:
+            a, b = _pick(population, cost, rng), _pick(population, cost, rng)
+            if rng.random() < pc:
+                c1, c2 = _ox(a, b, rng), _ox(b, a, rng)
+            else:
+                c1, c2 = a, b
+            _mutate(c1, rng, pm_gen)
+            _mutate(c2, rng, pm_gen)
+            newpop.extend((c1, c2))
+        population = np.array(newpop[:pop])
+        cost = _path_len_vec(population, D)
+
+    best = population[int(cost.argmin())].tolist()
+    return two_opt(best, D)
+
+
+# ----------------------------------------------------------------------------
+# 覆盖路点：贪心集合覆盖（保证圆域内任意点都在某路点 COVER_RADIUS 内）
+# ----------------------------------------------------------------------------
+def _disk_grid(radius: float, step: float) -> np.ndarray:
+    ax = np.arange(-radius, radius + 1e-9, step)
+    gx, gy = np.meshgrid(ax, ax)
+    pts = np.stack((gx.ravel(), gy.ravel()), axis=1)
+    return pts[np.linalg.norm(pts, axis=1) <= radius + 1e-9]
+
+
+@lru_cache(maxsize=1)
+def covering_waypoints() -> np.ndarray:
+    """用尽量少的路点覆盖整个目标圆域（每轮取"新增覆盖目标点"最多的候选路点）。"""
+    targets = _disk_grid(REGION_RADIUS, COVER_GRID)
+    centers = _disk_grid(REGION_RADIUS, COVER_STEP)
+    reach = np.linalg.norm(centers[:, None, :] - targets[None, :, :], axis=2) <= COVER_RADIUS
+    covered = np.zeros(len(targets), dtype=bool)
+    chosen: List[np.ndarray] = []
+    while not covered.all():
+        gain = reach[:, ~covered].sum(axis=1)
+        k = int(gain.argmax())
+        if gain[k] == 0:
+            break
+        chosen.append(centers[k])
+        covered |= reach[k]
+    return np.array(chosen, dtype=float)
+
+
+# ----------------------------------------------------------------------------
+# 机器狗策略
+# ----------------------------------------------------------------------------
+class RobotDog:
+    """覆盖观测 → GA 定位 → GA 规划路线逐个清除。"""
+
+    def __init__(self, sim, verbose: bool = True,
+                 logfile: Optional[str] = None, seed: int = SEED) -> None:
+        self.sim = sim
+        self.verbose = verbose
+        self._logfile = open(logfile, "a", encoding="utf-8") if logfile else None
+        self.obs: Dict[int, List[Obs]] = defaultdict(list)
+        self.cleared: set = set()
+        self.pos = np.zeros(2)
+        self.vt = 0.0
+        self.n_measure = 0
+        self.n_clear = 0
+        self.deadline = float("inf")
+        self.localizer = GeneticLocalizer(seed=seed)
+        self._rng = np.random.default_rng(seed)
+
+    # ---- 日志 ----
+    def log(self, msg: str) -> None:
+        if self.verbose:
+            print(msg, flush=True)
+        if self._logfile:
+            print(msg, file=self._logfile, flush=True)
+
+    def close(self) -> None:
+        if self._logfile:
+            self._logfile.close()
+
+    # ---- 原子动作 ----
+    def measure(self, x: float, y: float, channel: int) -> dict:
+        """测向；返回原始响应，direction 时自动记录示向度。"""
+        r = self.sim.measure(float(x), float(y), channel)
+        if not r.get("accepted"):
+            raise RuntimeError(f"/measure 被拒绝：{r}")
+        self.pos, self.vt = np.array([float(x), float(y)]), float(r["virtual_time_s"])
+        self.n_measure += 1
+        if r.get("measure_result") == "direction":
+            self.obs[channel].append(Obs(channel, float(x), float(y), float(r["svd_deg"])))
+        return r
+
+    def clear(self, x: float, y: float, channel: int) -> bool:
+        """清除；返回是否成功。"""
+        r = self.sim.clear(float(x), float(y), channel)
+        if not r.get("accepted"):
+            raise RuntimeError(f"/clear 被拒绝：{r}")
+        self.pos, self.vt = np.array([float(x), float(y)]), float(r["virtual_time_s"])
+        self.n_clear += 1
+        ok = r.get("clear_result") == "success"
+        if ok:
+            self.cleared.add(channel)
+        return ok
+
+    def _out_of_time(self) -> bool:
+        return time.monotonic() > self.deadline
+
+    def _plan_route(self, pts: np.ndarray) -> List[int]:
+        """用路线 GA 规划从当前位置出发访问 pts 的顺序。"""
+        return route_ga(pts, self.pos, seed=int(self._rng.integers(1 << 31)))
+
+    def _sweep(self, channels: Sequence[int], at: Sequence[float]) -> Dict[str, int]:
+        """在 at 处逐频道测向（按频道号升序以减少切换）；近距则就地清除。"""
+        counts = {"direction": 0, "near": 0, "no_signal": 0}
+        for ch in sorted(channels):
+            if self._out_of_time():
+                break
+            res = self.measure(at[0], at[1], ch).get("measure_result", "no_signal")
+            counts[res] = counts.get(res, 0) + 1
+            if res == "near" and self.clear(at[0], at[1], ch):
+                self.log(f"    [near] 频道{ch} 距离过近，就地清除成功")
+        return counts
+
+    def _probe(self, channel: int, candidates: Sequence[Sequence[float]]) -> bool:
+        """依次在候选点测向：取到 direction 或就地清除后即停；返回是否新增示向度。"""
+        for x, y in candidates:
+            if self._out_of_time():
+                return False
+            if max(abs(x), abs(y)) > COORD_LIMIT:      # 超出协议允许的坐标范围
+                continue
+            res = self.measure(x, y, channel).get("measure_result", "no_signal")
+            if res == "direction":
+                return True
+            if res == "near":
+                self.clear(x, y, channel)
+                return False
+        return False
+
+    def _estimate(self, channel: int) -> Optional[Estimate]:
+        """定位 GA 求解该频道源位置，并给出位置 1σ。"""
+        ol = self.obs.get(channel, ())
+        if len(ol) < 2:
+            return None
+        G = self.localizer.localize(ol)
+        if G is None:
+            return None
+        return Estimate(float(G[0]), float(G[1]),
+                        position_sigma(GeneticLocalizer.covariance(ol, G)))
+
+    @staticmethod
+    def _residual(G: Sequence[float], obs_list: Sequence[Obs]) -> float:
+        return float(np.sqrt(np.mean([ang_diff(bearing((o.x, o.y), G), o.theta) ** 2
+                                       for o in obs_list])))
+
+    # ---- 阶段 1：起点完整扫描 ----
+    def _initial_scan(self) -> None:
+        self.log(f"阶段1：起点完整扫描全部 {len(CHANNELS)} 个频道 @ "
+                 f"({self.pos[0]:.0f}, {self.pos[1]:.0f})")
+        counts = self._sweep(CHANNELS, self.pos)
+        self.log(f"  有示向度 {counts['direction']} 个 {sorted(self.obs)}，"
+                 f"近距清除 {counts['near']} 个，无信号 {counts['no_signal']} 个")
+
+    # ---- 阶段 2：覆盖观测 ----
+    def _coverage_survey(self) -> None:
+        waypoints = covering_waypoints()
+        route = waypoints[self._plan_route(waypoints)]
+        self.log(f"阶段2：覆盖观测，{len(route)} 个路点（GA 定序，覆盖半径 {COVER_RADIUS:.0f} m）")
+        for wp in route:
+            active = [c for c in CHANNELS if c not in self.cleared
+                      and len(self.obs.get(c, ())) < OBS_PER_SOURCE]
+            if not active or self._out_of_time():
+                break
+            self._sweep(active, wp)
+        self.log(f"  观测结束，已探测频道 {len(self.obs)} 个")
+
+    # ---- 阶段 3：定位 ----
+    def _single_candidates(self, channel: int) -> List[Tuple[float, float]]:
+        """单射线补测点：沿示向度前移并带侧偏，保证仍在接收范围内且拉开交会角。"""
+        o = self.obs[channel][0]
+        return [(o.x + t * math.cos(math.radians(o.theta + s * beta)),
+                 o.y + t * math.sin(math.radians(o.theta + s * beta)))
+                for t, beta in SINGLE_PROBES for s in (1.0, -1.0)]
+
+    def _perp_candidates(self, channel: int, e: Estimate) -> List[Tuple[float, float]]:
+        """几何病态时的补测点：沿"良态方向"外移。
+
+        近共线时取公共直线的法向（新射线与原直线相交即可定距）；否则取位置协方差最小
+        特征值方向，即当前最不确定的方向。
+        """
+        ol = self.obs[channel]
+        if max_ray_sine(ol) < GEOM_SIN_MIN:
+            t2 = 2.0 * np.radians([o.theta for o in ol])
+            orient = 0.5 * math.atan2(float(np.sin(t2).mean()), float(np.cos(t2).mean()))
+            nx, ny = -math.sin(orient), math.cos(orient)
+        else:
+            _, vecs = np.linalg.eigh(GeneticLocalizer.covariance(ol, e.point))
+            nx, ny = float(vecs[0, 0]), float(vecs[1, 0])
+        return [(e.x + r * nx, e.y + r * ny) for r in PERP_STEPS]
+
+    def _resolve_singles(self) -> None:
+        """对只有单条射线、无法定距的频道补测第二视角。"""
+        singles = [c for c in sorted(self.obs) if c not in self.cleared and len(self.obs[c]) == 1]
+        if not singles:
+            return
+        self.log(f"阶段3a：单射线频道补测第二视角 {singles}")
+        for c in singles:
+            self._probe(c, self._single_candidates(c))
+
+    def _fix_geometry(self, channel: int) -> bool:
+        """交会几何病态时补测垂直视角，最多 3 轮；返回是否有补测。"""
+        probed = False
+        for _ in range(3):
+            e = self._estimate(channel)
+            ol = self.obs.get(channel, ())
+            if e is None or len(ol) < 2:
+                return probed
+            if e.sigma <= GEOM_SIGMA and max_ray_sine(ol) >= GEOM_SIN_MIN:
+                return probed
+            if not self._probe(channel, self._perp_candidates(channel, e)):
+                return probed
+            probed = True
+        return probed
+
+    def localize_all(self) -> Dict[int, Estimate]:
+        """对每个已积累足够示向度的频道跑定位 GA，并修掉病态几何。"""
+        self._resolve_singles()
+        est: Dict[int, Estimate] = {}
+        for c in sorted(self.obs):
+            if c in self.cleared:
+                continue
+            e = self._estimate(c)
+            if e is None:
+                continue
+            if e.sigma > GEOM_SIGMA or max_ray_sine(self.obs[c]) < GEOM_SIN_MIN:
+                if self._fix_geometry(c):
+                    e = self._estimate(c) or e
+            est[c] = e
+        if est:
+            rms = float(np.mean([self._residual(e.point, self.obs[c]) for c, e in est.items()]))
+            self.log(f"阶段3：GA 定位 {len(est)} 个源，示向度残差 RMS = {rms:.2f}°")
+        return est
+
+    # ---- 阶段 4：清除 ----
+    def _home_and_clear(self, channel: int, est: Dict[int, Estimate]) -> None:
+        """靠近并清除：先按定位解 /clear，未成功则沿最新实测示向度逐步逼近。
+
+        示向度误差是"同一地点固定"的系统误差，仅靠多视角交会存在沿射线方向的偏移；
+        靠近后直接沿最新示向度走一步（16 m 步长的横向误差约 0.3 m）即可稳定进入清除半径。
+        """
+        for _ in range(HOMING_MAX):
+            e = est.get(channel)
+            if e is None or self._out_of_time():
+                return
+            if self.clear(e.x, e.y, channel):
+                self.log(f"    [清除] 频道{channel} 成功 @ ({e.x:.0f}, {e.y:.0f})")
+                return
+            r = self.measure(e.x, e.y, channel)
+            res = r.get("measure_result")
+            if res == "near":
+                if self.clear(e.x, e.y, channel):
+                    self.log(f"    [清除] 频道{channel} 近距命中")
+                return
+            if res == "direction":
+                th = math.radians(float(r["svd_deg"]))
+                est[channel] = Estimate(e.x + HOMING_STEP * math.cos(th),
+                                        e.y + HOMING_STEP * math.sin(th), e.sigma)
+                continue
+            # no_signal：定位偏了，用新示向度重新定位；仍不行则补测视角
+            ne = self._estimate(channel)
+            if ne is None or dist(ne.point, e.point) <= 3.0:
+                if len(self.obs[channel]) == 1:
+                    self._probe(channel, self._single_candidates(channel))
+                ne = self._estimate(channel)
+            if ne is not None:
+                est[channel] = ne
+        self.log(f"    [警告] 频道{channel} 逼近 {HOMING_MAX} 次仍未能清除")
+
+    def _clear_all(self, est: Dict[int, Estimate]) -> None:
+        todo = [c for c in sorted(est) if c not in self.cleared]
+        if not todo:
+            return
+        pts = np.array([est[c].point for c in todo])
+        order = self._plan_route(pts)
+        D = _dist_matrix(pts, self.pos)
+        self.log(f"阶段4：GA 规划 {len(todo)} 个源的清除顺序，路程 {_path_len(order, D):.0f} m")
+        for k, i in enumerate(order):
+            if self._out_of_time():
+                self.log(f"    [警告] 现实时间不足，剩余 {len(order) - k} 个源未处理")
+                return
+            self._home_and_clear(todo[i], est)
+
+    # ---- 主流程 ----
+    def run(self) -> Dict[str, float]:
+        self.log("=" * 74)
+        self.log("策略：遗传算法（定位 GA + 路线 GA）")
+        enter = self.sim.enter()
+        if not enter.get("accepted"):
+            raise RuntimeError(f"/enter 被拒绝：{enter}")
+        left = float(enter.get("remaining_real_duration_s", 1200.0))
+        self.deadline = time.monotonic() + max(left - SAFETY_MARGIN, 0.0)
+        self.log(f"/enter 成功：虚拟时刻 {enter.get('virtual_time_s')} s，现实剩余 {left:.0f} s")
+
+        try:
+            self._initial_scan()
+            self._coverage_survey()
+            self._clear_all(self.localize_all())
+        finally:
+            try:
+                self.sim.exit()                     # 无论成功与否都要正常退出，保住测试记录
+            except OSError as exc:
+                self.log(f"    [警告] /exit 失败：{exc}")
+
+        n = len(self.cleared)
+        return {
+            "cleared": n,
+            "total_time_s": self.vt,
+            "avg_time_s": self.vt / n if n else float("inf"),
+            "n_measure": self.n_measure,
+            "n_clear": self.n_clear,
+        }
+
+
+# ----------------------------------------------------------------------------
+# 本地演练场：拉起 jammers-py 并用其控制台 REST 开固定场景的一局
+# ----------------------------------------------------------------------------
+def _free_port(preferred: int) -> int:
+    """取一个可用端口：优先 preferred，被占用则依次向后试 20 个。"""
+    for port in range(preferred, preferred + 20):
+        with socket.socket() as s:
+            if s.connect_ex(("127.0.0.1", port)) != 0:      # 无进程监听
+                return port
+    raise RuntimeError(f"端口 {preferred}~{preferred + 19} 都被占用")
+
+
+class PracticeArena:
+    """本地演练用的 jammers-py 模拟器：自动拉起进程（或复用已在运行的实例）+ 控制台 REST。"""
+
+    REUSE_PORTS = (8090, 8080)      # 探测已有 jammers-py 的控制台端口（8080 为其默认端口）
+
+    def __init__(self, jammers_dir: Path, robot_id: str, robot_port: int = 2026,
+                 console_port: int = 8090, countdown: int = 1) -> None:
+        self.jammers_dir = Path(jammers_dir).resolve()
+        self.robot_id = robot_id
+        self.robot_port = robot_port
+        self.console_port = console_port
+        self.countdown = countdown
+        self.robot_url = f"http://127.0.0.1:{robot_port}"
+        self.console_url = f"http://127.0.0.1:{console_port}"
+        self._proc: Optional[subprocess.Popen] = None
+
+    # ---- 生命周期 ----
+    def __enter__(self) -> "PracticeArena":
+        existing = self._find_existing()
+        if existing is not None:
+            self.console_url, state = existing
+            # 复用已在运行的 jammers-py：机器狗接口以它的实际配置为准
+            self.robot_port = int(state.get("config", {}).get("robot_port", self.robot_port))
+            self.robot_url = f"http://127.0.0.1:{self.robot_port}"
+            print(f"检测到已在运行的 jammers-py（控制台 {self.console_url}），"
+                  f"直接复用，退出时不关闭它")
+            return self
+
+        run_py = self.jammers_dir / "run.py"
+        if not run_py.exists():
+            raise FileNotFoundError(f"未找到 jammers-py 模拟器：{run_py}（用 --jammers-dir 指定）")
+        self.console_port = _free_port(self.console_port)
+        self.console_url = f"http://127.0.0.1:{self.console_port}"
+        self._proc = subprocess.Popen(
+            [sys.executable, str(run_py),
+             "--robot-port", str(self.robot_port), "--web-port", str(self.console_port),
+             "--countdown", str(self.countdown), "--team", self.robot_id],
+            cwd=str(self.jammers_dir), stdout=subprocess.DEVNULL)
+        deadline = time.monotonic() + 15.0
+        while time.monotonic() < deadline:
+            if self._state(self.console_url) is not None:
+                return self
+            if self._proc.poll() is not None:
+                raise RuntimeError(f"jammers-py 启动失败：机器狗接口 {self.robot_port} 或控制台 "
+                                   f"{self.console_port} 端口被占用")
+            time.sleep(0.2)
+        raise TimeoutError("等待 jammers-py 控制台就绪超时")
+
+    def __exit__(self, *exc) -> bool:
+        self.close()
+        return False
+
+    def close(self) -> None:
+        if self._proc is None:
+            return
+        self._proc.terminate()
+        try:
+            self._proc.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            self._proc.kill()
+            self._proc.wait()
+        self._proc = None
+
+    # ---- 控制台 REST ----
+    def _request(self, path: str, payload: Optional[dict] = None,
+                 base: Optional[str] = None, post: bool = False) -> dict:
+        data = None if payload is None else json.dumps(payload).encode("utf-8")
+        req = urllib.request.Request((base or self.console_url) + path, data=data,
+                                     headers={"Content-Type": "application/json"},
+                                     method="POST" if post or payload is not None else "GET")
+        with urllib.request.urlopen(req, timeout=10.0) as resp:
+            return json.loads(resp.read().decode("utf-8"))
+
+    def _state(self, base: str) -> Optional[dict]:
+        """读取控制台状态；该地址不是 jammers-py 或未启动时返回 None。"""
+        try:
+            state = self._request("/api/state", base=base)
+            return state if "state" in state else None
+        except Exception:
+            return None
+
+    def _find_existing(self) -> Optional[Tuple[str, dict]]:
+        """探测是否已有 jammers-py 在运行（端口按常驻优先顺序）。"""
+        for port in dict.fromkeys((self.console_port, *self.REUSE_PORTS)):
+            base = f"http://127.0.0.1:{port}"
+            state = self._state(base)
+            if state is not None:
+                return base, state
+        return None
+
+    def _wait_state(self, target: str, timeout: float = 30.0) -> None:
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            state = self._request("/api/state").get("state")
+            if state == target:
+                return
+            if state == "finished":
+                raise RuntimeError(f"演练局提前结束（期望状态 {target}）")
+            time.sleep(0.2)
+        raise TimeoutError(f"等待状态 {target} 超时")
+
+    # ---- 一局演练 ----
+    def start_episode(self, seed: Optional[int] = None) -> List[dict]:
+        """按种子生成固定场景并开一局，等接口开放后返回干扰源真值。"""
+        scenario = self._request("/api/scenario",
+                                 {"problem_no": 3, "seed": seed})["scenario"]
+        self._request("/api/start", {"problem_no": 3, "scenario": scenario})
+        self._wait_state("window_open")
+        return scenario["jammers"]
+
+    def finish_episode(self) -> dict:
+        """收掉本局并返回模拟器引擎统计（真值清除数、虚拟时刻、检测次数）。"""
+        snap = self._request("/api/state")
+        engine = snap.get("engine") or {}
+        if snap.get("state") != "finished":
+            self._request("/api/abort", post=True)
+        self._request("/api/clear", post=True)
+        return engine
+
+
+# ----------------------------------------------------------------------------
+# 主程序
+# ----------------------------------------------------------------------------
+def run_official(args: argparse.Namespace) -> int:
+    sim = sim_api.Simulator(robot_id=args.robot_id, base_url=args.base_url, timeout=args.timeout)
+    print(f"连接模拟器 {args.base_url}（robot_id={args.robot_id}）")
+    dog = RobotDog(sim, verbose=not args.quiet, logfile=args.log, seed=args.seed)
+    try:
+        stats = dog.run()
+    finally:
+        dog.close()
+    print(f"完成：清除 {stats['cleared']} 个，虚拟总时间 {stats['total_time_s']:.1f} s，"
+          f"平均 {stats['avg_time_s']:.1f} s/个，测向 {stats['n_measure']} 次，"
+          f"清除动作 {stats['n_clear']} 次")
+    return 0
+
+
+def run_practice(args: argparse.Namespace) -> int:
+    """本地演练：自动拉起 jammers-py，跑 N 局固定场景（同种子可比），汇总统计。"""
+    jammers_dir = Path(args.jammers_dir) if args.jammers_dir else Path(__file__).parent / "jammers-py"
+    rows: List[dict] = []
+    with PracticeArena(jammers_dir, robot_id=args.robot_id,
+                       console_port=args.console_port) as arena:
+        print(f"jammers-py 已就绪：机器狗接口 {arena.robot_url}，控制台 {arena.console_url}")
+        for ep in range(args.practice):
+            seed = args.seed + ep
+            truth = arena.start_episode(seed)
+            print(f"\n----- 演练第 {ep + 1}/{args.practice} 局（seed={seed}，"
+                  f"干扰源 {len(truth)} 个）-----")
+            dog = RobotDog(sim_api.Simulator(robot_id=args.robot_id, base_url=arena.robot_url,
+                                             timeout=args.timeout),
+                           verbose=not args.quiet, logfile=args.log, seed=seed)
+            try:
+                stats = dog.run()
+            finally:
+                dog.close()
+            engine = arena.finish_episode()
+            n_cleared = int(engine.get("cleared_jammer_count", stats["cleared"]))
+            total_time = float(engine.get("virtual_time_s", stats["total_time_s"]))
+            rows.append({
+                "seed": seed, "n": len(truth), "cleared": n_cleared,
+                "ratio": n_cleared / len(truth) if truth else 0.0,
+                "total_time_s": total_time,
+                "avg_time_s": total_time / n_cleared if n_cleared else float("inf"),
+                "n_measure": int(engine.get("measure_accepted_count", stats["n_measure"])),
+            })
+            r = rows[-1]
+            print(f"本局：清除 {r['cleared']}/{r['n']}（{r['ratio']:.3f}），"
+                  f"虚拟总时间 {r['total_time_s']:.1f} s，平均 {r['avg_time_s']:.1f} s/个，"
+                  f"测向 {r['n_measure']} 次")
+    print("\n" + "=" * 74)
+    print(f"汇总（{len(rows)} 局）：平均清除比例 {np.mean([r['ratio'] for r in rows]):.4f}，"
+          f"平均 {np.mean([r['avg_time_s'] for r in rows]):.1f} s/个，"
+          f"平均虚拟总时间 {np.mean([r['total_time_s'] for r in rows]):.1f} s")
+    print("逐局：" + "  ".join(f"seed{r['seed']}={r['cleared']}/{r['n']}" for r in rows))
+    print("=" * 74)
+    return 0
+
+
+def build_parser() -> argparse.ArgumentParser:
+    p = argparse.ArgumentParser(
+        description="2026 CUMCM B 题问题三：遗传算法机器狗自动定位与清除")
+    p.add_argument("--robot-id", default=sim_api.ROBOT_ID, help="参赛队号（须与模拟器一致）")
+    p.add_argument("--base-url", default=sim_api.BASE_URL, help="官方模拟器地址")
+    p.add_argument("--timeout", type=float, default=5.0, help="HTTP 超时 / s")
+    p.add_argument("--practice", type=int, nargs="?", const=1, default=0,
+                   help="本地演练局数：自动拉起 jammers-py 跑 N 局（缺省 1 局）")
+    p.add_argument("--jammers-dir", default=None, help="jammers-py 目录（缺省为本脚本旁的 jammers-py/）")
+    p.add_argument("--console-port", type=int, default=8090,
+                   help="演练时 jammers-py 控制台端口（缺省 8090，被占用则自动顺延）")
+    p.add_argument("--seed", type=int, default=0, help="随机种子（演练场景与 GA）")
+    p.add_argument("--log", default=None, help="过程日志文件（追加写入）")
+    p.add_argument("--quiet", action="store_true", help="只输出汇总，不打印过程")
+    return p
+
+
+def main(argv: Optional[Sequence[str]] = None) -> int:
+    args = build_parser().parse_args(argv)
+    print("=" * 74)
+    print("2026 CUMCM B 题 · 问题三：遗传算法自动定位与清除")
+    print("=" * 74)
+    try:
+        return run_practice(args) if args.practice else run_official(args)
+    except KeyboardInterrupt:
+        print("\n已中断")
+        return 130
+    except OSError as exc:      # 连接被拒/超时：多半是模拟器没启动或测试窗口未开放
+        print(f"连接模拟器失败：{exc}", file=sys.stderr)
+        print("请确认模拟器已启动并处于测试窗口内（默认地址 http://127.0.0.1:2026）。",
+              file=sys.stderr)
+        return 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

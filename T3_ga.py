@@ -3,16 +3,17 @@
 """T3_ga.py —— 2026 全国大学生数学建模竞赛 B 题 · 问题三
 机器狗自动定位并清除无线电干扰源（遗传算法求解）
 
-策略（三个阶段，定位与路线全用遗传算法）
+策略（四个阶段，定位与路线全用遗传算法）
 ======================================
-1. 覆盖观测：贪心集合覆盖挑出尽量少的路点，使半径 1800 m 圆域内任意点都落在某个路点
+1. 起点扫描：在原点对全部 20 个频道测向，先拿到一批示向度。
+2. 覆盖观测：贪心集合覆盖挑出尽量少的路点，使半径 1800 m 圆域内任意点都落在某个路点
    950 m 内（< 有效接收半径下界 1000 m），再用路线 GA 定序依次访问；每个路点对尚未
    确认的频道测向。既不漏源，又天然形成多视角交会。
-2. 测向定位（实数编码 GA）：个体是干扰源位置 (x, y)，适应度为示向度残差 RMS（度）+
-   越界惩罚（距离超过有效接收半径上界、位置越出圆域）；初始种子用射线两两交点加速收敛。
-   若交会几何病态（位置 1σ 过大或射线近共线），或某频道只有单条射线，则补测"垂直视角"。
-3. 定点清除：路线 GA 规划已定位源的访问顺序，逐个靠近后先 /clear；未成功则沿最新实测
-   示向度以 16 m 步长末端逼近（±1° 的横向偏差约 0.3 m），直到返回 success。
+3. GA 定位：个体是干扰源位置 (x, y)，适应度为示向度残差 RMS（度）+ 越界惩罚（距离超过
+   有效接收半径上界、位置越出圆域）；初始种子用射线两两交点加速收敛。若交会几何病态
+   （位置 1σ 过大或射线近共线），或某频道只有单条射线，则补测"垂直视角"。
+4. GA 规划清除：路线 GA 规划已定位源的访问顺序，逐个靠近后先 /clear；未成功则沿最新
+   实测示向度以 16 m 步长末端逼近（±1° 的横向偏差约 0.3 m），直到返回 success。
 
 运行
 ====
@@ -20,6 +21,7 @@
     python T3_ga.py --robot-id 202614023005
 
     # 本地演练（= GA 训练）：自动拉起同目录 jammers-py 模拟器，跑 5 局固定场景并汇总
+    # 同一 --seed 完全可复现（场景布局与示向度噪声都由 seed 决定）
     python T3_ga.py --practice 5 --seed 100
 
 训练结果落盘
@@ -40,6 +42,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import hashlib
 import json
 import math
 import socket
@@ -48,7 +51,7 @@ import sys
 import time
 import urllib.request
 from collections import defaultdict
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from functools import lru_cache
 from pathlib import Path
 from typing import Any, Dict, List, NamedTuple, Optional, Sequence, Tuple
@@ -79,22 +82,26 @@ HOMING_STEP = 16.0              # 末端沿示向度逼近的步长 / m
 HOMING_MAX = 24                 # 末端逼近最大迭代次数
 SAFETY_MARGIN = 30.0            # 现实时限预留余量 / s
 
-# 定位 GA（实数编码）
-GA_LOC_POP = 80
-GA_LOC_GENS = 150
-GA_LOC_PC = 0.90
-GA_LOC_PM = 0.35
-GA_LOC_DOMAIN = 2200.0
-# 路线 GA（排列编码，开路径 TSP）
-GA_ROUTE_POP = 100
-GA_ROUTE_GENS = 300
-GA_ROUTE_PC = 0.90
-GA_ROUTE_PM = 0.35
-GA_RECORD_STRIDE = 5            # 训练记录抽稀步长：每多少代记一个收敛点
-
 SEED = 2026
 
 RESULTS_DIR = "results"         # 训练结果输出目录（可用 --save-dir 改）
+
+
+@dataclass(frozen=True)
+class GAParams:
+    """GA 超参数：只在这里定义一次，GA 实例与训练记录的 meta 共用，避免两处不同步。"""
+
+    pop: int
+    gens: int
+    pc: float
+    pm: float
+
+
+GA_LOC = GAParams(pop=80, gens=150, pc=0.90, pm=0.35)       # 定位 GA（实数编码）
+GA_ROUTE = GAParams(pop=100, gens=300, pc=0.90, pm=0.35)    # 路线 GA（排列编码，开路径 TSP）
+GA_LOC_DOMAIN = 2200.0          # 定位 GA 个体取值半径 / m
+GA_RECORD_STRIDE = 5            # 训练记录抽稀步长：每多少代记一个收敛点
+CONVERGED_FITNESS = 1e-4        # 定位 GA 提前收敛的适应度阈值
 
 
 # ----------------------------------------------------------------------------
@@ -165,9 +172,12 @@ def ray_intersection(o1: Obs, o2: Obs) -> Optional[np.ndarray]:
 
 def max_ray_sine(obs_list: Sequence[Obs]) -> float:
     """所有射线两两夹角的正弦最大值：接近 0 表示近共线（无法定距）。"""
-    dirs = np.array([o.direction for o in obs_list])
+    if len(obs_list) < 2:
+        return 0.0
+    t = np.radians([o.theta for o in obs_list])
+    dirs = np.stack((np.cos(t), np.sin(t)), axis=1)
     cross = np.abs(dirs[:, None, 0] * dirs[None, :, 1] - dirs[:, None, 1] * dirs[None, :, 0])
-    return float(cross.max()) if len(dirs) > 1 else 0.0
+    return float(cross.max())
 
 
 def position_sigma(cov: np.ndarray) -> float:
@@ -175,20 +185,29 @@ def position_sigma(cov: np.ndarray) -> float:
     return float(math.sqrt(max(float(np.trace(cov)), 0.0)))
 
 
+def _split_runs(ga_runs: Sequence[dict]) -> Tuple[List[dict], List[dict]]:
+    """把训练记录按 GA 类型拆成（定位 GA 记录, 路线 GA 记录）。"""
+    return ([r for r in ga_runs if r["ga"] == "localize"],
+            [r for r in ga_runs if r["ga"] == "route"])
+
+
+# ----------------------------------------------------------------------------
+# GA 通用算子（两个 GA 共用）
+# ----------------------------------------------------------------------------
 def _record(record: Optional[List[List[float]]], gen: int, cost: np.ndarray) -> None:
-    """把一个种群代次的最优/平均/标准差适应度追加进训练记录。"""
+    """把一个种群代次的最优/平均/标准差适应度追加进训练记录（record 为 None 时不做）。"""
     if record is not None:
         record.append([gen, float(cost.min()), float(cost.mean()), float(cost.std())])
 
 
 def _pick(pop: np.ndarray, cost: np.ndarray, rng, k: int = 3) -> np.ndarray:
-    """锦标赛选择单个个体：抽 k 个候选，取代价最小者，返回副本。"""
+    """锦标赛选择单个个体（排列编码用）：抽 k 个候选，取代价最小者，返回副本。"""
     idx = rng.integers(0, len(pop), size=k)
     return pop[idx[int(np.argmin(cost[idx]))]].copy()
 
 
 def _tournament(pop: np.ndarray, cost: np.ndarray, rng, k: int = 3) -> np.ndarray:
-    """锦标赛选择整群（向量化）：每个子代抽 k 个候选，取代价最小者。"""
+    """锦标赛选择整群（实数编码用，向量化）：每个子代抽 k 个候选，取代价最小者。"""
     idx = rng.integers(0, len(pop), size=(len(pop), k))
     winners = np.argmin(cost[idx], axis=1)
     return pop[idx[np.arange(len(pop)), winners]].copy()
@@ -210,19 +229,9 @@ class GeneticLocalizer:
     PENALTY_DIST = 0.02
     PENALTY_REGION = 0.02
 
-    def __init__(
-        self,
-        pop: int = GA_LOC_POP,
-        gens: int = GA_LOC_GENS,
-        pc: float = GA_LOC_PC,
-        pm: float = GA_LOC_PM,
-        domain: float = GA_LOC_DOMAIN,
-        seed: int = SEED,
-    ) -> None:
-        self.pop = pop
-        self.gens = gens
-        self.pc = pc
-        self.pm = pm
+    def __init__(self, params: GAParams = GA_LOC, domain: float = GA_LOC_DOMAIN,
+                 seed: int = SEED) -> None:
+        self.pop, self.gens, self.pc, self.pm = params.pop, params.gens, params.pc, params.pm
         self.domain = domain
         self.seed = seed
 
@@ -231,7 +240,7 @@ class GeneticLocalizer:
         dx = P[:, 0, None] - S[None, :, 0]
         dy = P[:, 1, None] - S[None, :, 1]
         d = np.hypot(dx, dy)
-        diff = (((np.degrees(np.arctan2(dy, dx))) - theta[None, :] + 180.0) % 360.0) - 180.0
+        diff = ((np.degrees(np.arctan2(dy, dx)) - theta[None, :] + 180.0) % 360.0) - 180.0
         rms = np.sqrt(np.mean(diff * diff, axis=1))
         excess = np.maximum(d - MAX_RECEPTION, 0.0).sum(axis=1)
         outside = np.maximum(np.hypot(P[:, 0], P[:, 1]) - REGION_RADIUS, 0.0)
@@ -282,7 +291,7 @@ class GeneticLocalizer:
             np.clip(C, -dom, dom, out=C)
             P = np.vstack((P[0], P[1], C))[:n]                    # 精英保留：最优两个个体
             cost = self._fitness(P, S, theta)
-            converged = bool(cost[0] < 1e-4)
+            converged = bool(cost[0] < CONVERGED_FITNESS)
             if converged or gen % GA_RECORD_STRIDE == 0 or gen == self.gens - 1:
                 _record(record, gen + 1, cost)
             if converged:
@@ -393,10 +402,7 @@ def two_opt(order: Sequence[int], D: np.ndarray) -> List[int]:
 def route_ga(
     pts: np.ndarray,
     start: Sequence[float],
-    pop: int = GA_ROUTE_POP,
-    gens: int = GA_ROUTE_GENS,
-    pc: float = GA_ROUTE_PC,
-    pm: float = GA_ROUTE_PM,
+    params: GAParams = GA_ROUTE,
     seed: int = SEED,
     record: Optional[List[List[float]]] = None,
 ) -> List[int]:
@@ -410,7 +416,8 @@ def route_ga(
     if n == 1:
         return [0]
 
-    pop = max(pop, 4)
+    pop, gens, pc, pm = params.pop, params.gens, params.pc, params.pm
+    pop = max(pop, 4)                       # 至少留 2 个精英 + 1 对子代
     rng = np.random.default_rng(seed)
     D = _dist_matrix(pts, start)
     # 初始种群：一个最近邻个体 + 若干随机排列
@@ -475,8 +482,8 @@ def covering_waypoints() -> np.ndarray:
 class RobotDog:
     """覆盖观测 → GA 定位 → GA 规划路线逐个清除。"""
 
-    def __init__(self, sim, verbose: bool = True,
-                 logfile: Optional[str] = None, seed: int = SEED) -> None:
+    def __init__(self, sim, verbose: bool = True, logfile: Optional[str] = None,
+                 seed: int = SEED, episode: int = 0) -> None:
         self.sim = sim
         self.verbose = verbose
         self._logfile = open(logfile, "a", encoding="utf-8") if logfile else None
@@ -489,7 +496,7 @@ class RobotDog:
         self.deadline = float("inf")
         self.localizer = GeneticLocalizer(seed=seed)
         self._rng = np.random.default_rng(seed)
-        self.episode = 0            # 局号（由演练循环写入，用于训练记录分组）
+        self.episode = episode      # 局号（用于训练记录分组）
         self.ga_runs: List[Dict[str, Any]] = []     # GA 训练记录（逐次调用一条）
         self.final_est: Dict[int, Estimate] = {}    # 本局各频道的最终定位解
 
@@ -501,8 +508,10 @@ class RobotDog:
             print(msg, file=self._logfile, flush=True)
 
     def close(self) -> None:
+        """关闭日志文件（幂等；run() 已在 finally 中调用）。"""
         if self._logfile:
             self._logfile.close()
+            self._logfile = None
 
     # ---- 原子动作 ----
     def measure(self, x: float, y: float, channel: int) -> dict:
@@ -531,22 +540,23 @@ class RobotDog:
     def _out_of_time(self) -> bool:
         return time.monotonic() > self.deadline
 
-    def _plan_route(self, pts: np.ndarray, label: str) -> List[int]:
-        """用路线 GA 规划从当前位置出发访问 pts 的顺序，并记录其训练（进化）过程。"""
+    def _plan_route(self, pts: np.ndarray, label: str) -> Tuple[List[int], float]:
+        """路线 GA 规划从当前位置出发访问 pts 的顺序；返回（访问顺序, 总里程 m）。
+
+        顺带记录本次训练（进化）过程；里程在这里一次算好，供调用方直接使用。
+        """
         seed = int(self._rng.integers(1 << 31))
         record: List[List[float]] = []
         order = route_ga(pts, self.pos, seed=seed, record=record)
-        D = _dist_matrix(pts, self.pos)
+        length = _path_len(order, _dist_matrix(pts, self.pos))
+        first, last = record[0], record[-1]
         self.ga_runs.append({
             "episode": self.episode, "ga": "route", "label": label, "seed": seed,
-            "n_points": int(len(pts)),
-            "initial_best_g0": record[0][1] if record else None,
-            "generations": int(record[-1][0]) if record else 0,
-            "final_length_m": _path_len(order, D),
-            "solution": [int(i) for i in order],
-            "history": record,
+            "n_points": len(pts), "initial_best_g0": first[1],
+            "generations": int(last[0]), "final_length_m": length,
+            "solution": order, "history": record,
         })
-        return order
+        return order, length
 
     def _sweep(self, channels: Sequence[int], at: Sequence[float]) -> Dict[str, int]:
         """在 at 处逐频道测向（按频道号升序以减少切换）；近距则就地清除。"""
@@ -586,17 +596,15 @@ class RobotDog:
             return None
         est = Estimate(float(G[0]), float(G[1]),
                        position_sigma(GeneticLocalizer.covariance(ol, G)))
+        first, last = record[0], record[-1]
         self.ga_runs.append({
             "episode": self.episode, "ga": "localize", "label": f"频道{channel}",
             "seed": self.localizer.seed, "channel": channel, "n_obs": len(ol),
-            "generations": int(record[-1][0]) if record else 0,
-            "converged": bool(record and record[-1][1] < 1e-4),
-            "initial_best_g0": record[0][1] if record else None,
-            "final_fitness": record[-1][1] if record else None,
+            "generations": int(last[0]),
+            "converged": bool(last[1] < CONVERGED_FITNESS),
+            "initial_best_g0": first[1], "final_fitness": last[1],
             "residual_rms_deg": self._residual(est.point, ol),
-            "sigma_m": est.sigma,
-            "solution": [est.x, est.y],
-            "history": record,
+            "sigma_m": est.sigma, "solution": [est.x, est.y], "history": record,
         })
         return est
 
@@ -616,7 +624,8 @@ class RobotDog:
     # ---- 阶段 2：覆盖观测 ----
     def _coverage_survey(self) -> None:
         waypoints = covering_waypoints()
-        route = waypoints[self._plan_route(waypoints, "覆盖路点巡回")]
+        route_idx, _ = self._plan_route(waypoints, "覆盖路点巡回")
+        route = waypoints[route_idx]
         self.log(f"阶段2：覆盖观测，{len(route)} 个路点（GA 定序，覆盖半径 {COVER_RADIUS:.0f} m）")
         for wp in route:
             active = [c for c in CHANNELS if c not in self.cleared
@@ -733,9 +742,8 @@ class RobotDog:
         if not todo:
             return
         pts = np.array([est[c].point for c in todo])
-        order = self._plan_route(pts, "清除顺序")
-        D = _dist_matrix(pts, self.pos)
-        self.log(f"阶段4：GA 规划 {len(todo)} 个源的清除顺序，路程 {_path_len(order, D):.0f} m")
+        order, length = self._plan_route(pts, "清除顺序")
+        self.log(f"阶段4：GA 规划 {len(todo)} 个源的清除顺序，路程 {length:.0f} m")
         for k, i in enumerate(order):
             if self._out_of_time():
                 self.log(f"    [警告] 现实时间不足，剩余 {len(order) - k} 个源未处理")
@@ -743,7 +751,8 @@ class RobotDog:
             self._home_and_clear(todo[i], est)
 
     # ---- 主流程 ----
-    def run(self) -> Dict[str, float]:
+    def run(self) -> Dict[str, Any]:
+        """跑完一局：/enter → 起点扫描 → 覆盖观测 → GA 定位 → GA 规划清除 → /exit。"""
         self.log("=" * 74)
         self.log("策略：遗传算法（定位 GA + 路线 GA）")
         enter = self.sim.enter()
@@ -763,6 +772,7 @@ class RobotDog:
                 self.sim.exit()                     # 无论成功与否都要正常退出，保住测试记录
             except OSError as exc:
                 self.log(f"    [警告] /exit 失败：{exc}")
+            self.close()                            # 日志句柄随本局一并关闭
 
         n = len(self.cleared)
         return {
@@ -888,10 +898,17 @@ class PracticeArena:
         raise TimeoutError(f"等待状态 {target} 超时")
 
     # ---- 一局演练 ----
-    def start_episode(self, seed: Optional[int] = None) -> List[dict]:
-        """按种子生成固定场景并开一局，等接口开放后返回干扰源真值。"""
-        scenario = self._request("/api/scenario",
-                                 {"problem_no": 3, "seed": seed})["scenario"]
+    def start_episode(self, seed: int) -> List[dict]:
+        """按种子生成固定场景并开一局，等接口开放后返回干扰源真值。
+
+        jammers-py 的 `generate_scenario` 只把 seed 用于干扰源布局，示向度噪声种子
+        `noise_seed_hex` 是每次随机生成的 —— 于是同一个 seed 反复演练，噪声实现也不同。
+        这里把噪声种子覆写成由 seed 派生的确定值，使整局（布局 + 噪声）完全可复现：
+        同一个 `--seed` 必然得到同一份训练结果。
+        """
+        scenario = self._request("/api/scenario", {"problem_no": 3, "seed": seed})["scenario"]
+        scenario["noise_seed_hex"] = hashlib.blake2b(f"t3-practice-{seed}".encode(),
+                                                    digest_size=8).hexdigest()
         self._request("/api/start", {"problem_no": 3, "scenario": scenario})
         self._wait_state("window_open")
         return scenario["jammers"]
@@ -919,14 +936,15 @@ def save_training_results(save_dir: Path, episodes: List[dict], ga_runs: List[di
     文件名固定，重复运行直接覆盖，便于论文与后续绘图脚本稳定引用。
     """
     save_dir.mkdir(parents=True, exist_ok=True)
-    paths = [save_dir / "ga_training.json", save_dir / "ga_convergence.csv",
-             save_dir / "episodes.csv"]
+    json_path = save_dir / "ga_training.json"
+    curve_path = save_dir / "ga_convergence.csv"
+    episodes_path = save_dir / "episodes.csv"
 
     summary = [{k: v for k, v in r.items() if k != "history"} for r in ga_runs]
-    paths[0].write_text(json.dumps({"meta": meta, "episodes": episodes, "ga_runs": summary},
-                                   ensure_ascii=False, indent=2), encoding="utf-8")
+    json_path.write_text(json.dumps({"meta": meta, "episodes": episodes, "ga_runs": summary},
+                                    ensure_ascii=False, indent=2), encoding="utf-8")
 
-    with paths[1].open("w", encoding="utf-8", newline="") as fh:
+    with curve_path.open("w", encoding="utf-8", newline="") as fh:
         writer = csv.writer(fh)
         writer.writerow(["episode", "ga", "label", "seed", "generation",
                          "best", "mean", "std"])
@@ -938,27 +956,26 @@ def save_training_results(save_dir: Path, episodes: List[dict], ga_runs: List[di
     keys = ["episode", "seed", "n_sources", "cleared", "clear_ratio", "virtual_time_s",
             "avg_time_s", "n_measure", "n_clear", "ga_runs", "localize_rms_deg",
             "n_located", "localize_err_mean_m", "localize_err_max_m"]
-    with paths[2].open("w", encoding="utf-8", newline="") as fh:
+    with episodes_path.open("w", encoding="utf-8", newline="") as fh:
         writer = csv.DictWriter(fh, fieldnames=keys, extrasaction="ignore")
         writer.writeheader()
         writer.writerows(episodes)
-    return paths
+    return [json_path, curve_path, episodes_path]
 
 
-def print_ga_summary(ga_runs: List[dict]) -> None:
+def print_ga_summary(ga_runs: Sequence[dict]) -> None:
     """打印 GA 训练摘要：定位 GA 的收敛代数与残差、路线 GA 的优化幅度。"""
     if not ga_runs:
         print("GA 训练摘要：本次没有产生训练记录")
         return
-    loc = [r for r in ga_runs if r["ga"] == "localize"]
-    route = [r for r in ga_runs if r["ga"] == "route"]
+    loc, route = _split_runs(ga_runs)
     if loc:
         rms = np.array([r["residual_rms_deg"] for r in loc], dtype=float)
         fit = np.array([r["final_fitness"] for r in loc], dtype=float)
         n_conv = sum(1 for r in loc if r["converged"])
-        print(f"定位 GA：{len(loc)} 次训练（每代 {GA_LOC_POP} 个体），"
-              f"提前收敛 {n_conv}/{len(loc)} 次（判据 适应度<1e-4），"
-              f"否则跑满 {GA_LOC_GENS} 代；最终适应度均值 {fit.mean():.3f}°，"
+        print(f"定位 GA：{len(loc)} 次训练（每代 {GA_LOC.pop} 个体），"
+              f"提前收敛 {n_conv}/{len(loc)} 次（判据 适应度<{CONVERGED_FITNESS:.0e}），"
+              f"否则跑满 {GA_LOC.gens} 代；最终适应度均值 {fit.mean():.3f}°，"
               f"示向度残差 RMS 均值 {rms.mean():.2f}°")
     for r in route:
         g0, g1 = r["initial_best_g0"], r["final_length_m"]
@@ -967,50 +984,78 @@ def print_ga_summary(ga_runs: List[dict]) -> None:
               f"改进 {gain:.1f}%")
 
 
-def _ga_params(kind: str = "localize") -> dict:
-    """记录当前 GA 超参数，写入训练结果 JSON 便于复现。"""
-    if kind == "route":
-        return {"pop": GA_ROUTE_POP, "gens": GA_ROUTE_GENS, "pc": GA_ROUTE_PC,
-                "pm": GA_ROUTE_PM, "record_stride": GA_RECORD_STRIDE}
-    return {"pop": GA_LOC_POP, "gens": GA_LOC_GENS, "pc": GA_LOC_PC, "pm": GA_LOC_PM,
-            "domain_m": GA_LOC_DOMAIN, "record_stride": GA_RECORD_STRIDE}
+def _ga_meta() -> Dict[str, dict]:
+    """训练记录里的 GA 超参数快照，便于复现实验。"""
+    return {
+        "ga_loc": {**asdict(GA_LOC), "domain_m": GA_LOC_DOMAIN,
+                   "record_stride": GA_RECORD_STRIDE},
+        "ga_route": {**asdict(GA_ROUTE), "record_stride": GA_RECORD_STRIDE},
+    }
 
 
-def _mean_rms(ga_runs: List[dict]) -> Optional[float]:
+def _mean_rms(ga_runs: Sequence[dict]) -> Optional[float]:
     """本局所有定位 GA 的示向度残差均值（度）。"""
-    rms = [r["residual_rms_deg"] for r in ga_runs if r["ga"] == "localize"]
+    rms = [r["residual_rms_deg"] for r in _split_runs(ga_runs)[0]]
     return float(np.mean(rms)) if rms else None
+
+
+def _episode_row(episode: int, seed: int, truth: Optional[List[dict]], dog: RobotDog,
+                 stats: Dict[str, Any], engine: Optional[dict] = None) -> dict:
+    """汇总一局战绩，供 CSV/JSON 落盘。
+
+    演练模式传模拟器真值 `truth` 与引擎统计 `engine`，并逐源算定位误差；官方模式真值
+    不可得（接口不返回），相关字段为 None。
+    """
+    engine = engine or {}
+    cleared = int(engine.get("cleared_jammer_count", stats["cleared"]))
+    total_time = float(engine.get("virtual_time_s", stats["total_time_s"]))
+    errors = [dist((e.x, e.y), (j["position"]["x"], j["position"]["y"]))
+              for j in (truth or []) if (e := dog.final_est.get(j["channel"]))]
+    return {
+        "episode": episode, "seed": seed, "n_sources": len(truth) if truth else None,
+        "cleared": cleared, "clear_ratio": cleared / len(truth) if truth else None,
+        "virtual_time_s": total_time,
+        "avg_time_s": total_time / cleared if cleared else None,
+        "n_measure": int(engine.get("measure_accepted_count", stats["n_measure"])),
+        "n_clear": stats["n_clear"], "ga_runs": len(dog.ga_runs),
+        "localize_rms_deg": _mean_rms(dog.ga_runs),
+        "n_located": len(errors),
+        "localize_err_mean_m": float(np.mean(errors)) if errors else None,
+        "localize_err_max_m": float(np.max(errors)) if errors else None,
+        "truth": [{"channel": j["channel"], "x": j["position"]["x"], "y": j["position"]["y"],
+                   "receive_m": j["receive"]} for j in (truth or [])],
+    }
+
+
+def _save_and_report(args: argparse.Namespace, episodes: List[dict],
+                     ga_runs: List[dict], meta: dict) -> None:
+    """打印 GA 训练摘要并写出训练结果。"""
+    print_ga_summary(ga_runs)
+    paths = save_training_results(Path(args.save_dir), episodes, ga_runs, meta)
+    print("训练结果已保存：" + "，".join(str(p) for p in paths))
 
 
 def run_official(args: argparse.Namespace) -> int:
     sim = sim_api.Simulator(robot_id=args.robot_id, base_url=args.base_url, timeout=args.timeout)
     print(f"连接模拟器 {args.base_url}（robot_id={args.robot_id}）")
-    dog = RobotDog(sim, verbose=not args.quiet, logfile=args.log, seed=args.seed)
-    try:
-        stats = dog.run()
-    finally:
-        dog.close()
+    dog = RobotDog(sim, verbose=not args.quiet, logfile=args.log, seed=args.seed, episode=1)
+    stats = dog.run()
     print(f"完成：清除 {stats['cleared']} 个，虚拟总时间 {stats['total_time_s']:.1f} s，"
           f"平均 {stats['avg_time_s']:.1f} s/个，测向 {stats['n_measure']} 次，"
           f"清除动作 {stats['n_clear']} 次")
-    print_ga_summary(dog.ga_runs)
-    episode = {
-        "episode": 1, "seed": args.seed, "n_sources": None, "cleared": stats["cleared"],
-        "clear_ratio": None, "virtual_time_s": stats["total_time_s"],
-        "avg_time_s": stats["avg_time_s"] if math.isfinite(stats["avg_time_s"]) else None,
-        "n_measure": stats["n_measure"],
-        "n_clear": stats["n_clear"], "ga_runs": len(dog.ga_runs),
-        "localize_rms_deg": _mean_rms(dog.ga_runs),
-    }
+    row = _episode_row(1, args.seed, None, dog, stats)
     meta = {"mode": "official", "base_url": args.base_url, "robot_id": args.robot_id,
-            "seed": args.seed, "ga_loc": _ga_params(), "ga_route": _ga_params("route")}
-    paths = save_training_results(Path(args.save_dir), [episode], dog.ga_runs, meta)
-    print("训练结果已保存：" + "，".join(str(p) for p in paths))
+            "seed": args.seed, **_ga_meta()}
+    _save_and_report(args, [row], dog.ga_runs, meta)
     return 0
 
 
 def run_practice(args: argparse.Namespace) -> int:
-    """本地演练：自动拉起 jammers-py，跑 N 局固定场景（同种子可比），汇总统计。"""
+    """本地演练：自动拉起 jammers-py，跑 N 局场景并汇总。
+
+    第 i 局用 seed=args.seed+i：场景布局与示向度噪声都由它确定，因此同一 --seed 的整轮
+    演练完全可复现（含各次 GA 的解），可用于新旧策略的严格对比。
+    """
     jammers_dir = Path(args.jammers_dir) if args.jammers_dir else Path(__file__).parent / "jammers-py"
     rows: List[dict] = []
     ga_runs: List[dict] = []
@@ -1024,32 +1069,11 @@ def run_practice(args: argparse.Namespace) -> int:
                   f"干扰源 {len(truth)} 个）-----")
             dog = RobotDog(sim_api.Simulator(robot_id=args.robot_id, base_url=arena.robot_url,
                                              timeout=args.timeout),
-                           verbose=not args.quiet, logfile=args.log, seed=seed)
-            dog.episode = ep + 1
-            try:
-                stats = dog.run()
-            finally:
-                dog.close()
+                           verbose=not args.quiet, logfile=args.log, seed=seed, episode=ep + 1)
+            stats = dog.run()
             ga_runs.extend(dog.ga_runs)
             engine = arena.finish_episode()
-            n_cleared = int(engine.get("cleared_jammer_count", stats["cleared"]))
-            total_time = float(engine.get("virtual_time_s", stats["total_time_s"]))
-            errors = [dist((e.x, e.y), (j["position"]["x"], j["position"]["y"]))
-                      for j in truth if (e := dog.final_est.get(j["channel"]))]
-            rows.append({
-                "episode": ep + 1, "seed": seed, "n_sources": len(truth), "cleared": n_cleared,
-                "clear_ratio": n_cleared / len(truth) if truth else 0.0,
-                "virtual_time_s": total_time,
-                "avg_time_s": total_time / n_cleared if n_cleared else None,
-                "n_measure": int(engine.get("measure_accepted_count", stats["n_measure"])),
-                "n_clear": stats["n_clear"], "ga_runs": len(dog.ga_runs),
-                "localize_rms_deg": _mean_rms(dog.ga_runs),
-                "n_located": len(errors),
-                "localize_err_mean_m": float(np.mean(errors)) if errors else None,
-                "localize_err_max_m": float(np.max(errors)) if errors else None,
-                "truth": [{"channel": j["channel"], "x": j["position"]["x"],
-                           "y": j["position"]["y"], "receive_m": j["receive"]} for j in truth],
-            })
+            rows.append(_episode_row(ep + 1, seed, truth, dog, stats, engine))
             r = rows[-1]
             avg_txt = f"{r['avg_time_s']:.1f} s/个" if r["avg_time_s"] else "—"
             err_txt = (f"定位误差 {r['localize_err_mean_m']:.1f} m 均值 / "
@@ -1065,12 +1089,10 @@ def run_practice(args: argparse.Namespace) -> int:
           + f"平均虚拟总时间 {np.mean([r['virtual_time_s'] for r in rows]):.1f} s")
     print("逐局：" + "  ".join(f"seed{r['seed']}={r['cleared']}/{r['n_sources']}" for r in rows))
     print("=" * 74)
-    print_ga_summary(ga_runs)
     meta = {"mode": "practice", "robot_id": args.robot_id, "seed0": args.seed,
-            "episodes": args.practice, "ga_loc": _ga_params(),
-            "ga_route": _ga_params("route"), "coverage_waypoints": len(covering_waypoints())}
-    paths = save_training_results(Path(args.save_dir), rows, ga_runs, meta)
-    print("训练结果已保存：" + "，".join(str(p) for p in paths))
+            "episodes": args.practice, **_ga_meta(),
+            "coverage_waypoints": len(covering_waypoints())}
+    _save_and_report(args, rows, ga_runs, meta)
     return 0
 
 
@@ -1085,7 +1107,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--jammers-dir", default=None, help="jammers-py 目录（缺省为本脚本旁的 jammers-py/）")
     p.add_argument("--console-port", type=int, default=8090,
                    help="演练时 jammers-py 控制台端口（缺省 8090，被占用则自动顺延）")
-    p.add_argument("--seed", type=int, default=0, help="随机种子（演练场景与 GA）")
+    p.add_argument("--seed", type=int, default=0,
+                   help="随机种子（演练第 1 局的场景布局、示向度噪声与 GA 都由它确定）")
     p.add_argument("--save-dir", default=RESULTS_DIR,
                    help=f"训练结果输出目录（缺省 {RESULTS_DIR}/；写入 GA 训练记录与逐局统计）")
     p.add_argument("--log", default=None, help="过程日志文件（追加写入）")

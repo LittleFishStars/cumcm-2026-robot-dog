@@ -9,3 +9,6 @@ __pycache__/
 
 # 竞赛题目材料（如需入库请手动 git add -f Problem/）
 Problem/
+
+# 机器狗运行日志（接口层自动记录，不入库）
+logs/*.jsonl

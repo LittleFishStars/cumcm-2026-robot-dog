@@ -2,7 +2,7 @@
 
     from sim_api import Simulator
 
-    sim = Simulator("<参赛队号>")            # 默认 http://127.0.0.1:2026
+    sim = Simulator()                       # 默认队号 202614023005，地址 http://127.0.0.1:2026
     sim.enter()
     r = sim.measure(300, 400, 1)            # r["measure_result"]: no_signal / near / direction
     if r["measure_result"] == "direction":
@@ -21,11 +21,12 @@
 import json
 import urllib.request
 
+ROBOT_ID = "202614023005"                   # 参赛队号，必须与模拟器登录的队号一致
 BASE_URL = "http://127.0.0.1:2026"          # 官方默认地址，模拟器只监听本机回环
 
 
 class Simulator:
-    def __init__(self, robot_id, base_url=BASE_URL, timeout=5.0):
+    def __init__(self, robot_id=ROBOT_ID, base_url=BASE_URL, timeout=5.0):
         self.robot_id = robot_id
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout
@@ -62,8 +63,6 @@ class Simulator:
 
 
 if __name__ == "__main__":
-    import sys
-
-    sim = Simulator(sys.argv[1] if len(sys.argv) > 1 else "<参赛队号>")
+    sim = Simulator()
     print(sim.enter())
     print(sim.exit())

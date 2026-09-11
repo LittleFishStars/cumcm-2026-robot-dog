@@ -226,14 +226,14 @@
       "n_sources": 16,
       "cleared": 16,
       "clear_ratio": 1.0,
-      "virtual_time_s": 6164.989462,
-      "avg_time_s": 385.311841375,
-      "n_measure": 171,
-      "n_clear": 23,
+      "virtual_time_s": 6069.942681,
+      "avg_time_s": 379.3714175625,
+      "n_measure": 164,
+      "n_clear": 16,
       "ga_runs": 21,
       "localize_rms_deg": 0.10522686675023565,
       "n_located": 16,
-      "localize_err_mean_m": 9.2685728499128,
+      "localize_err_mean_m": 8.521074696129954,
       "localize_err_max_m": 19.429793040587175,
       "truth": [
         {
@@ -508,14 +508,14 @@
       "n_sources": 14,
       "cleared": 14,
       "clear_ratio": 1.0,
-      "virtual_time_s": 5008.087043,
-      "avg_time_s": 357.7205030714286,
-      "n_measure": 158,
-      "n_clear": 20,
+      "virtual_time_s": 4966.984348,
+      "avg_time_s": 354.78459628571426,
+      "n_measure": 152,
+      "n_clear": 14,
       "ga_runs": 16,
       "localize_rms_deg": 0.12522957201153112,
       "n_located": 14,
-      "localize_err_mean_m": 7.602998909300382,
+      "localize_err_mean_m": 7.483942120178538,
       "localize_err_max_m": 16.329207092378567,
       "truth": [
         {
@@ -994,14 +994,14 @@
       "n_sources": 14,
       "cleared": 14,
       "clear_ratio": 1.0,
-      "virtual_time_s": 4930.265204,
-      "avg_time_s": 352.1618002857143,
-      "n_measure": 143,
-      "n_clear": 18,
+      "virtual_time_s": 4819.361579,
+      "avg_time_s": 344.2401127857143,
+      "n_measure": 139,
+      "n_clear": 14,
       "ga_runs": 16,
-      "localize_rms_deg": 0.1855864004151591,
+      "localize_rms_deg": 0.18558640041516047,
       "n_located": 14,
-      "localize_err_mean_m": 5.183416564201159,
+      "localize_err_mean_m": 4.8224911926683145,
       "localize_err_max_m": 13.453054849553926,
       "truth": [
         {
@@ -1378,15 +1378,15 @@
       "n_sources": 10,
       "cleared": 10,
       "clear_ratio": 1.0,
-      "virtual_time_s": 5183.977063,
-      "avg_time_s": 518.3977063,
-      "n_measure": 171,
-      "n_clear": 16,
+      "virtual_time_s": 5102.848062,
+      "avg_time_s": 510.2848062,
+      "n_measure": 165,
+      "n_clear": 10,
       "ga_runs": 15,
-      "localize_rms_deg": 0.1614209897588169,
+      "localize_rms_deg": 0.16142098975881844,
       "n_located": 10,
-      "localize_err_mean_m": 5.401015238588297,
-      "localize_err_max_m": 10.168439452297422,
+      "localize_err_mean_m": 5.076245436610669,
+      "localize_err_max_m": 7.289920176902923,
       "truth": [
         {
           "channel": 2,
@@ -2524,15 +2524,15 @@
       "seed": 2,
       "channel": 1,
       "n_obs": 2,
-      "generations": 150,
-      "converged": false,
-      "initial_best_g0": 0.05780496327703077,
-      "final_fitness": 0.05780496327703077,
+      "generations": 1,
+      "converged": true,
+      "initial_best_g0": 0.0,
+      "final_fitness": 0.0,
       "residual_rms_deg": 2.0097183471152322e-14,
-      "sigma_m": 17.11608933219643,
+      "sigma_m": 13.608889854161959,
       "solution": [
-        1457.8524553011853,
-        -1060.697631512685
+        1432.8025570194256,
+        -933.3701613032242
       ]
     },
     {
@@ -2865,9 +2865,9 @@
       "label": "清除顺序",
       "seed": 561807780,
       "n_points": 16,
-      "initial_best_g0": 11737.435517918206,
+      "initial_best_g0": 11635.37885516027,
       "generations": 300,
-      "final_length_m": 9247.966191446421,
+      "final_length_m": 9180.827168543034,
       "solution": [
         4,
         13,
@@ -3612,15 +3612,15 @@
       "seed": 5,
       "channel": 8,
       "n_obs": 2,
-      "generations": 150,
-      "converged": false,
-      "initial_best_g0": 0.5517995956530058,
-      "final_fitness": 0.5517995956530058,
+      "generations": 1,
+      "converged": true,
+      "initial_best_g0": 0.0,
+      "final_fitness": 0.0,
       "residual_rms_deg": 2.0097183471152322e-14,
-      "sigma_m": 24.017859789333198,
+      "sigma_m": 20.00743637457652,
       "solution": [
-        1382.2433589624773,
-        -1195.612157351236
+        1373.0506277712284,
+        -1072.2004702136528
       ]
     },
     {
@@ -3755,22 +3755,22 @@
       "label": "清除顺序",
       "seed": 1728730615,
       "n_points": 14,
-      "initial_best_g0": 9933.959473668601,
+      "initial_best_g0": 9880.533320459286,
       "generations": 300,
-      "final_length_m": 9108.921149110036,
+      "final_length_m": 9188.30932271141,
       "solution": [
         13,
         3,
         6,
         10,
         0,
-        9,
-        12,
         5,
+        12,
         1,
         2,
         7,
         8,
+        9,
         11,
         4
       ]
@@ -5008,15 +5008,15 @@
       "seed": 10,
       "channel": 3,
       "n_obs": 2,
-      "generations": 150,
-      "converged": false,
-      "initial_best_g0": 3.762003612616991,
-      "final_fitness": 3.762003612616991,
-      "residual_rms_deg": 0.0,
-      "sigma_m": 10.049017694677234,
+      "generations": 1,
+      "converged": true,
+      "initial_best_g0": 0.0,
+      "final_fitness": 0.0,
+      "residual_rms_deg": 2.0097183471152322e-14,
+      "sigma_m": 6.553738800687509,
       "solution": [
-        -1501.9165136531333,
-        -1302.608580595274
+        -1320.2802480344487,
+        -1141.8538632046516
       ]
     },
     {
@@ -5223,16 +5223,12 @@
       "label": "清除顺序",
       "seed": 2052998038,
       "n_points": 14,
-      "initial_best_g0": 9022.002651379653,
+      "initial_best_g0": 8660.025555704256,
       "generations": 300,
-      "final_length_m": 8782.069178517933,
+      "final_length_m": 8118.3217271557105,
       "solution": [
         13,
         4,
-        7,
-        11,
-        12,
-        3,
         8,
         6,
         10,
@@ -5240,7 +5236,11 @@
         9,
         2,
         0,
-        1
+        1,
+        3,
+        12,
+        7,
+        11
       ]
     },
     {
@@ -6290,11 +6290,11 @@
       "converged": true,
       "initial_best_g0": 0.0,
       "final_fitness": 0.0,
-      "residual_rms_deg": 0.0,
-      "sigma_m": 20.71156160386218,
+      "residual_rms_deg": 2.0097183471152322e-14,
+      "sigma_m": 17.57118480014101,
       "solution": [
-        1360.062641210261,
-        -1142.7368542691793
+        1354.7727580635049,
+        -1039.3840455511408
       ]
     },
     {
@@ -6429,9 +6429,9 @@
       "label": "清除顺序",
       "seed": 1784523089,
       "n_points": 10,
-      "initial_best_g0": 8518.383243787144,
+      "initial_best_g0": 8462.956023477205,
       "generations": 300,
-      "final_length_m": 7773.612874730814,
+      "final_length_m": 7619.515166690083,
       "solution": [
         7,
         0,

@@ -74,6 +74,7 @@ import socket
 import subprocess
 import sys
 import time
+import urllib.error
 import urllib.request
 from collections import defaultdict
 from contextlib import contextmanager
@@ -631,12 +632,10 @@ class RecordedSim:
         return self._call("/enter", {}, lambda rid: self._sim.enter(request_id=rid))
 
     def measure(self, x: float, y: float, channel: int) -> dict:
-        x, y = clamp_to_region(float(x), float(y))
         return self._call("/measure", {"x": x, "y": y, "channel": int(channel)},
                           lambda rid: self._sim.measure(x, y, int(channel), request_id=rid))
 
     def clear(self, x: float, y: float, channel: int) -> dict:
-        x, y = clamp_to_region(float(x), float(y))
         return self._call("/clear", {"x": x, "y": y, "channel": int(channel)},
                           lambda rid: self._sim.clear(x, y, int(channel), request_id=rid))
 
@@ -694,6 +693,10 @@ class RobotDog:
         self.episode = episode      # 局号（用于训练记录分组）
         self.ga_runs: List[Dict[str, Any]] = []     # GA 训练记录（逐次调用一条）
         self.final_est: Dict[int, Estimate] = {}    # 本局各频道的最终定位解
+        # 轨迹记录：起始于 (0,0)，之后每次实际动作点依次追加，用于每局结束后出轨迹图
+        self.track: List[Tuple[float, float]] = [(0.0, 0.0)]
+        self.marks: List[Tuple[float, float, str]] = []   # 动作点及其类型（measure/clear）
+        self.hits: List[Tuple[float, float]] = []   # 成功清除的落点
 
     # ---- 日志 ----
     def log(self, msg: str) -> None:
@@ -711,25 +714,32 @@ class RobotDog:
     # ---- 原子动作 ----
     def measure(self, x: float, y: float, channel: int) -> dict:
         """测向；返回原始响应，direction 时自动记录示向度。"""
-        r = self.sim.measure(float(x), float(y), channel)
+        x, y = clamp_to_region(float(x), float(y))      # 机器狗不得离开作业圆域
+        r = self.sim.measure(x, y, channel)
         if not r.get("accepted"):
             raise RuntimeError(f"/measure 被拒绝：{r}")
-        self.pos, self.vt = np.array([float(x), float(y)]), float(r["virtual_time_s"])
+        self.pos, self.vt = np.array([x, y]), float(r["virtual_time_s"])
+        self.track.append((x, y))
+        self.marks.append((x, y, "measure"))
         self.n_measure += 1
         if r.get("measure_result") == "direction":
-            self.obs[channel].append(Obs(channel, float(x), float(y), float(r["svd_deg"])))
+            self.obs[channel].append(Obs(channel, x, y, float(r["svd_deg"])))
         return r
 
     def clear(self, x: float, y: float, channel: int) -> bool:
         """清除；返回是否成功。"""
-        r = self.sim.clear(float(x), float(y), channel)
+        x, y = clamp_to_region(float(x), float(y))      # 与测向同一处裁剪
+        r = self.sim.clear(x, y, channel)
         if not r.get("accepted"):
             raise RuntimeError(f"/clear 被拒绝：{r}")
-        self.pos, self.vt = np.array([float(x), float(y)]), float(r["virtual_time_s"])
+        self.pos, self.vt = np.array([x, y]), float(r["virtual_time_s"])
+        self.track.append((x, y))
+        self.marks.append((x, y, "clear"))
         self.n_clear += 1
         ok = r.get("clear_result") == "success"
         if ok:
             self.cleared.add(channel)
+            self.hits.append((x, y))
         return ok
 
     def _out_of_time(self) -> bool:
@@ -981,6 +991,170 @@ class RobotDog:
 
 
 # ----------------------------------------------------------------------------
+# 每局轨迹图：跑完一局后把机器狗的行驶轨迹画成 PNG
+# ----------------------------------------------------------------------------
+TRAJ_DIR_NAME = "trajectory"        # 每局轨迹图落在 <save-dir>/trajectory/ 下
+
+# 本地演练场开新局时的重试（仅演练场用：上一局会话未释放会让 /api/start 返回 409）
+START_RETRIES = 6
+START_RETRY_WAIT_S = 1.0
+# 中文字体候选：优先 Windows 自带，再退到 Linux 常见 CJK 字体，最后 DejaVu 兜底
+TRAJ_FONTS = ("Microsoft YaHei", "SimHei", "Noto Sans CJK SC", "Noto Sans CJK JP",
+              "WenQuanYi Zen Hei", "DejaVu Sans")
+
+_C_PLOT_PATH = "#2f6fb5"        # 轨迹 / 主色
+_C_PLOT_SRC = "#c0392b"         # 干扰源真值
+_C_PLOT_HIT = "#2e9e5b"         # 成功清除落点
+_C_PLOT_FRAME = "#5b6470"       # 圆域边界
+
+
+def draw_trajectory(out_path: Path, track: Sequence[Sequence[float]],
+                    sources: Sequence[Sequence[float]] = (),
+                    hits: Sequence[Sequence[float]] = (),
+                    marks: Sequence[Tuple[float, float, str]] = (),
+                    title: Optional[str] = None, figsize: Tuple[float, float] = (6.4, 6.1),
+                    dpi: float = 160.0) -> Path:
+    """把机器狗轨迹画成图并存盘；格式由文件名后缀决定（.png / .pdf）。
+
+    - `track`：按时间排序的动作点 [(x, y), ...]（含 /measure 与 /clear 的落点）
+    - `sources`：干扰源真值 [(x, y, channel), ...]；官方模式拿不到真值，传空即可
+    - `hits`：成功清除的落点 [(x, y), ...]
+    - `marks`：动作点及类型 [(x, y, "measure"|"clear"), ...]，用于区分测向与清除
+    - `title`：图内标题；论文用图传 None（标题交给 caption），每局诊断图传一句概况
+    - `dpi`：位图分辨率（矢量格式忽略此项）
+
+    matplotlib 只在本函数内导入：未安装会抛 ImportError，由调用方决定是否忽略——
+    这样 T3_ga.py 在没有 matplotlib 的机器（如官方测试机）上仍能完成整局测试。
+    """
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    with matplotlib.rc_context({"font.sans-serif": list(TRAJ_FONTS),
+                                "font.family": "sans-serif",
+                                "axes.unicode_minus": False, "font.size": 10}):
+        fig, ax = plt.subplots(figsize=figsize)
+        th = np.linspace(0.0, 2.0 * math.pi, 400)
+
+        # 作业圆域（题目 1800 m）与官方生成器源域（1770 m）
+        ax.plot(REGION_RADIUS * np.cos(th), REGION_RADIUS * np.sin(th),
+                color=_C_PLOT_FRAME, lw=1.4, label="作业圆域 1800 m")
+        gen_r = REGION_RADIUS - 30.0
+        ax.plot(gen_r * np.cos(th), gen_r * np.sin(th), color=_C_PLOT_FRAME,
+                lw=0.8, ls="--", alpha=0.8, label="干扰源生成域 1770 m")
+
+        # 轨迹（连线表示行驶路径，动作点按类型分开画）
+        pts = np.asarray(track, dtype=float)
+        if len(pts) > 1:
+            ax.plot(pts[:, 0], pts[:, 1], "-", lw=1.0, color=_C_PLOT_PATH,
+                    alpha=0.85, label=f"行驶路径（{len(pts) - 1} 次动作）")
+        mk = [(x, y, k) for x, y, k in marks]
+        for kind, style, label in (("measure", dict(marker=".", ms=4.5, ls="none",
+                                                   color=_C_PLOT_PATH), "测向点 /measure"),
+                                   ("clear", dict(marker="^", ms=5.5, ls="none",
+                                                 mfc="none", mec=_C_PLOT_HIT, mew=1.2),
+                                    "清除尝试 /clear")):
+            sel = [(x, y) for x, y, k in mk if k == kind]
+            if sel:
+                arr = np.asarray(sel, dtype=float)
+                ax.plot(arr[:, 0], arr[:, 1], label=f"{label}（{len(sel)} 次）", **style)
+
+        # 干扰源真值与清除半径
+        for i, (sx, sy, ch) in enumerate(sources):
+            ax.add_patch(plt.Circle((sx, sy), 20.0, fill=False, color=_C_PLOT_SRC,
+                                    lw=0.6, alpha=0.55))
+            ax.plot([sx], [sy], "x", ms=8, mew=1.7, color=_C_PLOT_SRC,
+                    label="干扰源真值（20 m 清除半径）" if i == 0 else None)
+            # 标签交替错开，缓解密集处互相压字
+            dx, dy, ha = ((8, 4, "left") if i % 2 == 0 else (-8, -10, "right"))
+            ax.annotate(f"ch{ch}", (sx, sy), textcoords="offset points", xytext=(dx, dy),
+                        fontsize=7.5, color=_C_PLOT_SRC, ha=ha)
+
+        # 成功清除落点
+        if len(hits):
+            hp = np.asarray(hits, dtype=float)
+            ax.plot(hp[:, 0], hp[:, 1], "o", ms=6.5, mfc="none", mec=_C_PLOT_HIT,
+                    mew=1.5, label=f"成功清除落点（{len(hp)} 处）")
+
+        ax.plot([0.0], [0.0], marker="*", ms=15, color="#c8871b",
+                label="起点 / 结束点")
+
+        ax.set_aspect("equal")
+        ax.set_xlabel("x / m")
+        ax.set_ylabel("y / m")
+        pad = 240.0
+        ax.set_xlim(-REGION_RADIUS - pad, REGION_RADIUS + pad)
+        ax.set_ylim(-REGION_RADIUS - pad, REGION_RADIUS + pad)
+        ax.legend(fontsize=8.5, loc="upper center", bbox_to_anchor=(0.5, -0.09), ncol=2)
+        if title:
+            ax.set_title(title, fontsize=10.5, pad=8)
+
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        fig.savefig(out_path, bbox_inches="tight", dpi=dpi)
+        plt.close(fig)
+    return out_path
+
+
+_PLOT_HINTED = False           # 缺 matplotlib 的提示只打印一次，避免每局重复刷屏
+
+
+def save_trajectory_plot(save_dir: str, name: str, track: Sequence[Sequence[float]],
+                         sources: Sequence[Sequence[float]] = (),
+                         hits: Sequence[Sequence[float]] = (),
+                         marks: Sequence[Tuple[float, float, str]] = (),
+                         title: Optional[str] = None) -> Optional[Path]:
+    """保存一局的轨迹图与同名轨迹表；失败只提示、不影响测试结果（返回图路径或 None）。
+
+    在 /exit 之后调用，因此绘图耗时不计入现实运行时间预算。绘图或落盘出错都不应
+    影响已完成的测试，故这里吞掉异常（含缺 matplotlib 的情况）。
+
+    同时写一份同名 .csv（`step,x,y,kind`），使图上的动作点可被逐条核对——否则
+    图片只是一张无法验证的图。CSV 与 PNG 同目录同名，一一对应。
+    """
+    global _PLOT_HINTED
+    out = Path(save_dir) / TRAJ_DIR_NAME / f"{name}.png"
+    try:
+        out.parent.mkdir(parents=True, exist_ok=True)
+        _write_track_csv(out.with_suffix(".csv"), track, marks)
+    except OSError as exc:
+        if not _PLOT_HINTED:
+            _PLOT_HINTED = True
+            print(f"提示：轨迹表写入失败（{type(exc).__name__}: {exc}）")
+    try:
+        return draw_trajectory(out, track, sources, hits, marks, title)
+    except ImportError:
+        if not _PLOT_HINTED:
+            _PLOT_HINTED = True
+            print("提示：未安装 matplotlib，已跳过轨迹图（pip install matplotlib 后可自动生成）")
+    except Exception as exc:        # 字体/磁盘/权限等问题都不该影响测试结论
+        if not _PLOT_HINTED:
+            _PLOT_HINTED = True
+            print(f"提示：轨迹图生成失败，已跳过（{type(exc).__name__}: {exc}）")
+    return None
+
+
+def _write_track_csv(path: Path, track: Sequence[Sequence[float]],
+                     marks: Sequence[Tuple[float, float, str]]) -> None:
+    """把轨迹写成 `step,x,y,kind`，与轨迹图上的点逐条对应。
+
+    step 0 固定为起点 (0,0)；其后每个动作点对应一次 /measure 或 /clear，
+    kind 取 measure / clear，便于与 api_calls.jsonl 对账。
+    """
+    with path.open("w", newline="", encoding="utf-8") as fh:
+        w = csv.writer(fh)
+        w.writerow(["step", "x", "y", "kind"])
+        w.writerow([0, f"{float(track[0][0]):.3f}", f"{float(track[0][1]):.3f}", "start"])
+        for i, (x, y, kind) in enumerate(marks, start=1):
+            w.writerow([i, f"{float(x):.3f}", f"{float(y):.3f}", kind])
+
+
+def _sources_of(truth: Optional[Sequence[dict]]) -> List[Tuple[float, float, int]]:
+    """把模拟器真值整理成绘图用的 [(x, y, channel), ...]。"""
+    return [(float(j["position"]["x"]), float(j["position"]["y"]), int(j["channel"]))
+            for j in (truth or [])]
+
+
+# ----------------------------------------------------------------------------
 # 本地演练场：拉起 jammers-py 并用其控制台 REST 开固定场景的一局
 # ----------------------------------------------------------------------------
 def _free_port(preferred: int) -> int:
@@ -1105,7 +1279,21 @@ class PracticeArena:
         scenario = self._request("/api/scenario", {"problem_no": 3, "seed": seed})["scenario"]
         scenario["noise_seed_hex"] = hashlib.blake2b(f"t3-practice-{seed}".encode(),
                                                     digest_size=8).hexdigest()
-        self._request("/api/start", {"problem_no": 3, "scenario": scenario})
+        # 连续多局时，上一局的会话可能尚未在模拟器侧完全释放，/api/start 会返回
+        # 409 Conflict；这是演练场的时序问题（非策略问题），短暂等待后重试即可。
+        # 只在演练场重试——sim_api.py 与官方模式保持"发一次就是一次"的语义。
+        last: Optional[Exception] = None
+        for attempt in range(START_RETRIES):
+            try:
+                self._request("/api/start", {"problem_no": 3, "scenario": scenario})
+                break
+            except urllib.error.HTTPError as exc:
+                last = exc
+                if exc.code != 409 or attempt == START_RETRIES - 1:
+                    raise
+                time.sleep(START_RETRY_WAIT_S)
+        else:                                   # pragma: no cover - 循环必然 break 或 raise
+            raise RuntimeError(f"多次重试后仍无法开始演练局：{last}")
         self._wait_state("window_open")
         return scenario["jammers"]
 
@@ -1224,11 +1412,15 @@ def _episode_row(episode: int, seed: int, truth: Optional[List[dict]], dog: Robo
 
 
 def _save_and_report(args: argparse.Namespace, episodes: List[dict], ga_runs: List[dict],
-                     meta: dict, api_log: Optional[ApiLog] = None) -> None:
-    """打印 GA 训练摘要，写出训练结果，并汇总接口调用日志（四个产物路径并列在尾部）。"""
+                     meta: dict, api_log: Optional[ApiLog] = None,
+                     traj_paths: Optional[Sequence[Path]] = None) -> None:
+    """打印 GA 训练摘要，写出训练结果，汇总轨迹图与接口调用日志（产物路径并列在尾部）。"""
     print_ga_summary(ga_runs)
     paths = save_training_results(Path(args.save_dir), episodes, ga_runs, meta)
     print("训练结果已保存：" + "，".join(str(p) for p in paths))
+    if traj_paths:
+        where = Path(args.save_dir) / TRAJ_DIR_NAME
+        print(f"轨迹图已保存：{where}/ 共 {len(traj_paths)} 张（机器狗行驶轨迹，逐局一张）")
     if api_log is not None:
         api_log.report()
 
@@ -1253,21 +1445,27 @@ def run_official(args: argparse.Namespace) -> int:
         row = _episode_row(1, args.seed, None, dog, stats)
         meta = {"mode": "official", "base_url": args.base_url, "robot_id": args.robot_id,
                 "seed": args.seed, **_ga_meta()}
-        _save_and_report(args, [row], dog.ga_runs, meta, api_log)
+        traj = (None if args.no_plot else
+                save_trajectory_plot(args.save_dir, "ep01", dog.track, (), dog.hits, dog.marks,
+                                     title=f"官方测试 · 清除 {stats['cleared']} 个 · "
+                                           f"虚拟时间 {stats['total_time_s']:.0f} s"))
+        _save_and_report(args, [row], dog.ga_runs, meta, api_log,
+                         [traj] if traj else [])
     return 0
 
 
 def run_practice(args: argparse.Namespace) -> int:
-    if args.save_dir is None:
-        args.save_dir = RESULTS_DIR
     """本地演练：自动拉起 jammers-py，跑 N 局场景并汇总。
 
     第 i 局用 seed=args.seed+i：场景布局与示向度噪声都由它确定，因此同一 --seed 的整轮
     演练完全可复现（含各次 GA 的解），可用于新旧策略的严格对比。
     """
+    if args.save_dir is None:
+        args.save_dir = RESULTS_DIR
     jammers_dir = Path(args.jammers_dir) if args.jammers_dir else Path(__file__).parent / "jammers-py"
     rows: List[dict] = []
     ga_runs: List[dict] = []
+    traj_paths: List[Path] = []
     with _api_log(args, not args.quiet) as api_log, \
             PracticeArena(jammers_dir, robot_id=args.robot_id,
                           console_port=args.console_port) as arena:
@@ -1293,6 +1491,17 @@ def run_practice(args: argparse.Namespace) -> int:
             print(f"本局：清除 {r['cleared']}/{r['n_sources']}（{r['clear_ratio']:.3f}），"
                   f"虚拟总时间 {r['virtual_time_s']:.1f} s，平均 {avg_txt}，"
                   f"测向 {r['n_measure']} 次，{err_txt}")
+            # 轨迹图在 /exit 之后画，不占用现实时间预算
+            traj = (None if args.no_plot else
+                    save_trajectory_plot(args.save_dir, f"ep{ep + 1:02d}_seed{seed}",
+                                         dog.track, _sources_of(truth), dog.hits, dog.marks,
+                                         title=f"第 {ep + 1} 局 · seed {seed} · "
+                                               f"清除 {r['cleared']}/{r['n_sources']} · "
+                                               f"虚拟时间 {r['virtual_time_s']:.0f} s"))
+            if traj:
+                traj_paths.append(traj)
+                if not args.quiet:
+                    print(f"  轨迹图 {traj}")
     print("\n" + "=" * 74)
     avgs = [r["avg_time_s"] for r in rows if r["avg_time_s"]]
     print(f"汇总（{len(rows)} 局）：平均清除比例 {np.mean([r['clear_ratio'] for r in rows]):.4f}，"
@@ -1303,7 +1512,7 @@ def run_practice(args: argparse.Namespace) -> int:
     meta = {"mode": "practice", "robot_id": args.robot_id, "seed0": args.seed,
             "episodes": args.practice, **_ga_meta(),
             "coverage_waypoints": len(covering_waypoints())}
-    _save_and_report(args, rows, ga_runs, meta, api_log)
+    _save_and_report(args, rows, ga_runs, meta, api_log, traj_paths)
     return 0
 
 
@@ -1342,6 +1551,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--api-log", default=None,
                    help=f"接口调用日志（逐条记录 /enter /measure /clear /exit 的请求与"
                         f"原始响应；缺省 <save-dir>/{API_LOG_NAME}，传空字符串则关闭）")
+    p.add_argument("--no-plot", action="store_true",
+                   help=f"关闭每局轨迹图（缺省每局结束后在 <save-dir>/{TRAJ_DIR_NAME}/ 生成 PNG）")
     p.add_argument("--quiet", action="store_true", help="只输出汇总，不打印过程")
     return p
 

@@ -84,7 +84,11 @@ def dump_data(out_dir: Path, name: str, header: Sequence[str],
 
 
 def save(fig, path: Path) -> None:
-    fig.savefig(path)
+    """存图。显式清掉元数据里的生成时间，使同一份输入每次产出逐字节一致的 PDF——
+    否则每重新出一次图 PDF 都因内嵌时间戳而变，既无法验证可复现性，也污染版本历史。
+    """
+    meta = {"CreationDate": None} if path.suffix.lower() == ".pdf" else None
+    fig.savefig(path, metadata=meta)
     plt.close(fig)
     print(f"  √ {path}")
 

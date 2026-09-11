@@ -20,9 +20,12 @@
 from __future__ import annotations
 
 import argparse
+import csv
 import itertools
 import json
 import math
+import re
+import struct
 import subprocess
 import sys
 import time
@@ -585,6 +588,64 @@ def group_e_one(rep: Report, res_dir: Path) -> None:
               f"{len(curves) - 1} 个记录点")
     rep.metric(f"e_ga_runs_{tag}", {"localize": len(loc), "route": len(route)})
 
+    # E10 轨迹图与轨迹表：每局一对，且轨迹必须与接口日志逐条对应
+    traj_dir = res_dir / T.TRAJ_DIR_NAME
+    pngs = sorted(traj_dir.glob("*.png")) if traj_dir.is_dir() else []
+    csvs = sorted(traj_dir.glob("*.csv")) if traj_dir.is_dir() else []
+    rep.check("E", f"[{tag}] 每局各有一张轨迹图与一份轨迹表",
+              len(pngs) == len(eps) and len(csvs) == len(eps),
+              f"{len(pngs)} 张图 / {len(csvs)} 份表 / {len(eps)} 局 → {traj_dir}")
+
+    # 图必须是真实渲染出来的（PNG 头 + 尺寸），避免"生成了空图"却判为通过
+    sizes, bad_png = [], []
+    for f in pngs:
+        with f.open("rb") as fh:
+            head = fh.read(24)
+        if head[:8] != b"\x89PNG\r\n\x1a\n":
+            bad_png.append(f.name)
+            continue
+        w, h = struct.unpack(">II", head[16:24])
+        sizes.append((w, h))
+        if min(w, h) < 300:
+            bad_png.append(f"{f.name}({w}x{h})")
+    rep.check("E", f"[{tag}] 轨迹图均为有效且尺寸合理的 PNG", not bad_png,
+              f"{len(pngs)} 张，尺寸 {min(sizes) if sizes else '-'}~{max(sizes) if sizes else '-'}"
+              + (f"，异常 {bad_png}" if bad_png else ""))
+
+    # 轨迹表逐条对账：图上每个动作点都必须对应日志里的一次 /measure 或 /clear，
+    # 且坐标完全一致（图与日志同源，任一不符说明记录链路有问题）。
+    per_ep_actions: Dict[int, List[Tuple[float, float, str]]] = {}
+    for r in calls:
+        if r["call"] in ("/measure", "/clear"):
+            per_ep_actions.setdefault(r["episode"], []).append(
+                (float(r["x"]), float(r["y"]), r["call"].strip("/")))
+    mismatched, checked, radius_bad = [], 0, []
+    for csv_p in csvs:
+        # 轨迹表文件名形如 ep01_seed0 / ep01，取 ep 后的数字即局号（与逐局表的 episode 对齐）
+        m = re.match(r"ep(\d+)", csv_p.stem)
+        got = list(csv.DictReader(csv_p.open(encoding="utf-8")))
+        if not m:
+            mismatched.append(f"{csv_p.name}: 文件名无法解析局号")
+            continue
+        want = per_ep_actions.get(int(m.group(1)), [])
+        if len(got) - 1 != len(want):
+            mismatched.append(f"{csv_p.name}: 表 {len(got) - 1} 点 vs 日志 {len(want)} 次")
+            continue
+        for i, (row, exp) in enumerate(zip(got[1:], want), start=1):
+            if (abs(float(row["x"]) - exp[0]) > 1e-3 or abs(float(row["y"]) - exp[1]) > 1e-3
+                    or row["kind"] != exp[2]):
+                mismatched.append(f"{csv_p.name} 第 {i} 点")
+                break
+            checked += 1
+            if math.hypot(float(row["x"]), float(row["y"])) > T.REGION_RADIUS + 1e-6:
+                radius_bad.append(f"{csv_p.name} 第 {i} 点")
+    rep.check("E", f"[{tag}] 轨迹与接口日志逐点一致（坐标与动作类型）", not mismatched,
+              f"核对 {checked} 个动作点" + (f"，不符：{mismatched[:3]}" if mismatched else ""))
+    rep.check("E", f"[{tag}] 轨迹点全部在作业圆域内", not radius_bad,
+              f"{len(radius_bad)} 个越界点" if radius_bad else f"{checked} 个点全在域内")
+    rep.metric(f"e_traj_png_{tag}", {"files": len(pngs), "dir": str(traj_dir),
+                                     "points_checked": checked})
+
 
 # ---------------------------------------------------------------------------
 # F 可复现性
@@ -622,6 +683,17 @@ def group_f(rep: Report, res_dir: Path) -> None:
     a, b = norm(runs[0] / "api_calls.jsonl"), norm(runs[1] / "api_calls.jsonl")
     rep.check("F", "接口调用序列完全一致（除时间戳）", a == b, f"{len(a)} 条 vs {len(b)} 条")
     rep.metric("f_byte_identical", same)
+
+    # F2 论文图表：PDF 内嵌生成时间会让同一份输入每次产出不同的字节（既无法验证可复现性，
+    # 也让版本历史充满无意义的二进制差异）。检查出图脚本已清掉这些时间戳字段。
+    fig_dir = Path("figures")
+    pdfs = sorted(fig_dir.glob("*.pdf")) if fig_dir.is_dir() else []
+    if pdfs:
+        stamped = [f.name for f in pdfs
+                   if re.search(rb"/(CreationDate|ModDate)\s*\(", f.read_bytes())]
+        rep.check("F", "论文图 PDF 不含生成时间戳（可逐字节复现）", not stamped,
+                  f"{len(pdfs)} 个 PDF" + (f"，含时间戳：{stamped}" if stamped else "，均无时间戳"))
+        rep.metric("f_figures_pdf", len(pdfs))
 
 
 # ---------------------------------------------------------------------------

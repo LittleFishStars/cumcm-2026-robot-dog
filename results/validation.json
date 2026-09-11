@@ -132,7 +132,7 @@
       {
         "check": "[results] 存在可审计的训练结果与接口日志",
         "pass": true,
-        "detail": "20 局 / 3420 次调用"
+        "detail": "20 局 / 3374 次调用"
       },
       {
         "check": "[results] 所有动作坐标都在半径 1800 m 圆域内",
@@ -157,7 +157,7 @@
       {
         "check": "[results] 虚拟时钟可独立复算（与模拟器报告值一致到 1e-6 s）",
         "pass": true,
-        "detail": "最大差 0.00e+00 s（3380 次）"
+        "detail": "最大差 0.00e+00 s（3334 次）"
       },
       {
         "check": "[results] 每局恰有一次 /enter 与 /exit",
@@ -167,12 +167,12 @@
       {
         "check": "[results] 测向次数与逐局统计一致",
         "pass": true,
-        "detail": "3100 vs 3100"
+        "detail": "3077 vs 3077"
       },
       {
         "check": "[results] 清除动作次数与逐局统计一致",
         "pass": true,
-        "detail": "280 vs 280"
+        "detail": "257 vs 257"
       },
       {
         "check": "[results] 所有接口调用均被接受（无 rejected / 异常）",
@@ -187,7 +187,7 @@
       {
         "check": "[results] 逐局定位平均误差 < 20 m（清除半径）",
         "pass": true,
-        "detail": "最差局 9.27 m"
+        "detail": "最差局 8.52 m"
       },
       {
         "check": "[results] 逐局最坏定位误差 < 30 m",
@@ -202,7 +202,7 @@
       {
         "check": "[results] 每次定位都有 GA 训练记录且收敛到最后一代",
         "pass": true,
-        "detail": "286 次定位（提前收敛 92 次）"
+        "detail": "286 次定位（提前收敛 95 次）"
       },
       {
         "check": "[results] 每次路线规划都有 GA 训练记录（跑满代数）",
@@ -212,12 +212,32 @@
       {
         "check": "[results] 收敛曲线非空",
         "pass": true,
-        "detail": "8872 个记录点"
+        "detail": "8782 个记录点"
+      },
+      {
+        "check": "[results] 每局各有一张轨迹图与一份轨迹表",
+        "pass": true,
+        "detail": "20 张图 / 20 份表 / 20 局 → results/trajectory"
+      },
+      {
+        "check": "[results] 轨迹图均为有效且尺寸合理的 PNG",
+        "pass": true,
+        "detail": "20 张，尺寸 (912, 1025)~(912, 1025)"
+      },
+      {
+        "check": "[results] 轨迹与接口日志逐点一致（坐标与动作类型）",
+        "pass": true,
+        "detail": "核对 3334 个动作点"
+      },
+      {
+        "check": "[results] 轨迹点全部在作业圆域内",
+        "pass": true,
+        "detail": "3334 个点全在域内"
       },
       {
         "check": "[holdout] 存在可审计的训练结果与接口日志",
         "pass": true,
-        "detail": "10 局 / 1716 次调用"
+        "detail": "10 局 / 1676 次调用"
       },
       {
         "check": "[holdout] 所有动作坐标都在半径 1800 m 圆域内",
@@ -242,7 +262,7 @@
       {
         "check": "[holdout] 虚拟时钟可独立复算（与模拟器报告值一致到 1e-6 s）",
         "pass": true,
-        "detail": "最大差 0.00e+00 s（1696 次）"
+        "detail": "最大差 0.00e+00 s（1656 次）"
       },
       {
         "check": "[holdout] 每局恰有一次 /enter 与 /exit",
@@ -252,12 +272,12 @@
       {
         "check": "[holdout] 测向次数与逐局统计一致",
         "pass": true,
-        "detail": "1551 vs 1551"
+        "detail": "1531 vs 1531"
       },
       {
         "check": "[holdout] 清除动作次数与逐局统计一致",
         "pass": true,
-        "detail": "145 vs 145"
+        "detail": "125 vs 125"
       },
       {
         "check": "[holdout] 所有接口调用均被接受（无 rejected / 异常）",
@@ -272,7 +292,7 @@
       {
         "check": "[holdout] 逐局定位平均误差 < 20 m（清除半径）",
         "pass": true,
-        "detail": "最差局 8.76 m"
+        "detail": "最差局 7.93 m"
       },
       {
         "check": "[holdout] 逐局最坏定位误差 < 30 m",
@@ -282,12 +302,12 @@
       {
         "check": "[holdout] 虚拟总时间在题目 100 h 虚拟限时内",
         "pass": true,
-        "detail": "最长局 6585.7 s"
+        "detail": "最长局 6510.2 s"
       },
       {
         "check": "[holdout] 每次定位都有 GA 训练记录且收敛到最后一代",
         "pass": true,
-        "detail": "127 次定位（提前收敛 43 次）"
+        "detail": "127 次定位（提前收敛 45 次）"
       },
       {
         "check": "[holdout] 每次路线规划都有 GA 训练记录（跑满代数）",
@@ -297,7 +317,27 @@
       {
         "check": "[holdout] 收敛曲线非空",
         "pass": true,
-        "detail": "4014 个记录点"
+        "detail": "3954 个记录点"
+      },
+      {
+        "check": "[holdout] 每局各有一张轨迹图与一份轨迹表",
+        "pass": true,
+        "detail": "10 张图 / 10 份表 / 10 局 → results/holdout/trajectory"
+      },
+      {
+        "check": "[holdout] 轨迹图均为有效且尺寸合理的 PNG",
+        "pass": true,
+        "detail": "10 张，尺寸 (912, 1025)~(912, 1025)"
+      },
+      {
+        "check": "[holdout] 轨迹与接口日志逐点一致（坐标与动作类型）",
+        "pass": true,
+        "detail": "核对 1656 个动作点"
+      },
+      {
+        "check": "[holdout] 轨迹点全部在作业圆域内",
+        "pass": true,
+        "detail": "1656 个点全在域内"
       }
     ],
     "F": [
@@ -320,6 +360,11 @@
         "check": "接口调用序列完全一致（除时间戳）",
         "pass": true,
         "detail": "354 条 vs 354 条"
+      },
+      {
+        "check": "论文图 PDF 不含生成时间戳（可逐字节复现）",
+        "pass": true,
+        "detail": "10 个 PDF，均无时间戳"
       }
     ]
   },
@@ -404,8 +449,8 @@
     "e_vt_max_diff_s": 0.0,
     "e_calls_results": {
       "enter": 20,
-      "measure": 3100,
-      "clear": 280,
+      "measure": 3077,
+      "clear": 257,
       "exit": 20
     },
     "e_rejected": 0,
@@ -414,24 +459,29 @@
       "total": 256,
       "ratio": 1.0
     },
-    "e_loc_err_mean_m_results": 6.572153413485621,
-    "e_loc_err_worst_episode_m_results": 9.2685728499128,
+    "e_loc_err_mean_m_results": 6.494540907664863,
+    "e_loc_err_worst_episode_m_results": 8.521074696129954,
     "e_loc_err_worst_m_results": 19.652916874754176,
     "e_clear_ratio_results": 1.0,
     "e_virtual_time_s_results": {
       "min": 4083.124026,
       "max": 6212.097629,
-      "mean": 4723.969143600001,
+      "mean": 4707.560038500001,
       "median": 4532.105714
     },
     "e_ga_runs_results": {
       "localize": 286,
       "route": 40
     },
+    "e_traj_png_results": {
+      "files": 20,
+      "dir": "results/trajectory",
+      "points_checked": 3334
+    },
     "e_calls_holdout": {
       "enter": 10,
-      "measure": 1551,
-      "clear": 145,
+      "measure": 1531,
+      "clear": 125,
       "exit": 10
     },
     "e_cleared_holdout": {
@@ -439,28 +489,34 @@
       "total": 124,
       "ratio": 1.0
     },
-    "e_loc_err_mean_m_holdout": 6.681877896121515,
-    "e_loc_err_worst_episode_m_holdout": 8.757067313910197,
+    "e_loc_err_mean_m_holdout": 6.378858997072747,
+    "e_loc_err_worst_episode_m_holdout": 7.932076821926572,
     "e_loc_err_worst_m_holdout": 19.140097333603205,
     "e_clear_ratio_holdout": 1.0,
     "e_virtual_time_s_holdout": {
       "min": 4333.129113,
-      "max": 6585.673977,
-      "mean": 4845.9658865,
-      "median": 4637.8076120000005
+      "max": 6510.156338,
+      "mean": 4819.0525367,
+      "median": 4587.780662499999
     },
     "e_ga_runs_holdout": {
       "localize": 127,
       "route": 20
+    },
+    "e_traj_png_holdout": {
+      "files": 10,
+      "dir": "results/holdout/trajectory",
+      "points_checked": 1656
     },
     "f_byte_identical": {
       "ga_training.json": true,
       "ga_convergence.csv": true,
       "episodes.csv": true
     },
-    "elapsed_s": 80.6
+    "f_figures_pdf": 10,
+    "elapsed_s": 94.8
   },
   "failed": 0,
-  "elapsed_s": 80.6,
-  "generated_at": "2026-09-11 08:57:00"
+  "elapsed_s": 94.8,
+  "generated_at": "2026-09-11 10:43:03"
 }

@@ -5,6 +5,7 @@ requires-python = ">=3.14"
 dependencies = [
     "numpy>=2.5.3",
     "shapely>=2.1.2",
+    "matplotlib>=3.11",     # T3_figures.py 出图用（策略与验证不需要）
 ]
 
 [[tool.uv.index]]

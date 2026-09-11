@@ -48,6 +48,19 @@ request_id 由本程序生成（`<接口>-<局号>-<序号>`），既保证跨�
 自身行为日志里的同一条请求逐行对照 —— 比赛现场据此复核每一次动作。
 
 依赖：numpy；HTTP 层复用同目录 sim_api.py；本地演练用同目录 jammers-py/（纯标准库）。
+
+官方评测平台用法（赛期）
+------------------------------------------------
+1. 在本机运行官方模拟器（Windows 程序，界面依赖 WebView2；Wine 下缺 WebView2 无法启动），
+   联网登录后进入"问题3演练测试"或"问题3正式测试"，确认开始并等 5 秒倒计时结束。
+2. 倒计时结束后机器狗接口才开放（默认 http://127.0.0.1:2026）。此时执行：
+       python T3_ga.py                       # 连默认地址，robot_id 已填参赛队号
+       python T3_ga.py --base-url http://127.0.0.1:8080    # 若在设置里改过端口
+   程序会自行 /enter → 覆盖观测 → GA 定位 → GA 规划清除 → /exit，单局现实耗时约 3 秒
+   （现实限时 20 分钟），结果默认落到 results/official/。
+3. 接口只监听 127.0.0.1，因此本程序必须与模拟器在同一台机器上运行。
+4. 接口未开放时连接会被直接关闭，程序会提示"请确认模拟器已启动并处于测试窗口内"。
+   正式测试每题只有 3 次机会，务必先用演练测试跑通。
 """
 
 from __future__ import annotations
@@ -1221,6 +1234,13 @@ def _save_and_report(args: argparse.Namespace, episodes: List[dict], ga_runs: Li
 
 
 def run_official(args: argparse.Namespace) -> int:
+    """官方评测平台的正式流程：连 127.0.0.1 上已开放接口的模拟器，跑完一局。
+
+    与演练的关键差别：**拿不到干扰源真值**，因此定位误差等需要真值的指标留空；
+    结果默认写到 results/official/，不覆盖演练训练批的数据。
+    """
+    if args.save_dir is None:
+        args.save_dir = str(Path(RESULTS_DIR) / "official")
     sim = sim_api.Simulator(robot_id=args.robot_id, base_url=args.base_url, timeout=args.timeout)
     print(f"连接模拟器 {args.base_url}（robot_id={args.robot_id}）")
     with _api_log(args, not args.quiet) as api_log:
@@ -1238,6 +1258,8 @@ def run_official(args: argparse.Namespace) -> int:
 
 
 def run_practice(args: argparse.Namespace) -> int:
+    if args.save_dir is None:
+        args.save_dir = RESULTS_DIR
     """本地演练：自动拉起 jammers-py，跑 N 局场景并汇总。
 
     第 i 局用 seed=args.seed+i：场景布局与示向度噪声都由它确定，因此同一 --seed 的整轮
@@ -1298,8 +1320,9 @@ def build_parser() -> argparse.ArgumentParser:
                    help="演练时 jammers-py 控制台端口（缺省 8090，被占用则自动顺延）")
     p.add_argument("--seed", type=int, default=0,
                    help="随机种子（演练第 1 局的场景布局、示向度噪声与 GA 都由它确定）")
-    p.add_argument("--save-dir", default=RESULTS_DIR,
-                   help=f"训练结果输出目录（缺省 {RESULTS_DIR}/；写入 GA 训练记录与逐局统计）")
+    p.add_argument("--save-dir", default=None,
+                   help=f"结果输出目录（演练缺省 {RESULTS_DIR}/，官方测试缺省 "
+                        f"{RESULTS_DIR}/official/；写入 GA 训练记录与逐局统计）")
     p.add_argument("--log", default=None, help="过程日志文件（阶段/清除等文字过程，追加写入）")
     p.add_argument("--api-log", default=None,
                    help=f"接口调用日志（逐条记录 /enter /measure /clear /exit 的请求与"

@@ -166,7 +166,24 @@
     "n_circles": 6,
     "best_ring_radius_m": 1000.0,
     "computed_worst_m": 1059.3906,
-    "feasible": false
+    "feasible": false,
+    "family": "仅「1 中心 + 6 环上圆」这一族；更一般布局的严格下界见 min_circle_count"
+  },
+  "min_circle_count": {
+    "min_count": 7,
+    "ratio_r_over_R": 0.5555555556,
+    "disk_ratios": {
+      "5": 0.6093828640807096,
+      "6": 0.5559052114165887,
+      "7": 0.5
+    },
+    "boundary_arc_lower": 6,
+    "area_density_lower": 4,
+    "six_required_cover_radius_m": 1000.6294,
+    "six_shortfall_m": 0.6294,
+    "six_shortfall_ratio": 0.000629,
+    "six_max_region_radius_m": 1798.8678,
+    "seven_required_cover_radius_m": 900.0
   },
   "grid_step_m": 5.0,
   "boundary_samples": 20000

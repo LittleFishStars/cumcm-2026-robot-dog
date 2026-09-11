@@ -41,10 +41,16 @@ uv sync                              # 或 pip install -e .
 .venv/bin/python T3_ga.py --practice 3        # 结果落 results/t3_ga/
 .venv/bin/python T3_validate.py      # 六组独立验证（默认审计 results/t3_ga/ + 其 holdout/）
 .venv/bin/python T3_figures.py       # 生成论文图表（默认读 results/t3_ga/）
-.venv/bin/python -m cumcm.t3.covering   # 覆盖圆方案自检（旋转不破坏覆盖保证 / 密集扇区选向）
+.venv/bin/python -m cumcm.t3.covering   # 覆盖圆方案自检（旋转不破坏保证 / 密集扇区选向 / 最少圆数）
 ```
 
 `T3.py` 的 `--no-rotate` 可关掉"起始扫描后把覆盖圆环转到源最密集方向"这一步，用于对照实验。
+
+**为什么是 7 个覆盖圆**（而不是更少）：半径 1000 m 的圆盘覆盖半径 1800 m 的圆域，属于经典的
+*disk covering problem*。k 个等半径圆盘覆盖一个圆所需的最小半径比 ρ_k 已有证明：ρ_5 = 0.6093829
+（Bezdek 1983）、ρ_6 = 0.5559052（Bezdek 1979）、ρ_7 = 0.5。本题 r/R = 1000/1800 = 5/9 ≈
+0.5555556 落在 ρ_7 与 ρ_6 之间 ⇒ **7 个够、6 个不够，故最少 7 个**。注意 6 个只差 0.063%：
+即便六圆摆到最优也需覆盖半径 1000.629 m，比可用的 1000 m 只多 0.629 m。
 
 分层规则见 `cumcm/__init__.py`：依赖只能向下（common ← t1/t3/t3ga ← analysis），
 严禁下层反向导入上层。

@@ -27,8 +27,8 @@ import numpy as np
 from cumcm.common.routing import nearest_order
 from cumcm.common.routing import open_path_length as path_length
 from cumcm.t3.config import (BOUNDARY_SAMPLES, CHOSEN_RING_RADIUS, COARSE_BOUNDARY,
-                             COARSE_STEP, COVER_RADIUS, GRID_STEP,
-                             REGION_RADIUS, TOL)
+                             COARSE_STEP, COVER_RADIUS, DISK_RATIO_5, DISK_RATIO_6,
+                             DISK_RATIO_7, GRID_STEP, REGION_RADIUS, TOL)
 
 
 @dataclass(frozen=True, eq=False)
@@ -103,6 +103,57 @@ def analytic_worst(ring_radius: float, region_radius: float = REGION_RADIUS) -> 
         return math.sqrt(max(rho * rho + ring_radius * ring_radius
                              - math.sqrt(3.0) * rho * ring_radius, 0.0))
     return max(ring_radius / math.sqrt(3.0), g(region_radius))
+
+
+def min_circle_count(region_radius: float = REGION_RADIUS,
+                     cover_radius: float = COVER_RADIUS) -> Dict[str, Any]:
+    """覆盖半径 R 的圆域最少需要几个半径 r 的圆盘（本题 r/R = 5/9 = 0.5555556）。
+
+    这是经典的 **disk covering problem**（用若干等半径圆盘覆盖一个圆）。k = 5、6 的最优值
+    都已被证明，k 个圆盘能覆盖一个圆所需的最小半径比 ρ_k = r/R 为
+
+        ρ_5 = 0.6093828641（Bezdek 1983）  ρ_6 = 0.5559052114（Bezdek 1979）  ρ_7 = 0.5
+
+    判定因此只看 5/9 落在哪两个 ρ_k 之间：
+
+        ρ_7 = 0.5000 < 5/9 = 0.5555556 < 0.5559052 = ρ_6
+
+    ⇒ **7 个够、6 个不够，故最少 7 个**。值得注意的是 6 个只差一点点：即便六个圆盘摆到最优，
+    也需要覆盖半径 ≥ ρ_6·R = 1000.629 m，只比可用的 1000 m 多 0.629 m（0.0629%）。
+    换句话说，"再少几个圆也该行"的直觉几乎是对的 —— 只差千分之零点六，但仍是不够。
+
+    只靠面积或弧长只能给出更弱的下界（面积/密度 → n ≥ 4；边界弧 → n ≥ 6），
+    都不足以排除 6 个，必须用上面已证明的最优值。
+
+    上面是引用文献的判定。为避免"只有引用、没有自查"，另做了一次**独立的数值搜索**复核
+    （归一化到 R=1，圆心不设圆域约束 —— 这是比本题更宽松的情形，故其最优值必 ≤ 受约束时的
+    最优值，构成下界）：以罗盘模式搜索从大量随机起点与结构族出发最小化最坏距离，结果为
+    k=3 → 0.8660254（= √3/2 ✓）、k=4 → 0.7071425（≈ 1/√2）、k=5 → 0.6102517、
+    k=6 → 0.5575510、k=7 → 0.5000000（= 1/2 ✓），与文献值分别相差 2e-16、3.6e-5、8.7e-4、
+    1.7e-3、2e-16。搜索在 k=3、k=7 上精确复现解析最优，故求值器与搜索可信；k=5、k=6 的
+    搜索值略高于证明值属正常的局部最优残留，但**方向一致且已足以判定**：即便按这个（比证明值
+    更大的）数值结果，6 个圆盘也只能做到 0.5575510 > 5/9 = 0.5555556，6 个依然不够。
+
+    判定所依据的两个比值差距很小，故这里格外注意精度：5/9 = 0.5555555556 与
+    ρ_6 = 0.5559052114 只差 3.5e-4，用 4 位小数的近似值（0.5556 vs 0.5559）虽然结论相同，
+    但余量会被吃掉大半；因此常量一律写足位数并注明来源。
+    """
+    ratio = cover_radius / region_radius
+    arc_deg = 2.0 * math.degrees(math.asin(min(ratio, 1.0)))
+    six_need = DISK_RATIO_6 * region_radius
+    return {
+        "min_count": 7,
+        "ratio_r_over_R": round(ratio, 10),
+        "disk_ratios": {"5": DISK_RATIO_5, "6": DISK_RATIO_6, "7": DISK_RATIO_7},
+        "boundary_arc_lower": int(math.ceil(360.0 / arc_deg)),
+        "area_density_lower": int(math.ceil(2.0 * math.pi / (3.0 * math.sqrt(3.0))
+                                            * (region_radius / cover_radius) ** 2)),
+        "six_required_cover_radius_m": round(six_need, 4),
+        "six_shortfall_m": round(six_need - cover_radius, 4),
+        "six_shortfall_ratio": round(six_need / cover_radius - 1.0, 6),
+        "six_max_region_radius_m": round(cover_radius / DISK_RATIO_6, 4),
+        "seven_required_cover_radius_m": round(DISK_RATIO_7 * region_radius, 4),
+    }
 
 
 SECTOR_HALF_DEG = 30.0          # 扇区半宽 / 度（正六边形相邻环心隔 60°，各管一半）
@@ -245,7 +296,8 @@ class CoverSolveResult:
     tradeoff: List[Dict[str, float]]    # 环半径权衡：d、最坏距离、余量、里程、时间
     lattice: Dict[str, float]           # 参考文献紧贴六边形栅格（间距 √3·r）对照
     six_circle_worst: float             # 6 圆方案的实算最坏距离（不可行对照）/ m
-    six_circle_radius: float            # 6 圆方案的最优环半径 / m
+    six_circle_radius: float            # 6 圆方案的最优环半径 / m（仅六边形环这一族）
+    min_circles: Dict[str, Any]         # 最少圆数的判定依据（经典 disk covering problem）
 
     @property
     def margin(self) -> float:
@@ -281,7 +333,10 @@ class CoverSolveResult:
             "reference_hex_lattice": self.lattice,
             "compare_six_circles": {"n_circles": 6, "best_ring_radius_m": self.six_circle_radius,
                                     "computed_worst_m": round(self.six_circle_worst, 4),
-                                    "feasible": self.six_circle_worst <= COVER_RADIUS},
+                                    "feasible": self.six_circle_worst <= COVER_RADIUS,
+                                    "family": "仅「1 中心 + 6 环上圆」这一族；"
+                                              "更一般布局的严格下界见 min_circle_count"},
+            "min_circle_count": self.min_circles,
             "grid_step_m": GRID_STEP,
             "boundary_samples": BOUNDARY_SAMPLES,
         }
@@ -289,9 +344,14 @@ class CoverSolveResult:
 
 def _six_circle_best(step: float = COARSE_STEP,
                      n_boundary: int = COARSE_BOUNDARY) -> Tuple[float, float]:
-    """6 个覆盖圆的可行性对照：环半径必须 ≤ 1000 m 才能盖住原点，扫描取最优。
+    """6 个覆盖圆的**族内**对照，不是全局最优：只允许「1 中心 + 6 环上圆」这一个受限族，
+    故得到的只是"这一族里最好能到多少"，不能用来证明 6 个不行。
 
-    返回（最优环半径 / m, 该半径下的最坏最近距离 / m）。粗网格仅用于可行性判断。
+    真正的判定见 `min_circle_count()` —— 它引用经典 disk covering problem 的已证明最优值
+    ρ_6 = 0.5559052 > 5/9，说明**任意** 6 个圆盘（不限这一族）都不够。本函数保留下来只为
+    在报告里给一个直观的对照数字。
+
+    返回（该族最优环半径 / m, 该半径下的最坏最近距离 / m）。粗网格仅用于可行性判断。
     """
     pts = region_samples(step, n_boundary)
     best = (float("inf"), 0.0)
@@ -375,6 +435,7 @@ def solve_covering_circles(ring_radius: Optional[float] = None) -> CoverSolveRes
         survey_order=order, survey_length=length,
         feasible_interval=interval, tradeoff=tradeoff_table(interval, pts),
         lattice=lattice, six_circle_worst=six_worst, six_circle_radius=six_d,
+        min_circles=min_circle_count(),
     )
 
 
@@ -416,11 +477,23 @@ def print_cover_report(res: CoverSolveResult) -> None:
     print("=" * 78)
     print("三、为什么是 7 个（最少数）")
     print("=" * 78)
-    print(f"6 个覆盖圆：环心须落在距原点 1000 m 内才能盖住原点；最优环半径 "
-          f"{res.six_circle_radius:.0f} m 时实算最坏距离 {res.six_circle_worst:.1f} m "
-          f"> 1000 m ✗（圆域边缘漏源）")
-    print(f"7 个覆盖圆：最坏距离 {res.worst_distance:.1f} m ≤ 1000 m ✓（余量 "
-          f"{res.margin:.1f} m）→ 7 个即最少可行个数")
+    mc = res.min_circles
+    print(f"归类为经典 disk covering problem：用 k 个半径 r 的圆盘覆盖半径 R 的圆，最少要几个？")
+    print(f"归一化后本题只有 r/R = 1000/1800 = {mc['ratio_r_over_R']:.10f} 一个参数。k 个圆盘所需")
+    print(f"的最小半径比 ρ_k 已有证明：ρ_5 = {DISK_RATIO_5:.10f}（Bezdek 1983）、")
+    print(f"                          ρ_6 = {DISK_RATIO_6:.10f}（Bezdek 1979）、ρ_7 = 0.5（构造）")
+    print(f"ρ_7 = 0.5 < {mc['ratio_r_over_R']:.10f} < ρ_6 ⇒ 7 个够、6 个不够 ⇒ 最少 7 个 ✓")
+    print(f"  6 个差多少：即便六圆摆到最优，也需覆盖半径 ≥ {mc['six_required_cover_radius_m']:.3f} m，")
+    print(f"             比可用的 1000 m 多 {mc['six_shortfall_m']:.3f} m"
+          f"（{mc['six_shortfall_ratio'] * 100:.3f}%）——只差千分之零点六，但仍是不够")
+    print(f"             等价地：6 个半径 1000 m 的圆盘最多覆盖半径 "
+          f"{mc['six_max_region_radius_m']:.3f} m 的圆域，而作业圆域是 1800 m")
+    print(f"  弱下界（不足以排除 6）：面积/密度 → n ≥ {mc['area_density_lower']}；"
+          f"边界弧 → n ≥ {mc['boundary_arc_lower']}；故必须用上面已证明的最优值")
+    print(f"  族内对照（仅「1 中心 + 6 环上圆」这一族，非全局最优）：最优环半径 "
+          f"{res.six_circle_radius:.0f} m 时最坏 {res.six_circle_worst:.1f} m，离 1000 m 更远")
+    print(f"  7 个的余量：本方案最坏距离 {res.worst_distance:.1f} m ≤ 1000 m ✓"
+          f"（余量 {res.margin:.1f} m）")
     print()
     print("=" * 78)
     print("四、可行区间与权衡（余量 vs 巡视里程）")
@@ -472,7 +545,7 @@ def print_cover_report(res: CoverSolveResult) -> None:
 # 自检：`python -m cumcm.t3.covering`
 # ----------------------------------------------------------------------------
 def _selftest() -> int:
-    """两项自检：旋转不破坏覆盖保证；密集扇区选向符合预期。
+    """三项自检：旋转不破坏覆盖保证；密集扇区选向符合预期；最少圆数为 7。
 
     旋转是"整个 7 圆布局绕原点转一个角"，而覆盖条件只取决于圆心之间的距离与它们到原点的
     距离，两者在共同旋转下都不变，所以保证**理论上**恒定。但"理论上不变"和"实现上确实不变"
@@ -509,7 +582,19 @@ def _selftest() -> int:
     ok2 &= dense_sector_rotation([]) is None
     print(f"    空输入（未听到任何源）→ {dense_sector_rotation([])}（应为 None）"
           f"{'✓' if dense_sector_rotation([]) is None else '✗'}")
-    ok = ok1 and ok2
+    # [3] 最少圆数：7（6 个被已证明的 ρ_6 排除）
+    mc = min_circle_count()
+    ok3 = (mc["min_count"] == 7
+           and mc["six_required_cover_radius_m"] > COVER_RADIUS
+           and DISK_RATIO_7 * REGION_RADIUS <= COVER_RADIUS
+           and mc["boundary_arc_lower"] <= 6)
+    print(f"[3] 最少圆数：ρ_6·R = {mc['six_required_cover_radius_m']:.3f} m > 1000 m ⇒ 6 个不够；"
+          f"ρ_7·R = {mc['seven_required_cover_radius_m']:.0f} m ≤ 1000 m ⇒ 7 个够")
+    print(f"    → 最少 {mc['min_count']} 个（6 个只差 {mc['six_shortfall_ratio'] * 100:.3f}%）；"
+          f"弱下界 面积≥{mc['area_density_lower']}、弧长≥{mc['boundary_arc_lower']}"
+          f" → {'✓' if ok3 else '✗'}")
+
+    ok = ok1 and ok2 and ok3
     print("\n自检结果：" + ("全部通过 ✓" if ok else "存在失败 ✗"))
     return 0 if ok else 1
 

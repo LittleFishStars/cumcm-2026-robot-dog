@@ -31,7 +31,7 @@ import urllib.request
 from collections import defaultdict
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Callable, Dict, Iterator, Optional
+from typing import Any, Callable, Dict, Iterator, Optional, TextIO
 
 __all__ = ["ROBOT_ID", "BASE_URL", "API_LOG_NAME", "Simulator", "ApiLog", "RecordedSim",
            "api_brief", "ms_since", "api_log"]
@@ -113,12 +113,22 @@ class ApiLog:
     模拟器自身有行为日志，但那份记录不归我们掌握；这里留一份自己的痕迹：逐条含
     request_id，可与模拟器日志逐行对照。每次调用后立即 flush，即使中途断连或崩溃，
     已经发生的调用也不会丢。
+
+    **落盘策略（避免一次失败运行抹掉上一次成功的证据链）**：本轮第一次要落盘时才决定打开方式 ——
+
+    * 本轮已经发生过成功调用（正常情形，`/enter` 就是第一条且成功）→ **清空重写**，
+      即"一个结果目录 = 最新一次运行"，与直觉一致；
+    * 本轮至今全是失败（模拟器没启动、地址敲错而立刻连接失败）→ **追加**，并在记录里标
+      `"appended": true`：上一次成功运行的完整日志得以保全，本次失败也留了痕。
+
+    官方测试只有 3 次机会，若把上一次成功的记录交给一次敲错地址的运行清空，损失无法挽回。
+
+    路径为 --api-log 指定的文件，或 <save-dir>/api_calls.jsonl。
     """
 
     def __init__(self, path: Path, echo: Optional[Callable[[str], None]] = None) -> None:
         self.path = Path(path)
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        self._fh = self.path.open("w", encoding="utf-8")
+        self._fh: Optional[TextIO] = None
         self._echo = echo
         self._t0 = time.monotonic()
         self.counts: Dict[str, int] = defaultdict(int)
@@ -127,11 +137,23 @@ class ApiLog:
         """自日志建立起的秒数（单调时钟），用于记录各次调用的相对时刻。"""
         return time.monotonic() - self._t0
 
+    def _ensure_open(self, ok: bool, rec: Dict[str, Any]) -> TextIO:
+        """本轮第一次落盘时决定打开方式（说明见类文档：成功过就重写，纯失败则追加）。"""
+        if self._fh is None:
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+            if not ok and self.path.exists() and self.path.stat().st_size > 0:
+                self._fh = self.path.open("a", encoding="utf-8")
+                rec["appended"] = True          # 标记"这一条不与上一次运行同批"
+            else:
+                self._fh = self.path.open("w", encoding="utf-8")
+        return self._fh
+
     def write(self, rec: Dict[str, Any], line: str) -> None:
         """落盘一条调用记录，并把单行摘要交给终端。"""
+        fh = self._ensure_open(bool(rec.get("ok")), rec)
         self.counts[rec["call"]] += 1
-        self._fh.write(json.dumps(rec, ensure_ascii=False) + "\n")
-        self._fh.flush()
+        fh.write(json.dumps(rec, ensure_ascii=False) + "\n")
+        fh.flush()
         if self._echo:
             self._echo(line)
 

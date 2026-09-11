@@ -1,12 +1,16 @@
 [project]
 name = "sm"
-version = "0.1.0"
+version = "0.2.0"
+description = "2026 CUMCM B 题：机器狗搜索与清除干扰源（问题一~三的求解代码）"
 requires-python = ">=3.14"
 dependencies = [
     "numpy>=2.5.3",
-    "shapely>=2.1.2",
-    "matplotlib>=3.11",     # T3_figures.py 出图用（策略与验证不需要）
+    "shapely>=2.1.2",       # 问题一的定位区域（楔形交）计算
+    "matplotlib>=3.11",     # 轨迹图与论文图表（策略与验证不需要）
 ]
+
+[tool.uv]
+package = false
 
 [[tool.uv.index]]
 url = "https://pypi.tuna.tsinghua.edu.cn/simple"

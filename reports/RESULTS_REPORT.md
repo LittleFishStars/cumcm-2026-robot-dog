@@ -1,7 +1,8 @@
 # 问题三 计算结果：遗传算法自动定位与清除
 
-> 求解程序 `T3_ga.py`，验证脚本 `T3_validate.py`，绘图脚本 `T3_figures.py`。
-> 全部结果由 `--practice` 离线演练模式自动拉起 `jammers-py` 模拟器产生，可完全复现（见第 9 节）。
+> 求解程序 `T3_ga.py`（实现见 `cumcm/t3ga/`），验证脚本 `T3_validate.py`（`cumcm/analysis/validate.py`），
+> 绘图脚本 `T3_figures.py`（`cumcm/analysis/figures.py`）。
+> 全部结果由 `--practice` 离线演练模式自动拉起 `jammers-py` 模拟器产生，可完全复现（见第 8 节）。
 
 ## 1. 运行环境
 
@@ -221,7 +222,7 @@ cd /home/ylxc/Files/数学建模/CUMCM
 .venv/bin/python T3_ga.py --practice 20 --seed 0            # 主训练批
 .venv/bin/python T3_ga.py --practice 10 --seed 100 --save-dir results/holdout
 
-# 2) 验证（六组 71 项检查，约 95 s；F 组会自己开一局演练）
+# 2) 验证（六组 71 项检查，约 2 分钟；F 组会自己开一局演练）
 .venv/bin/python T3_validate.py --results results results/holdout
 
 # 3) 生成论文图表

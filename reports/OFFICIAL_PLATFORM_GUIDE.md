@@ -36,23 +36,42 @@ pip install numpy matplotlib
 
 ### 1.3 拷贝程序文件
 
-只需两个文件，放进同一个目录（例如 `D:\cumcm\`）：
+代码按包组织，需要**整个 `cumcm/` 目录 + 顶层入口**，放进同一个目录（例如 `D:\cumcm\`）：
 
 ```
-T3_ga.py      主程序（含策略与 GA）
-sim_api.py    HTTP 薄封装（必须与 T3_ga.py 同目录）
+T3_ga.py      入口（也可换成 T3.py，主线确定性策略）
+cumcm\        求解实现（common / t1 / t3 / t3ga / analysis 五个子包）
 ```
 
-不需要拷贝 `jammers-py/`（那是本地演练用的复刻模拟器，官方平台上用不到）、
-不需要 `results/`、`figures/`。
+`cumcm\` 少一层都不行：`T3_ga.py` 只调用 `cumcm.t3ga.cli`，`sim_api.py` 只是
+`cumcm.common.sim_client` 的兼容垫片。**不要**只拷 `sim_api.py` 和 `T3_ga.py` 两个文件 ——
+那样会报 `ModuleNotFoundError: No module named 'cumcm'`。
+
+不需要拷贝 `jammers-py/`（本地演练用的复刻模拟器，官方平台上用不到）、不需要 `results/`、
+`figures/`、`reports/`、`__pycache__/`。
 
 拷贝后自检（在 `D:\cumcm\` 下执行）：
 
 ```powershell
 python T3_ga.py --help
+python -c "import cumcm, cumcm.t3ga.cli; print(cumcm.__version__)"
 ```
 
-能看到中文参数说明即表示环境正常。
+能看到中文参数说明、并打印版本号即表示环境正常。若要把代码压成单文件交，见 1.4。
+
+### 1.4 可选：打包成单文件
+
+若平台只收单个 `.py`，用标准库 `zipapp` 把包和入口打成一个可执行文件：
+
+```bash
+# 在仓库根目录执行；产物是 build/submit.pyz
+python -m zipapp . -m "cumcm.t3ga.cli:main" -o build/submit.pyz -p "/usr/bin/env python3"
+python build/submit.pyz --help          # 自检
+```
+
+打包后仍是同一份代码、同样的随机行为（策略全程不依赖 `random`，用 `--seed` 完全可复现），
+只是把 `cumcm/` 收进了一个 zip 里。注意打出来的文件要在**同一个工作目录**下运行，
+`--save-dir` 等相对路径才与本地一致。
 
 ## 2. 演练测试：务必先跑通
 

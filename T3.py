@@ -173,6 +173,8 @@ d/√3 随 d 单调增，g₂ 在 d = √3R/2 处取最小值 R/2，两者恰在
     t3_survey.json        逐局统计 + 逐源真值核对 + 逐频道定位/清除档案 + 整批汇总
     t3_observations.csv   逐条测量记录（局号、频道、阶段、检测点坐标、结果类型、示向度）
                           —— 含 no_signal，便于逐条复核"为什么这里必然听不到"
+    trajectory/t3/        逐局轨迹图 epNN_seedMM.png 与同名轨迹表 .csv（--no-plot 可关闭，
+                          --traj-dir 可改目录）。刻意与 T3_ga.py 的 trajectory/ 分开，避免同名覆盖
 
 依赖：numpy（覆盖校验）、shapely（定位区域，经 T1.py）、matplotlib 不需要；
 HTTP 层复用同目录 sim_api.py；本地演练用同目录 jammers-py/（纯标准库）。
@@ -185,9 +187,11 @@ import csv
 import hashlib
 import json
 import math
+import os
 import socket
 import subprocess
 import sys
+import tempfile
 import time
 import urllib.request
 from collections import defaultdict
@@ -242,6 +246,11 @@ PLAN_JSON = "t3_cover_plan.json"        # 覆盖圆求解结果
 PLAN_CSV = "t3_cover_circles.csv"       # 覆盖圆圆心坐标
 SURVEY_JSON = "t3_survey.json"          # 逐局巡视扫描统计
 OBS_CSV = "t3_observations.csv"         # 逐条示向度观测
+# 逐局轨迹图与轨迹表所在子目录（相对 --save-dir）。**刻意与 T3_ga.py 分开**：后者把 GA 版的
+# 轨迹图写在 <save-dir>/trajectory/epNN_seedMM.png，两边同名且同目录会互相覆盖（实测踩过，
+# 一次性覆盖掉对方 10 个已提交文件）。故本程序固定写到自己的子目录，互不干扰。
+TRAJ_DIR = "trajectory/t3"
+TRAJ_DPI = 160.0                        # 轨迹图位图分辨率
 
 # ---- 第二阶段常量：定位区域、清除判据、补测选点准则（文献方法）----
 BEARING_ERROR_DEG = 1.0         # 示向度误差半宽 / 度（题目给定 |误差| ≤ 1°，楔形张角 2°）
@@ -994,6 +1003,7 @@ class RobotDog:
         self.n_skip = 0                                        # 判定必无信号而跳过的测量次数
         self.n_inline_fail = 0                                 # 巡视途中顺路试清白跑的次数
         self.initial_scan: Dict[str, Any] = {}                 # 起始全频道扫描的统计
+        self.actions: List[Dict[str, Any]] = []                # 逐次动作记录（供轨迹图/轨迹表）
         self.regions: Dict[int, ProbRegion] = {}
         self.tracks: Dict[int, Dict[str, Any]] = {}      # 逐频道的定位/清除档案
         self.cleared: set = set()
@@ -1038,6 +1048,7 @@ class RobotDog:
         self._apply_meas(reg, m)
         if outcome == "direction":
             self.obs[channel].append(Obs(channel, x, y, m.theta, self.stage))
+        self._note("measure", x, y, channel, outcome=outcome, theta=m.theta)
         return r
 
     def _provable_no_signal(self, channel: int, at: Sequence[float]) -> bool:
@@ -1064,7 +1075,22 @@ class RobotDog:
         if ok:
             self.cleared.add(channel)
             self.tracks.setdefault(channel, {})["clear_point"] = [x, y]
+        self._note("clear", x, y, channel, outcome="success" if ok else "no_target_in_range")
         return ok
+
+    def _note(self, kind: str, x: float, y: float, channel: int,
+              outcome: Optional[str] = None, theta: Optional[float] = None) -> None:
+        """登记一次动作（/measure 或 /clear），供逐局轨迹图与轨迹表使用。
+
+        记的是**动作点**（机器狗实际到达的坐标），与日志逐点对应；画图与落盘都在 /exit 之后
+        进行，不占用现实时间预算，也不影响任何实时决策。
+        """
+        self.actions.append({
+            "seq": len(self.actions), "kind": kind, "stage": self.stage,
+            "x": float(x), "y": float(y), "channel": int(channel),
+            "outcome": outcome, "theta": theta,
+            "virtual_time_s": round(self.vt, 3), "travel_m": round(self.travel_m, 2),
+        })
 
     def _out_of_time(self) -> bool:
         return time.monotonic() > self.deadline
@@ -1917,6 +1943,203 @@ def episode_row(ep: int, seed: int, truth: Optional[Sequence[dict]], dog: RobotD
 # ----------------------------------------------------------------------------
 # 两种运行模式
 # ----------------------------------------------------------------------------
+# ----------------------------------------------------------------------------
+# 逐局轨迹图：跑完一局后把机器狗的行驶轨迹、覆盖圆与测量结果画成图
+# ----------------------------------------------------------------------------
+# 中文字体候选：优先本地常见 CJK 字体，最后 DejaVu 兜底（缺字时只影响字形，不影响出图）
+TRAJ_FONTS = ("Noto Sans CJK SC", "Noto Sans CJK JP", "WenQuanYi Zen Hei",
+              "Microsoft YaHei", "SimHei", "DejaVu Sans")
+_C_PATH = "#2f6fb5"            # 行驶路径
+_C_DIR = "#1f4e79"             # 有示向度的测量点
+_C_NOSIG = "#9aa3ad"           # 必然听不到的测量点
+_C_NEAR = "#f0a020"            # 近距（可跳过测向）
+_C_TRY = "#7b3fa0"             # 清除尝试
+_C_HIT = "#2e9e5b"             # 成功清除落点
+_C_SRC = "#c0392b"             # 干扰源真值
+_C_COVER = "#6fae6f"           # 覆盖圆
+_C_FRAME = "#5b6470"           # 圆域边界
+
+
+def truth_points(truth: Optional[Sequence[dict]]) -> List[Dict[str, float]]:
+    """把引擎的源真值统一成 {channel, x, y}，供绘图使用（raw 引擎格式与核对行都能吃）。"""
+    out: List[Dict[str, float]] = []
+    for j in truth or []:
+        if "position" in j:                       # 引擎原始格式：{"position": {"x": .., "y": ..}}
+            pos = j["position"]
+            x, y = float(pos["x"]), float(pos["y"])
+        else:                                     # 核对行格式：{"x": .., "y": ..}
+            x, y = float(j["x"]), float(j["y"])
+        out.append({"channel": float(j["channel"]), "x": x, "y": y})
+    return out
+
+
+def draw_trajectory(out_path: Path, actions: Sequence[Dict[str, Any]],
+                    plan: CoverPlan, order: Sequence[int] = (),
+                    sources: Sequence[Dict[str, Any]] = (),
+                    title: Optional[str] = None,
+                    figsize: Tuple[float, float] = (9.0, 7.6)) -> Path:
+    """把一局的轨迹画成图并存盘（格式由后缀决定，.png / .pdf）。
+
+    - `actions`：逐次动作记录（RobotDog.actions），含测向与清除的落点、结果类型、虚拟时刻；
+    - `plan`：覆盖圆方案，用来画 7 个半径 1000 m 的覆盖圆与圆心（巡视航路点）；
+    - `order`：巡视访问顺序，用于给圆心标序号，直观看出"依次到圆心"的路线；
+    - `sources`：干扰源真值（仅演练模式有），画成红叉并按 20 m 清除半径画圈；
+    - `title`：图内小标题。论文用图传 None（大标题交给 caption）。
+
+    matplotlib 只在本函数内导入，故未安装时只会抛 ImportError、由调用方忽略 —— 官方测试机上
+    没有 matplotlib 也能正常完成整局。出图去掉时间戳类元数据，同一输入两次出图逐字节一致。
+    """
+    # matplotlib 的默认配置目录常不可写（沙箱/只读 home），会退化成 /tmp 下的随机目录并报警告；
+    # 显式指到一个固定可写目录，既消除警告也让两次运行共用同一缓存（出图更快）。
+    os.environ.setdefault("MPLCONFIGDIR", os.path.join(tempfile.gettempdir(),
+                                                       "cumcm-mplconfig"))
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    with matplotlib.rc_context({"font.sans-serif": list(TRAJ_FONTS),
+                                "font.family": "sans-serif",
+                                "axes.unicode_minus": False, "font.size": 10}):
+        from matplotlib.lines import Line2D
+        fig, ax = plt.subplots(figsize=figsize)
+        th = np.linspace(0.0, 2.0 * math.pi, 361)
+        cos_th, sin_th = np.cos(th), np.sin(th)
+
+        # 作业圆域 1800 m 与源生成域 1770 m
+        ax.plot(REGION_RADIUS * cos_th, REGION_RADIUS * sin_th,
+                color=_C_FRAME, lw=1.5)
+        gen_r = REGION_RADIUS - 30.0
+        ax.plot(gen_r * cos_th, gen_r * sin_th, color=_C_FRAME, lw=0.8, ls="--", alpha=0.85)
+
+        # 7 个覆盖圆（半径 1000 m）与圆心：逐圆画但不逐个进图例（否则图例会被撑爆）
+        wp = np.asarray(plan.waypoints, dtype=float)
+        for cx, cy in wp:
+            ax.plot(cx + COVER_RADIUS * cos_th, cy + COVER_RADIUS * sin_th,
+                    color=_C_COVER, lw=0.7, alpha=0.5, zorder=1.0)
+        ax.plot(wp[:, 0], wp[:, 1], marker="o", ms=4.0, ls="none", mfc="none",
+                mec=_C_COVER, mew=1.2)
+        for k, idx in enumerate(order or range(len(wp))):
+            ax.annotate(f"{k + 1}", (wp[idx, 0], wp[idx, 1]), textcoords="offset points",
+                        xytext=(5, 4), fontsize=8, color=_C_COVER)
+
+        # 行驶路径与各类动作点
+        handles = [Line2D([], [], color=_C_FRAME, lw=1.5,
+                          label=f"作业圆域 {REGION_RADIUS:.0f} m"),
+                   Line2D([], [], color=_C_FRAME, lw=0.8, ls="--", alpha=0.85,
+                          label=f"干扰源生成域 {gen_r:.0f} m"),
+                   Line2D([], [], color=_C_COVER, lw=0.7, alpha=0.5,
+                          label=f"{len(wp)} 个覆盖圆（半径 {COVER_RADIUS:.0f} m）"),
+                   Line2D([], [], marker="o", ms=4.0, ls="none", mfc="none", mec=_C_COVER,
+                          mew=1.2, label="覆盖圆圆心（航路点，标注访问序号）")]
+        if actions:
+            xs = [a["x"] for a in actions]
+            ys = [a["y"] for a in actions]
+            ax.plot([0.0] + xs, [0.0] + ys, "-", lw=1.0, color=_C_PATH, alpha=0.8,
+                    zorder=4.0)
+            handles.append(Line2D([], [], color=_C_PATH, lw=1.0,
+                                  label=f"行驶路径（{len(actions)} 次动作）"))
+            groups = (("direction", dict(marker=".", ms=5, ls="none", color=_C_DIR),
+                       "测得示向度"),
+                      ("no_signal", dict(marker="x", ms=3.5, ls="none", color=_C_NOSIG),
+                       "无信号"),
+                      ("near", dict(marker="o", ms=6, ls="none", mfc="none", mec=_C_NEAR,
+                                    mew=1.4), "近距 near"))
+            for kind, style, label in groups:
+                sel = [(a["x"], a["y"]) for a in actions
+                       if a["kind"] == "measure" and a["outcome"] == kind]
+                if not sel:
+                    continue
+                arr = np.asarray(sel, dtype=float)
+                ax.plot(arr[:, 0], arr[:, 1], zorder=5.0, **style)
+                handles.append(Line2D([], [], label=f"{label}（{len(arr)} 次）", **style))
+            tries = [(a["x"], a["y"]) for a in actions if a["kind"] == "clear"]
+            if tries:
+                arr = np.asarray(tries, dtype=float)
+                ax.plot(arr[:, 0], arr[:, 1], marker="^", ms=5.5, ls="none", mfc="none",
+                        mec=_C_TRY, mew=1.2, zorder=6.0)
+                handles.append(Line2D([], [], marker="^", ms=5.5, ls="none", mfc="none",
+                                      mec=_C_TRY, mew=1.2,
+                                      label=f"清除尝试（{len(arr)} 次）"))
+                ok = np.asarray([(a["x"], a["y"]) for a in actions
+                                 if a["kind"] == "clear" and a["outcome"] == "success"],
+                                dtype=float)
+                if len(ok):
+                    # 清除落点必然紧贴真值（20 m 内），故画在最上层才看得见
+                    ax.plot(ok[:, 0], ok[:, 1], marker="*", ms=11, ls="none", color=_C_HIT,
+                            zorder=8.0)
+                    handles.append(Line2D([], [], marker="*", ms=11, ls="none",
+                                          color=_C_HIT, label=f"清除成功（{len(ok)} 个）"))
+
+        # 干扰源真值（仅演练模式）与 20 m 清除半径
+        if sources:
+            arr = np.asarray([(s["x"], s["y"]) for s in sources], dtype=float)
+            ax.plot(arr[:, 0], arr[:, 1], marker="X", ms=8, ls="none", color=_C_SRC,
+                    zorder=7.0)
+            # 每个源一个半径 20 m 的圆：列方向必须是"每个圆一列"，否则会被连成一团
+            ax.plot(arr[:, 0][None, :] + CLEAR_RADIUS * cos_th[:, None],
+                    arr[:, 1][None, :] + CLEAR_RADIUS * sin_th[:, None],
+                    color=_C_SRC, lw=0.7, alpha=0.75, zorder=1.5)
+            handles.append(Line2D([], [], marker="X", ms=8, ls="none", color=_C_SRC,
+                                  label=f"干扰源真值（{len(arr)} 个）"))
+            handles.append(Line2D([], [], color=_C_SRC, lw=0.7, alpha=0.75,
+                                  label=f"清除半径 {CLEAR_RADIUS:.0f} m（全图视场 3600 m，需放大才可见）"))
+
+        ax.plot(0.0, 0.0, marker="s", ms=6, color="black")
+        handles.append(Line2D([], [], marker="s", ms=6, ls="none", color="black",
+                              label="起点（原点）"))
+        ax.set_aspect("equal")
+        ax.set_xlabel("x / m")
+        ax.set_ylabel("y / m")
+        if title:
+            ax.set_title(title, fontsize=10)
+        # 图例放到坐标轴下方：图内 3600 m 见方的圆域几乎没有空白，放进去必然压住轨迹
+        ax.legend(handles=handles, loc="upper center", bbox_to_anchor=(0.5, -0.07),
+                  ncol=3, fontsize=7.5, framealpha=0.9)
+        ax.grid(alpha=0.25, lw=0.5)
+        fig.tight_layout()
+        fig.savefig(out_path, dpi=TRAJ_DPI, metadata={"Software": None})
+        plt.close(fig)
+    return out_path
+
+
+def save_trajectory(save_dir: Path, name: str, actions: Sequence[Dict[str, Any]],
+                    plan: CoverPlan, order: Sequence[int] = (),
+                    sources: Sequence[Dict[str, Any]] = (),
+                    title: Optional[str] = None,
+                    traj_dir: str = TRAJ_DIR) -> List[Path]:
+    """落盘一局的轨迹：同名 PNG（图）与 CSV（轨迹表），返回已写出的文件列表。
+
+    轨迹表让"图上每个点"都能与过程日志逐点对账（序号、动作类型、阶段、坐标、结果、频道、
+    虚拟时刻、累计里程）。matplotlib 缺失只提示一次并跳过出图，轨迹表照常写出。
+    """
+    out_dir = save_dir / traj_dir
+    out_dir.mkdir(parents=True, exist_ok=True)
+    csv_path = out_dir / f"{name}.csv"
+    with csv_path.open("w", newline="", encoding="utf-8") as f:
+        w = csv.writer(f)
+        w.writerow(["seq", "kind", "stage", "x_m", "y_m", "channel", "outcome",
+                    "theta_deg", "virtual_time_s", "travel_m"])
+        for a in actions:
+            w.writerow([a["seq"], a["kind"], a["stage"], f"{a['x']:.2f}", f"{a['y']:.2f}",
+                        a["channel"], a["outcome"] or "",
+                        "" if a["theta"] is None else f"{a['theta']:.2f}",
+                        f"{a['virtual_time_s']:.3f}", f"{a['travel_m']:.2f}"])
+    paths = [csv_path]
+    try:
+        paths.insert(0, draw_trajectory(out_dir / f"{name}.png", actions, plan, order,
+                                        sources, title))
+    except ImportError:
+        global _PLOT_HINTED
+        if not _PLOT_HINTED:
+            _PLOT_HINTED = True
+            print("提示：未安装 matplotlib，已跳过轨迹图（pip install matplotlib 后可自动生成）")
+    return paths
+
+
+_PLOT_HINTED = False           # 缺 matplotlib 的提示只打印一次，避免每局刷屏
+
+
 def _observations(ep: int, plan: CoverPlan, meas: Dict[int, List[Meas]]) -> List[dict]:
     """把本局全部测量整理成 CSV 行（含 no_signal，并附"测量点到最近圆心的距离"）。"""
     rows = []
@@ -1982,6 +2205,15 @@ def run_practice(args: argparse.Namespace, res: CoverSolveResult, save_dir: Path
             rows.append(episode_row(ep + 1, seed, truth, dog, stats, check))
             observations.extend(_observations(ep + 1, res.plan, dog.meas))
             show(stats, check, len(truth))
+            if not args.no_plot:                    # 出图在 /exit 之后，不占现实时间预算
+                name = f"ep{ep + 1:02d}_seed{seed}"
+                files = save_trajectory(
+                    save_dir, name, dog.actions, res.plan, res.survey_order,
+                    truth_points(truth),
+                    title=f"第 {ep + 1} 局（seed={seed}）：清除 {stats['cleared']}/{len(truth)}、"
+                          f"里程 {stats['travel_m']:.0f} m、虚拟时间 {stats['virtual_time_s']:.0f} s",
+                    traj_dir=args.traj_dir)
+                print("  轨迹图：" + "，".join(str(f) for f in files))
     print("\n" + "=" * 78)
     if clear:
         print(f"汇总（{len(rows)} 局）：平均清除比例 "
@@ -2034,6 +2266,13 @@ def run_official(args: argparse.Namespace, res: CoverSolveResult, save_dir: Path
           f"听到 {stats['channels_heard']} 个频道（{stats['n_bearings']} 条示向度）")
     row = episode_row(1, args.seed, None, dog, stats,
                       truth_check(None, res.plan, dog.obs, dog.cleared, dog.tracks))
+    if not args.no_plot:
+        files = save_trajectory(
+            save_dir, f"ep01_seed{args.seed}", dog.actions, res.plan, res.survey_order, (),
+            title=f"官方模式：清除 {stats['cleared']} 个、里程 {stats['travel_m']:.0f} m、"
+                  f"虚拟时间 {stats['virtual_time_s']:.0f} s（无真值可比）",
+            traj_dir=args.traj_dir)
+        print("轨迹图：" + "，".join(str(f) for f in files))
     paths = (save_plan(res, save_dir)
              + save_survey(save_dir, [row], _observations(1, res.plan, dog.meas), res.to_json()))
     print("结果已保存：" + "，".join(str(p) for p in paths))
@@ -2088,6 +2327,11 @@ def build_parser() -> argparse.ArgumentParser:
                    help=f"巡视途中顺路试清允许的绕行里程上限 / m（缺省 {INLINE_DETOUR:.0f}）")
     p.add_argument("--survey-only", action="store_true",
                    help="只做阶段一（巡视扫描 + 覆盖核对），不做定位与清除")
+    p.add_argument("--traj-dir", default=TRAJ_DIR,
+                   help=f"轨迹图输出子目录（相对 --save-dir；缺省 {TRAJ_DIR}，"
+                        f"与 T3_ga.py 的 trajectory/ 分开以免互相覆盖）")
+    p.add_argument("--no-plot", action="store_true",
+                   help=f"不出逐局轨迹图（缺省每局在 <save-dir>/{TRAJ_DIR}/ 生成同名 png + csv）")
     p.add_argument("--quiet", action="store_true", help="只输出汇总，不打印过程")
     return p
 

@@ -100,6 +100,61 @@ def check_file(path):
     return [p for p in out if p[0] != "<module>"]
 
 
+def check_argparse_attrs(path: str) -> List[Tuple[str, str, int]]:
+    """同一类错漏的 argparse 版本：读到的 `args.X` 却没有任何 `add_argument` 产生。
+
+    为什么要这一项：撤/换命令行参数时按"两处锚点之间的区间"删代码，很容易连带删掉夹在中间的
+    其它参数（本项目真实发生过两次：撤 --piggyback 与换 --inline-* 时各误删一次
+    `--survey-only`、`--traj-dir`）。这类错 import 检查同样抓不到 —— 只有真跑到那条分支才炸，
+    而 `--survey-only` 恰好在 `run_practice` 开头就用到，属于"一跑就炸"的幸运情况。
+
+    判定：先收齐本文件 `add_argument` 产生的 dest（长选项去 `--`、连字符换下划线；有 `dest=`
+    则用它），再找出所有"命名空间变量"（`parse_args()` 的赋值目标，或注解为
+    `argparse.Namespace` 的参数）的属性读取，凡 attr 不在 dest 集合里即报告。
+    """
+    tree = ast.parse(Path(path).read_text(encoding="utf-8"), path)
+    dests, namespaces = set(), set()
+    for n in ast.walk(tree):
+        # add_argument("--foo", "-f", dest="bar")
+        if (isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute)
+                and n.func.attr == "add_argument"):
+            dest = None
+            for kw in n.keywords:
+                if kw.arg == "dest" and isinstance(kw.value, ast.Constant):
+                    dest = str(kw.value.value)
+            longs = [a.value for a in n.args
+                     if isinstance(a, ast.Constant) and isinstance(a.value, str)]
+            if dest is None:
+                cand = [x for x in longs if x.startswith("--")]
+                if cand:
+                    dest = cand[0][2:].replace("-", "_")
+                elif longs:                      # 位置参数
+                    dest = longs[0]
+            if dest:
+                dests.add(dest)
+        # X = p.parse_args(...)
+        if isinstance(n, ast.Assign) and isinstance(n.value, ast.Call) \
+                and isinstance(n.value.func, ast.Attribute) \
+                and n.value.func.attr == "parse_args":
+            for t in n.targets:
+                if isinstance(t, ast.Name):
+                    namespaces.add(t.id)
+        # def f(args: argparse.Namespace, ...)
+        if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            for a in n.args.posonlyargs + n.args.args + n.args.kwonlyargs:
+                ann = a.annotation
+                if isinstance(ann, ast.Attribute) and ann.attr == "Namespace":
+                    namespaces.add(a.arg)
+    if not dests:
+        return []
+    out = []
+    for n in ast.walk(tree):
+        if isinstance(n, ast.Attribute) and isinstance(n.value, ast.Name) \
+                and n.value.id in namespaces and n.attr not in dests:
+            out.append((n.attr, n.value.id, n.lineno))
+    return out
+
+
 def main(argv: List[str]) -> int:
     """扫若干文件或目录（缺省整个 `cumcm/` 包）；有漏定义返回 1，否则返回 0。"""
     args = argv or ["cumcm"]
@@ -116,8 +171,11 @@ def main(argv: List[str]) -> int:
         for where, nm, ln in check_file(t):
             print(f"  {t}:{ln}  {where}() 读到未绑定的 '{nm}'")
             total += 1
+        for attr, ns, ln in check_argparse_attrs(t):
+            print(f"  {t}:{ln}  读到的 '{ns}.{attr}' 没有任何 add_argument 产生")
+            total += 1
     print(f"共 {total} 处漏定义（扫了 {len(targets)} 个文件）" if total
-          else f"未发现漏定义 ✓（扫了 {len(targets)} 个文件）")
+          else f"未发现漏定义或缺失参数 ✓（扫了 {len(targets)} 个文件）")
     return 1 if total else 0
 
 

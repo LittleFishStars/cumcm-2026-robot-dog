@@ -20,7 +20,7 @@ from cumcm.common.paths import default_jammers_dir
 from cumcm.common.practice_arena import PracticeArena
 from cumcm.common.sim_client import API_LOG_NAME, BASE_URL, ROBOT_ID, Simulator
 from cumcm.common.sim_client import api_log as _api_log_raw
-from cumcm.t3.config import (BEARING_ERROR_DEG, CHOSEN_RING_RADIUS, CLEAR_RADIUS, COVER_RADIUS, INLINE_SECTOR_DEG, K_CLEAR_MAX, RESULTS_DIR, SEED, TRAJ_DIR)
+from cumcm.t3.config import (BEARING_ERROR_DEG, CHOSEN_RING_RADIUS, CLEAR_RADIUS, COVER_RADIUS, INLINE_PROBE_DIAM_M, INLINE_RADIUS_MAX_M, INLINE_SECTOR_DEG, K_CLEAR_MAX, RESULTS_DIR, SEED, TRAJ_DIR)
 from cumcm.t3.covering import (CoverSolveResult, optimal_ring_radius, print_cover_report, solve_covering_circles)
 from cumcm.common.scanfigure import STEP_DIR_NAME, reset_dir
 from cumcm.t3.plotting import save_scan_figures, save_trajectory, truth_points
@@ -84,6 +84,8 @@ def run_practice(args: argparse.Namespace, res: CoverSolveResult, save_dir: Path
                            verbose=not args.quiet, logfile=args.log, episode=ep + 1,
                            clear=clear, k_clear_max=args.k_clear_max,
                            inline_sector_deg=args.inline_sector_deg,
+                           inline_radius_max=args.inline_radius_max,
+                           inline_probe_diam=args.inline_probe_diam,
                            rotate=not args.no_rotate, api_log=api_log)
             stats = dog.run(res.plan, res.survey_order)
             arena.finish_episode()
@@ -172,6 +174,8 @@ def run_official(args: argparse.Namespace, res: CoverSolveResult, save_dir: Path
         dog = RobotDog(sim, verbose=not args.quiet, logfile=args.log, episode=1,
                        clear=not args.survey_only, k_clear_max=args.k_clear_max,
                        inline_sector_deg=args.inline_sector_deg,
+                           inline_radius_max=args.inline_radius_max,
+                           inline_probe_diam=args.inline_probe_diam,
                        rotate=not args.no_rotate, api_log=api_log)
         stats = dog.run(res.plan, res.survey_order)
         print(f"完成：清除 {stats['cleared']} 个，巡视 {stats['waypoints_visited']} 个圆心，"
@@ -249,6 +253,12 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--k-clear-max", type=int, default=K_CLEAR_MAX,
                    help=f"试清未中后最多再补清几个点（用 K 个半径 20 m 的圆覆盖定位区域；"
                         f"缺省 {K_CLEAR_MAX}，只在能盖满区域时才用，盖不满则转入补测）")
+    p.add_argument("--inline-probe-diam", type=float, default=INLINE_PROBE_DIAM_M,
+                   help=f"顺路清除时顺手补测的直径阈值 / m（区域直径 > 此值的已扫频道在清除点补测一次"
+                        f"；缺省 {INLINE_PROBE_DIAM_M:.0f}，0 = 关闭）")
+    p.add_argument("--inline-radius-max", type=float, default=INLINE_RADIUS_MAX_M,
+                   help=f"顺路清除扇区的半径上界 / m（缺省 {INLINE_RADIUS_MAX_M:.0f} = 区域半径 = "
+                        f"圆域内都算；曾收紧到两站半径以压白跑，用户确认放宽）")
     p.add_argument("--inline-sector-deg", type=float, default=INLINE_SECTOR_DEG,
                    help=f"巡视途中顺路清除的方位扇区半张角 / 度（缺省 {INLINE_SECTOR_DEG:.0f}；"
                         f"判据：估计点与圆心的连线方向落在「本站→圆心」与「下一站→圆心」"

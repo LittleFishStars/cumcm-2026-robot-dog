@@ -71,9 +71,12 @@ class _CorridorProbe:
     _polar_deg = staticmethod(T3_strategy.RobotDog._polar_deg)
     _at_origin = staticmethod(T3_strategy.RobotDog._at_origin)
 
-    def __init__(self, sector_deg: float = 2.0, exclude_r: float = 0.0) -> None:
+    def __init__(self, sector_deg: float = 2.0, exclude_r: float = 0.0,
+                 radius_max: float | None = None) -> None:
         self.inline_sector_deg = float(sector_deg)
         self.inline_exclude_r = float(exclude_r)
+        self.inline_radius_max = (T3_cfg.INLINE_RADIUS_MAX_M if radius_max is None
+                                  else float(radius_max))
 
 
 class _T3GA:
@@ -424,11 +427,12 @@ def group_c(rep: Report, rng: np.random.Generator) -> None:
     at, nxt = (900.0, 0.0), (450.0, 779.4)          # 方位 0° 与 60°
 
     # C4 定点：方位在两条连线之间则放行，反之拒绝；半径不限。
-    acases = [((800.0, 240.0), True, "方位 16.7° 在扇区内（半径 835 m ≤ 两站半径 900 m）"),
+    acases = [((800.0, 240.0), True, "方位 16.7° 在扇区内（半径 835 m ≤ 1800）"),
+              ((850.0, 1000.0), True, "方位 49.6° 在扇区内（半径 1312 m ≤ 1800，远源可清）"),
               ((500.0, 0.0), True, "方位 0° = 本站连线方向（含端点）"),
               ((225.0, 389.7), True, "方位 60° = 下一站连线方向（含端点）"),
               ((300.0, 750.0), False, "方位 68.2° 出扇区（半径 808 m 在界内，是被方位排除）"),
-              ((850.0, 1000.0), False, "方位 49.6° 在方位内但半径 1312 m 超两站半径"),
+              ((1500.0, 1400.0), False, "方位 43° 在方位内但半径 2052 m 超区域半径 1800"),
               ((-500.0, 0.0), False, "方位 180°（反侧）")]
     wrong = [d for est, want, d in acases if (arc(probe, at, nxt, est) is not None) != want]
     rep.check("C", "顺路清除方位扇区：两连线之间放行、之外拒绝（5 例）",
@@ -445,8 +449,7 @@ def group_c(rep: Report, rng: np.random.Generator) -> None:
         q = rng.uniform(-1800, 1800, size=2)
         th = lambda p: float(np.degrees(np.arctan2(p[1], p[0])) % 360.0)
         d_ab = T_geometry.ang_diff(th(a), th(b))
-        r_ok = float(np.linalg.norm(q)) <= max(float(np.linalg.norm(a)),
-                                               float(np.linalg.norm(b))) + 1e-6
+        r_ok = float(np.linalg.norm(q)) <= T3_cfg.INLINE_RADIUS_MAX_M + 1e-6
         want = r_ok and (T_geometry.ang_diff(th(q), th(a))
                          + T_geometry.ang_diff(th(q), th(b)) <= d_ab + 1e-9)
         got = arc(probe, a, b, q) is not None
@@ -467,7 +470,7 @@ def group_c(rep: Report, rng: np.random.Generator) -> None:
               arc(probe, at, nxt, refl) is None and sin_trap and a_refl > 60.0,
               f"|sin 方位差|≈0 会误判、ang_diff 给出 {a_refl:.0f}° ⇒ 正确排除")
 
-    # C7 区域圆心排除规则：极角扇区半径不限、延伸到圆域各处，所以 600 m 排除**确实会触发**。
+    # C7 区域圆心排除规则：极角扇区半径到区域半径 1800、延伸到圆域各处，600 m 排除**确实会触发**。
     ex_probe = _CorridorProbe(exclude_r=T3_cfg.INLINE_EXCLUDE_R_M)
     near = (400.0, 230.0)                            # 方位 29.9° 在扇区内，距原点 461 m
     far = (800.0, 300.0)                             # 方位 20.6° 在扇区内，距原点 854 m

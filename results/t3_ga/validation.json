@@ -104,6 +104,26 @@
         "check": "2-opt 精修从不使路程变长（20 例）",
         "pass": true,
         "detail": ""
+      },
+      {
+        "check": "巡视走廊：段内放行、越界与段外拒绝（5 例）",
+        "pass": true,
+        "detail": "全部符合"
+      },
+      {
+        "check": "巡视走廊：与线段投影判据等价（4000 组随机，非端点处）",
+        "pass": true,
+        "detail": "实质不一致 0 处"
+      },
+      {
+        "check": "巡视走廊：越站点被排除（|sin| 判据会误判为在线上）",
+        "pass": true,
+        "detail": "垂距 0 m ≤ 半宽、回望角 180° ⇒ 角度判据正确排除"
+      },
+      {
+        "check": "顺路清除排除距区域圆心 600 m 内的估计点",
+        "pass": true,
+        "detail": "400 m 处排除、700 m 处保留；门槛置 0 时不再排除"
       }
     ],
     "D": [
@@ -384,7 +404,7 @@
       {
         "check": "接口调用序列完全一致（除时间戳）",
         "pass": true,
-        "detail": "324 条 vs 324 条"
+        "detail": "314 条 vs 314 条"
       },
       {
         "check": "论文图 PDF 不含生成时间戳（可逐字节复现）",
@@ -421,6 +441,8 @@
     "c_gap_n7": 0.0,
     "c_nn_gain_mean": 0.06675930683115512,
     "c_nn_gain_worst": 0.0,
+    "c_corridor_mismatch": 0,
+    "c_inline_chord_min_r_m": 891.3104646828592,
     "d_loc_pop": {
       "pop20": 4.653528809687247,
       "pop40": 4.655964411384091,
@@ -541,10 +563,10 @@
       "episodes.csv": true
     },
     "f_figures_pdf": 10,
-    "elapsed_s": 104.6
+    "elapsed_s": 122.7
   },
   "failed": 0,
   "skipped": 5,
-  "elapsed_s": 104.6,
-  "generated_at": "2026-09-11 21:39:20"
+  "elapsed_s": 122.7,
+  "generated_at": "2026-09-11 23:21:03"
 }

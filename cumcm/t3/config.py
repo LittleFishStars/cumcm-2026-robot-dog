@@ -15,11 +15,6 @@ REGION_RADIUS = 1800.0          # 目标圆域半径 / m
 COVER_RADIUS = 1000.0           # 覆盖圆半径 = 有效接收半径下界 / m
 RECEIVE_MAX = 1500.0            # 有效接收半径上界 / m（题目给定 1000~1500）
 RECEIVE_MID = 0.5 * (COVER_RADIUS + RECEIVE_MAX)   # 接收半径中值，用于估源距离 / m
-INLINE_TRY_RADIUS = 150.0       # 巡视途中顺路试清：估计点覆盖圆半径 ≤ 该值才值得绕 / m
-INLINE_DETOUR = 400.0           # 巡视途中顺路试清允许的最大绕行里程 / m
-                                # （两者缺省值由 5 局 × 4 组参数实测选出：半径 150 与 300 结果相同，
-                                #   说明 150 已覆盖全部机会；绕行放宽到 600/700 m 反而更慢 ——
-                                #   绕得越远，试清失败时就越是纯粹白跑）
 EXCL_QUAD = 16                  # 圆盘约束的近似精度：正 4×EXCL_QUAD 边形（见 ProbRegion）
 CHANNELS: Tuple[int, ...] = tuple(range(1, 21))      # 20 个频道
 COORD_LIMIT = 2.0e6             # 坐标分量绝对值上限 / m（协议规定）
@@ -113,6 +108,13 @@ BEARING_ERROR_DEG = 1.0         # 示向度误差半宽 / 度（题面给定 |�
 SIGMA_DEG = BEARING_ERROR_DEG
 SIGMA_RAD = math.radians(SIGMA_DEG)
 CLEAR_RADIUS = 20.0             # 清除半径 / m（光学精确定位要求 ≤ 20 m）
+# 巡视途中顺路清除的判据：估计点是否落在"本站 → 下一站"这段直线的走廊内（按角度算，见
+# RobotDog._leg_corridor）。走廊半宽取**清除半径**：机器狗沿直线走向下一站时，只要"擦过"
+# 估计点 20 m 以内就清得到，于是清这些点不额外花里程（总里程与直奔下一站相同），只花 5 s
+# （命中）或 3 s（未命中）—— 而留到阶段二则至少要从别处专程跑一趟（几百米）。
+INLINE_CORRIDOR_M = CLEAR_RADIUS    # 走廊半宽 / m（角度口径：|Δ方位| ≤ asin(半宽 / 距离)）
+INLINE_EXCLUDE_R_M = 600.0      # 排除距区域圆心（原点）该距离以内的估计点 / m（作用范围限制）
+
 NEAR_RADIUS = 5.0               # 近距阈值 / m（≤ 5 m 可跳过测向直接清除）
 CLIP_SIDES = 256                # 定位区域求交时目标圆域的内接多边形边数
 CLIP_ERR = REGION_RADIUS * (1.0 - math.cos(math.pi / CLIP_SIDES))   # 内接多边形与真圆的偏差 / m

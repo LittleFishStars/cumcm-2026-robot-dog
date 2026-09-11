@@ -20,7 +20,7 @@ from cumcm.common.paths import default_jammers_dir
 from cumcm.common.practice_arena import PracticeArena
 from cumcm.common.sim_client import API_LOG_NAME, BASE_URL, ROBOT_ID, Simulator
 from cumcm.common.sim_client import api_log as _api_log_raw
-from cumcm.t3.config import (BEARING_ERROR_DEG, CHOSEN_RING_RADIUS, CLEAR_RADIUS, COVER_RADIUS, INLINE_DETOUR, INLINE_TRY_RADIUS, K_CLEAR_MAX, RESULTS_DIR, SEED, TRAJ_DIR)
+from cumcm.t3.config import (BEARING_ERROR_DEG, CHOSEN_RING_RADIUS, CLEAR_RADIUS, COVER_RADIUS, INLINE_CORRIDOR_M, K_CLEAR_MAX, RESULTS_DIR, SEED, TRAJ_DIR)
 from cumcm.t3.covering import (CoverSolveResult, optimal_ring_radius, print_cover_report, solve_covering_circles)
 from cumcm.common.scanfigure import STEP_DIR_NAME, reset_dir
 from cumcm.t3.plotting import save_scan_figures, save_trajectory, truth_points
@@ -83,8 +83,7 @@ def run_practice(args: argparse.Namespace, res: CoverSolveResult, save_dir: Path
                                              timeout=args.timeout),
                            verbose=not args.quiet, logfile=args.log, episode=ep + 1,
                            clear=clear, k_clear_max=args.k_clear_max,
-                           inline_try_radius=args.inline_try_radius,
-                           inline_detour=args.inline_detour,
+                           inline_corridor=args.inline_corridor,
                            rotate=not args.no_rotate, api_log=api_log)
             stats = dog.run(res.plan, res.survey_order)
             arena.finish_episode()
@@ -172,8 +171,7 @@ def run_official(args: argparse.Namespace, res: CoverSolveResult, save_dir: Path
     with _api_log(args, not args.quiet) as api_log:
         dog = RobotDog(sim, verbose=not args.quiet, logfile=args.log, episode=1,
                        clear=not args.survey_only, k_clear_max=args.k_clear_max,
-                       inline_try_radius=args.inline_try_radius,
-                       inline_detour=args.inline_detour,
+                       inline_corridor=args.inline_corridor,
                        rotate=not args.no_rotate, api_log=api_log)
         stats = dog.run(res.plan, res.survey_order)
         print(f"完成：清除 {stats['cleared']} 个，巡视 {stats['waypoints_visited']} 个圆心，"
@@ -251,11 +249,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--k-clear-max", type=int, default=K_CLEAR_MAX,
                    help=f"试清未中后最多再补清几个点（用 K 个半径 20 m 的圆覆盖定位区域；"
                         f"缺省 {K_CLEAR_MAX}，只在能盖满区域时才用，盖不满则转入补测）")
-    p.add_argument("--inline-try-radius", type=float, default=INLINE_TRY_RADIUS,
-                   help=f"巡视途中顺路试清允许的覆盖圆半径上限 / m（缺省 {INLINE_TRY_RADIUS:.0f}；"
-                        f"设成 {CLEAR_RADIUS:.0f} 表示只清估计已够准的）")
-    p.add_argument("--inline-detour", type=float, default=INLINE_DETOUR,
-                   help=f"巡视途中顺路试清允许的绕行里程上限 / m（缺省 {INLINE_DETOUR:.0f}）")
+    p.add_argument("--inline-corridor", type=float, default=INLINE_CORRIDOR_M,
+                   help=f"巡视途中顺路清除的直线走廊半宽 / m（缺省 {INLINE_CORRIDOR_M:.0f} = 清除"
+                        f"半径；走廊内的估计点沿直线顺路清掉，总里程不变）")
     p.add_argument("--survey-only", action="store_true",
                    help="只做阶段一（巡视扫描 + 覆盖核对），不做定位与清除")
     p.add_argument("--traj-dir", default=TRAJ_DIR,

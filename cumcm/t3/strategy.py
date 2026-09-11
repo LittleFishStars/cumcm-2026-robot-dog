@@ -24,14 +24,15 @@ import numpy as np
 
 from functools import partial
 
-from cumcm.common.geometry import dist
+from cumcm.common.geometry import ang_diff, bearing, dist
 from cumcm.common.geometry import clamp_to_region as _clamp_to_region
 from cumcm.common.routing import (dist_matrix, exact_open_by_end, exact_open_order,
                                   nearest_order)
 from cumcm.common.sim_client import RecordedSim
 from cumcm.t3.config import (BEARING_ERROR_DEG, CHANNELS, CLEAR_RADIUS, CLIP_ERR, CLIP_SIDES,
                              COVER_RADIUS, HOMING_CAP, HOMING_MAX, HOMING_STEP,
-                             INLINE_DETOUR, INLINE_TRY_RADIUS, K_CLEAR_MAX, K_COVER_SAMPLES,
+                             INLINE_CORRIDOR_M, INLINE_EXCLUDE_R_M, K_CLEAR_MAX,
+                             K_COVER_SAMPLES,
                              K_COVER_STEP_MIN, NEAR_RADIUS, OBS_CAP, RECEIVE_MAX, RECEIVE_MID,
                              REFINE_MAX, REGION_MARGIN, REGION_RADIUS, SAFETY_MARGIN, TOL,
                              TRY_CLEAR_RADIUS)
@@ -68,8 +69,8 @@ class RobotDog:
     def __init__(self, sim, verbose: bool = True, logfile: Optional[str] = None,
                  episode: int = 0, clear: bool = True,
                  k_clear_max: int = K_CLEAR_MAX,
-                 inline_try_radius: float = INLINE_TRY_RADIUS,
-                 inline_detour: float = INLINE_DETOUR,
+                 inline_corridor: float = INLINE_CORRIDOR_M,
+                 inline_exclude_r: float = INLINE_EXCLUDE_R_M,
                  rotate: bool = True,
                  api_log=None) -> None:
         # 传入 api_log 时套一层记录代理：4 个接口的每一次调用都会落盘
@@ -78,8 +79,8 @@ class RobotDog:
         self.verbose = verbose
         self.clear_enabled = clear
         self.k_clear_max = int(k_clear_max)
-        self.inline_try_radius = float(inline_try_radius)    # 顺路试清允许的覆盖圆半径上限 / m
-        self.inline_detour = float(inline_detour)            # 顺路试清允许的绕行里程上限 / m
+        self.inline_corridor = float(inline_corridor)        # 顺路清除直线走廊的半宽 / m
+        self.inline_exclude_r = float(inline_exclude_r)      # 顺路清除排除的区域圆心半径 / m
         self.rotate = bool(rotate)                           # 起始扫描后是否旋转覆盖圆布局
         # 过程日志用 "w"：每局开头重写，于是整份日志只描述**最新一局**。
         # 原先用 "a" 追加，跨局、跨运行无限累积，几轮演练后文件里混着几百局的内容难以查阅。
@@ -471,37 +472,99 @@ class RobotDog:
         self.survey_order_planned = list(path)
         self._survey_path_len = length
 
-    def _inline_clear(self, at: Sequence[float], next_wp: Sequence[float]) -> int:
-        """巡视途中顺路清除：估计点就在路线上（绕行代价小）的频道，当场清掉。
+    def _leg_corridor(self, at: Sequence[float], next_wp: Sequence[float],
+                      est: Sequence[float]) -> Optional[Tuple[float, float, float, float]]:
+        """估计点 est 是否落在"at → next_wp"这段直线的走廊内；返回 (沿线距离, 横向偏离, Δ₁, Δ₂)。
 
-        巡视本来就要路过这些位置，绕一下的额外里程 ≤ INLINE_DETOUR；而留到阶段二再清，至少要从
-        别处专程跑一趟（几百米）。清掉后该频道后续各站都不再测量，双向省时间。
+        判据按**角度**算，并且**两头都判** —— 后者同时实现了"只算夹在本站与下一站之间的点"：
+            Δ₁ = 从 at 看 est 的方位 与 at → next_wp 的方位 之间的夹角；
+            Δ₂ = 从 next_wp 看 est 的方位 与 next_wp → at 的方位 之间的夹角。
+        两者都不超过"走廊半宽在该距离处张开的角" asin(半宽 / d) 才算在走廊内。点若落在
+        next_wp 之外，从 next_wp 望过去的方向与回望 at 的方向几乎相反（差近 180°），Δ₂ 必然
+        超限而被排除 —— 这正是"只算两站之间"的要求。
+
+        必须用**角度**比较而不能用 sin 比较：sin 分不出 0° 与 180°，站外的点会被误判成在线上。
+
+        数学上与本仓库惯用的线段判据等价（沿线距离 t ∈ [0, L] 且横向偏离 h ≤ 半宽），写成角度
+        口径是为了与"按角度算"的要求一致，也让日志能直接报出角度偏差。距离不超过半宽时该点
+        本身就在端点的走廊内（此时角度阈值无意义），直接放行。
+        """
+        if dist(at, next_wp) <= 1e-9:
+            return None
+        half = self.inline_corridor
+        b_leg, b_back = bearing(at, next_wp), bearing(next_wp, at)
+        d1, d2 = dist(at, est), dist(next_wp, est)
+        a1 = 0.0 if d1 <= 1e-9 else ang_diff(bearing(at, est), b_leg)
+        a2 = 0.0 if d2 <= 1e-9 else ang_diff(bearing(next_wp, est), b_back)
+        lim1 = 180.0 if d1 <= half else math.degrees(math.asin(min(1.0, half / d1)))
+        lim2 = 180.0 if d2 <= half else math.degrees(math.asin(min(1.0, half / d2)))
+        if a1 > lim1 or a2 > lim2:
+            return None
+        return (d1 * math.cos(math.radians(a1)), d1 * math.sin(math.radians(a1)), a1, a2)
+
+    def _inline_excluded(self, est: Sequence[float]) -> bool:
+        """估计点是否因"距区域圆心（原点）太近"而被排除在顺路清除之外。
+
+        单独成方法是为了能被**直接单测** —— 它落实的是一条明确的作用范围限制，而"这条规则到底
+        有没有生效"必须能独立验证，不能埋在 _inline_clear 的循环里无从检查。
+        """
+        return math.hypot(est[0], est[1]) < self.inline_exclude_r
+
+    def _inline_clear(self, at: Sequence[float], next_wp: Sequence[float]) -> int:
+        """巡视途中顺路清除：把"本站 → 下一站"直线走廊内的估计点顺路清掉（判据见 _leg_corridor）。
+
+        为什么这条路是"免费"的：机器狗本来就要沿直线走到下一站，而走廊内的估计点都在这条线上
+        （横向偏离 ≤ 走廊半宽 = 清除半径），走过去再继续前行，**总里程与直奔下一站相同**。
+        于是这些点只需付 5 s（命中）或 3 s（未命中），而留到阶段二处理至少要从别处专程跑一趟
+        （几百米）。命中后该频道在后续各站都不再测量，双向省时间。
+
+        不设"估计可信度"门槛（原先要求估计点覆盖圆半径 ≤ 150 m 才试）：走廊判据本身已意味着
+        零额外里程，未命中只花 3 s，门槛挡掉的都是可能白捡的命中。
+
+        排除距区域圆心（原点）INLINE_EXCLUDE_R_M 以内的估计点 —— 作用范围限制，于是顺路清除
+        只发生在外圈走廊上。
         """
         if not self.clear_enabled:
             return 0
-        n = 0
+        picked: List[Tuple[float, int, Tuple[float, float], float, float, float, float]] = []
+        n_excluded = 0
         for ch in sorted(self.obs):
-            if ch in self.cleared or self._out_of_time():
+            if ch in self.cleared:
                 continue
             mec = self.region(ch).enclosing_circle
-            if mec is None or mec[2] + CLIP_ERR >= self.inline_try_radius:
-                continue                                  # 估计太离谱就不值得绕
-            est = (mec[0], mec[1])
-            extra = (dist(at, est) + dist(est, next_wp) - dist(at, next_wp))
-            if extra > self.inline_detour:
+            if mec is None:
+                continue                              # 区域为空/退化：连估计点都没有
+            est = (float(mec[0]), float(mec[1]))
+            got = self._leg_corridor(at, next_wp, est)
+            if got is None:
                 continue
+            if self._inline_excluded(est):
+                n_excluded += 1
+                continue                              # 距区域圆心太近：按需求排除
+            picked.append((got[0], ch, est, got[1], got[2], got[3], float(mec[2])))
+        if not picked:
+            return 0
+        picked.sort(key=lambda p: (p[0], p[1]))       # 沿线由近到远，走直线依次清
+        self.log(f"    [顺路清除] 本站 → 下一站 ({next_wp[0]:.0f}, {next_wp[1]:.0f}) 直线走廊内"
+                 f"（半宽 {self.inline_corridor:.0f} m）有 {len(picked)} 个估计点"
+                 f"{f'，另排除距圆心 {self.inline_exclude_r:.0f} m 内的 {n_excluded} 个' if n_excluded else ''}"
+                 f"；本段里程 {dist(at, next_wp):.0f} m 不变")
+        n = 0
+        for t, ch, est, h, a1, a2, r_mec in picked:
+            if self._out_of_time():
+                break
             self.stage = "survey-clear"
+            where = (f"沿线 {t:.0f} m、横向偏离 {h:.0f} m、角度偏差 {a1:.2f}°/{a2:.2f}°、"
+                     f"估计覆盖圆半径 {r_mec:.0f} m")
             if self.clear(est[0], est[1], ch):
                 self.tracks.setdefault(ch, {}).update({"method": "survey-inline",
                                                        "clear_point": [est[0], est[1]]})
                 n += 1
-                self.log(f"    [顺路清除] 频道{ch} @ ({est[0]:.1f}, {est[1]:.1f}) 命中"
-                         f"（绕行 {extra:.0f} m，估计误差 "
-                         f"{dist(est, (mec[0], mec[1])):.0f} m，省下专程往返）")
+                self.log(f"    [顺路清除] 频道{ch} @ ({est[0]:.1f}, {est[1]:.1f}) 命中（{where}）")
             else:
                 self.n_inline_fail += 1
                 self.log(f"    [顺路清除] 频道{ch} @ ({est[0]:.1f}, {est[1]:.1f}) 未命中"
-                         f"（绕行 {extra:.0f} m、覆盖圆半径 {mec[2]:.0f} m，留到阶段二处理）")
+                         f"（{where}，留到阶段二处理）")
         if n:
             self.log(f"    本段顺路清除 {n} 个，累计已清 {len(self.cleared)} 个")
         return n

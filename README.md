@@ -6,7 +6,8 @@
 ## 目录结构
 
 ```
-T1.py / T3.py / T3_ga.py / T3_validate.py / T3_figures.py   顶层薄入口（只调用 cumcm.*，用法不变）
+T1.py / T3.py / T3_ga.py / T3_validate.py / T3_figures.py / T4.py / T4_figures.py
+                                                                  顶层薄入口（只调用 cumcm.*，用法不变）
 sim_api.py                                                  模拟器接口的兼容垫片
 cumcm/
   common/    跨题通用：geometry 几何、routing 路线算子、sim_client 接口、practice_arena 演练场、
@@ -16,12 +17,16 @@ cumcm/
              report / plotting / cli
   t3ga/      问题三 GA 对照方案：config / localize / routing_ga / ga_ops / covering /
              strategy / plotting / training / cli
-  analysis/  验证与出图：validate（六组独立验证）、figures（论文图表）
+  t4/        问题四（定向 + 全向混合，确定性策略）：config / sweep（寻向拖网）/ regions /
+             probing / strategy / report / plotting / cli
+  analysis/  验证与出图：validate（六组独立验证）、figures / figures_t4（论文图表）
 jammers-py/  本地演练场（复刻模拟器；data/behavior-logs/ 会随每次演练累积日志，可随时清空）
-results/     运行产物，按两套方案分成两棵子树（**不按运行模式分家**：一个目录 = 最新一次运行）：
+results/     运行产物，按各题分成独立子树（**不按运行模式分家**：一个目录 = 最新一次运行）：
   t3/        确定性方案（T3.py）：覆盖圆方案、巡视汇总、逐条观测、接口日志、总轨迹图、逐步扫描图
   t3_ga/     GA 对照方案（T3_ga.py）：GA 训练记录、逐局统计、接口日志、验证结果、
              轨迹与扫描图，以及 holdout/（独立 seed 泛化批）
+  t4/        问题四方案（T4.py）：寻向拖网方案（含半圆盘命中校验）、逐局统计、观测明细、
+             接口日志、轨迹图与逐步拖网扫描图
 figures/     论文用图表 PDF 与背后的数据 CSV
 reports/     方案说明与结果报告
 References/  参考文献（PDF）

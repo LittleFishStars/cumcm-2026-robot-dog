@@ -26,7 +26,7 @@ from typing import Any, List, Optional, Tuple
 
 __all__ = ["PracticeArena", "free_port"]
 
-PROBLEM_NO = 3                      # 本题固定为问题三
+PROBLEM_NO = 3                      # 默认题目编号（问题三；问题四由调用方传 problem_no=4）
 START_RETRIES = 6                   # 开局 409 时的重试次数（仅演练场）
 START_RETRY_WAIT_S = 1.0            # 每次重试前的等待 / s
 
@@ -47,13 +47,14 @@ class PracticeArena:
 
     def __init__(self, jammers_dir: Path, robot_id: str, robot_port: int = 2026,
                  console_port: int = 8090, countdown: int = 1,
-                 reuse_existing: bool = True) -> None:
+                 reuse_existing: bool = True, problem_no: int = PROBLEM_NO) -> None:
         self.reuse_existing = reuse_existing
         self.jammers_dir = Path(jammers_dir).resolve()
         self.robot_id = robot_id
         self.robot_port = robot_port
         self.console_port = console_port
         self.countdown = countdown
+        self.problem_no = int(problem_no)       # 题目编号：3 = 全向源，4 = 定向+全向混合
         self.robot_url = f"http://127.0.0.1:{robot_port}"
         self.console_url = f"http://127.0.0.1:{console_port}"
         self._proc: Optional[subprocess.Popen] = None
@@ -148,19 +149,21 @@ class PracticeArena:
         """按种子生成固定场景并开一局，等接口开放后返回干扰源真值。
 
         噪声种子被覆写成由 seed 派生的确定值，使整局（布局 + 噪声）完全可复现：同一个
-        `--seed` 必然得到同一份结果，新旧策略也可严格对照。
+        `--seed` 必然得到同一份结果，新旧策略也可严格对照。盐里带题目编号，避免不同题目、
+        相同 seed 碰巧共用同一噪声流。
         """
-        scenario = self._request("/api/scenario", {"problem_no": PROBLEM_NO,
+        scenario = self._request("/api/scenario", {"problem_no": self.problem_no,
                                                    "seed": seed})["scenario"]
-        scenario["noise_seed_hex"] = hashlib.blake2b(f"t3-practice-{seed}".encode(),
-                                                     digest_size=8).hexdigest()
+        scenario["noise_seed_hex"] = hashlib.blake2b(
+            f"t{self.problem_no}-practice-{seed}".encode(), digest_size=8).hexdigest()
         # 连续多局时，上一局的会话可能尚未在模拟器侧完全释放，/api/start 会返回 409
         # Conflict；这是演练场的时序问题（非策略问题），短暂等待后重试即可。
         # 只在演练场重试 —— 官方模式保持"发一次就是一次"的语义，以免掩盖真实故障。
         last: Optional[Exception] = None
         for attempt in range(START_RETRIES):
             try:
-                self._request("/api/start", {"problem_no": PROBLEM_NO, "scenario": scenario})
+                self._request("/api/start", {"problem_no": self.problem_no,
+                                             "scenario": scenario})
                 break
             except urllib.error.HTTPError as exc:
                 last = exc

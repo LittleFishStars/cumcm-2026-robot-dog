@@ -1,0 +1,647 @@
+{
+  "stage": "第一阶段：1000 m 覆盖圆求解 + 依次到圆心巡视扫描",
+  "cover_plan": {
+    "region_radius_m": 1800.0,
+    "cover_radius_m": 1000.0,
+    "ring_radius_m": 1558.846,
+    "n_circles": 7,
+    "analytic_worst_m": 900.0,
+    "computed_worst_m": 900.0,
+    "margin_m": 100.0,
+    "worst_point": [
+      1558.85,
+      -900.0
+    ],
+    "coverage_ratio": 1.0,
+    "multiplicity_points": {
+      "1": 271595,
+      "2": 144096,
+      "3": 11406
+    },
+    "single_ratio": 0.6359094069965371,
+    "multi_ratio": 0.3640905930034629,
+    "mean_multiplicity": 1.3908,
+    "survey_order": [
+      0,
+      3,
+      2,
+      1,
+      6,
+      5,
+      4
+    ],
+    "survey_length_m": 9353.07,
+    "centers": [
+      {
+        "id": 0,
+        "kind": "中心圆",
+        "x": 0.0,
+        "y": 0.0
+      },
+      {
+        "id": 1,
+        "kind": "环上圆",
+        "x": 1558.846,
+        "y": 0.0
+      },
+      {
+        "id": 2,
+        "kind": "环上圆",
+        "x": 779.423,
+        "y": 1350.0
+      },
+      {
+        "id": 3,
+        "kind": "环上圆",
+        "x": -779.423,
+        "y": 1350.0
+      },
+      {
+        "id": 4,
+        "kind": "环上圆",
+        "x": -1558.846,
+        "y": 0.0
+      },
+      {
+        "id": 5,
+        "kind": "环上圆",
+        "x": -779.423,
+        "y": -1350.0
+      },
+      {
+        "id": 6,
+        "kind": "环上圆",
+        "x": 779.423,
+        "y": -1350.0
+      }
+    ],
+    "feasible_ring_interval_m": [
+      1122.956,
+      1732.051
+    ],
+    "ring_radius_tradeoff": [
+      {
+        "ring_radius_m": 1122.956,
+        "computed_worst_m": 1000.0,
+        "analytic_worst_m": 1000.0,
+        "margin_m": 0.0,
+        "survey_length_m": 6737.7,
+        "survey_time_s": 1347.5,
+        "mean_multiplicity": 1.8623,
+        "min_multiplicity": 1
+      },
+      {
+        "ring_radius_m": 1200.0,
+        "computed_worst_m": 968.902,
+        "analytic_worst_m": 968.902,
+        "margin_m": 31.098,
+        "survey_length_m": 7200.0,
+        "survey_time_s": 1440.0,
+        "mean_multiplicity": 1.7847,
+        "min_multiplicity": 1
+      },
+      {
+        "ring_radius_m": 1300.0,
+        "computed_worst_m": 936.483,
+        "analytic_worst_m": 936.483,
+        "margin_m": 63.517,
+        "survey_length_m": 7800.0,
+        "survey_time_s": 1560.0,
+        "mean_multiplicity": 1.6786,
+        "min_multiplicity": 1
+      },
+      {
+        "ring_radius_m": 1400.0,
+        "computed_worst_m": 913.91,
+        "analytic_worst_m": 913.91,
+        "margin_m": 86.09,
+        "survey_length_m": 8400.0,
+        "survey_time_s": 1680.0,
+        "mean_multiplicity": 1.5687,
+        "min_multiplicity": 1
+      },
+      {
+        "ring_radius_m": 1558.846,
+        "computed_worst_m": 900.0,
+        "analytic_worst_m": 900.0,
+        "margin_m": 100.0,
+        "survey_length_m": 9353.1,
+        "survey_time_s": 1870.6,
+        "mean_multiplicity": 1.3908,
+        "min_multiplicity": 1
+      },
+      {
+        "ring_radius_m": 1700.0,
+        "computed_worst_m": 981.122,
+        "analytic_worst_m": 981.495,
+        "margin_m": 18.878,
+        "survey_length_m": 10200.0,
+        "survey_time_s": 2040.0,
+        "mean_multiplicity": 1.2325,
+        "min_multiplicity": 1
+      },
+      {
+        "ring_radius_m": 1732.051,
+        "computed_worst_m": 1000.0,
+        "analytic_worst_m": 1000.0,
+        "margin_m": 0.0,
+        "survey_length_m": 10392.3,
+        "survey_time_s": 2078.5,
+        "mean_multiplicity": 1.1969,
+        "min_multiplicity": 1
+      }
+    ],
+    "reference_hex_lattice": {
+      "ring_radius_m": 1732.051,
+      "computed_worst_m": 1000.0,
+      "analytic_worst_m": 1000.0,
+      "margin_m": 0.0,
+      "survey_length_m": 10392.3,
+      "survey_time_s": 2078.5,
+      "mean_multiplicity": 1.1969,
+      "min_multiplicity": 1
+    },
+    "compare_six_circles": {
+      "n_circles": 6,
+      "best_ring_radius_m": 1000.0,
+      "computed_worst_m": 1059.3906,
+      "feasible": false
+    },
+    "grid_step_m": 5.0,
+    "boundary_samples": 20000
+  },
+  "episodes": [
+    {
+      "episode": 1,
+      "seed": 0,
+      "n_sources": 16,
+      "waypoints_visited": 7,
+      "travel_m": 9353.074360871937,
+      "virtual_time_s": 2595.61487,
+      "n_measure": 121,
+      "n_clear": 0,
+      "channels_heard": 16,
+      "n_bearings": 36,
+      "waypoint_stats": [
+        {
+          "waypoint": 0,
+          "x": 0.0,
+          "y": 0.0,
+          "n_channels": 20,
+          "direction": 8,
+          "near": 0,
+          "no_signal": 12,
+          "virtual_time_s": 119.0,
+          "travel_m": 0.0
+        },
+        {
+          "waypoint": 3,
+          "x": -779.4228634059943,
+          "y": 1350.0,
+          "n_channels": 20,
+          "direction": 5,
+          "near": 0,
+          "no_signal": 15,
+          "virtual_time_s": 550.769,
+          "travel_m": 1558.85
+        },
+        {
+          "waypoint": 2,
+          "x": 779.4228634059949,
+          "y": 1349.9999999999998,
+          "n_channels": 20,
+          "direction": 8,
+          "near": 0,
+          "no_signal": 12,
+          "virtual_time_s": 982.538,
+          "travel_m": 3117.69
+        },
+        {
+          "waypoint": 1,
+          "x": 1558.8457268119894,
+          "y": 0.0,
+          "n_channels": 17,
+          "direction": 5,
+          "near": 0,
+          "no_signal": 12,
+          "virtual_time_s": 1396.307,
+          "travel_m": 4676.54
+        },
+        {
+          "waypoint": 6,
+          "x": 779.4228634059937,
+          "y": -1350.0000000000005,
+          "n_channels": 15,
+          "direction": 4,
+          "near": 0,
+          "no_signal": 11,
+          "virtual_time_s": 1798.077,
+          "travel_m": 6235.38
+        },
+        {
+          "waypoint": 5,
+          "x": -779.4228634059954,
+          "y": -1349.9999999999993,
+          "n_channels": 15,
+          "direction": 4,
+          "near": 0,
+          "no_signal": 11,
+          "virtual_time_s": 2199.846,
+          "travel_m": 7794.23
+        },
+        {
+          "waypoint": 4,
+          "x": -1558.8457268119894,
+          "y": 1.9090354297048322e-13,
+          "n_channels": 14,
+          "direction": 2,
+          "near": 0,
+          "no_signal": 12,
+          "virtual_time_s": 2595.615,
+          "travel_m": 9353.07
+        }
+      ],
+      "truth_check": {
+        "sources": [
+          {
+            "channel": 1,
+            "x": -425.37,
+            "y": 963.04,
+            "receive_m": 1320.21,
+            "nearest_center_m": 524.49,
+            "heard": true,
+            "n_bearings": 3
+          },
+          {
+            "channel": 2,
+            "x": -757.19,
+            "y": -259.37,
+            "receive_m": 1221.35,
+            "nearest_center_m": 800.38,
+            "heard": true,
+            "n_bearings": 3
+          },
+          {
+            "channel": 3,
+            "x": 1181.42,
+            "y": 487.44,
+            "receive_m": 1459.23,
+            "nearest_center_m": 616.48,
+            "heard": true,
+            "n_bearings": 3
+          },
+          {
+            "channel": 4,
+            "x": 1411.35,
+            "y": 936.91,
+            "receive_m": 1420.05,
+            "nearest_center_m": 754.97,
+            "heard": true,
+            "n_bearings": 2
+          },
+          {
+            "channel": 5,
+            "x": 325.84,
+            "y": -1455.67,
+            "receive_m": 1312.63,
+            "nearest_center_m": 465.73,
+            "heard": true,
+            "n_bearings": 2
+          },
+          {
+            "channel": 6,
+            "x": 652.2,
+            "y": -1221.33,
+            "receive_m": 1166.57,
+            "nearest_center_m": 180.95,
+            "heard": true,
+            "n_bearings": 1
+          },
+          {
+            "channel": 7,
+            "x": -434.37,
+            "y": -1448.87,
+            "receive_m": 1031.49,
+            "nearest_center_m": 358.94,
+            "heard": true,
+            "n_bearings": 1
+          },
+          {
+            "channel": 8,
+            "x": 299.76,
+            "y": 1668.25,
+            "receive_m": 1401.67,
+            "nearest_center_m": 575.64,
+            "heard": true,
+            "n_bearings": 2
+          },
+          {
+            "channel": 9,
+            "x": -643.92,
+            "y": -178.29,
+            "receive_m": 1045.61,
+            "nearest_center_m": 668.15,
+            "heard": true,
+            "n_bearings": 2
+          },
+          {
+            "channel": 10,
+            "x": 1248.01,
+            "y": -1246.65,
+            "receive_m": 1498.99,
+            "nearest_center_m": 479.85,
+            "heard": true,
+            "n_bearings": 2
+          },
+          {
+            "channel": 12,
+            "x": -393.28,
+            "y": 1173.97,
+            "receive_m": 1145.55,
+            "nearest_center_m": 424.37,
+            "heard": true,
+            "n_bearings": 1
+          },
+          {
+            "channel": 13,
+            "x": -310.67,
+            "y": 542.68,
+            "receive_m": 1461.12,
+            "nearest_center_m": 625.31,
+            "heard": true,
+            "n_bearings": 3
+          },
+          {
+            "channel": 14,
+            "x": 243.83,
+            "y": -759.71,
+            "receive_m": 1273.62,
+            "nearest_center_m": 797.06,
+            "heard": true,
+            "n_bearings": 3
+          },
+          {
+            "channel": 16,
+            "x": 796.28,
+            "y": 516.86,
+            "receive_m": 1398.97,
+            "nearest_center_m": 833.31,
+            "heard": true,
+            "n_bearings": 3
+          },
+          {
+            "channel": 18,
+            "x": 49.4,
+            "y": 995.41,
+            "receive_m": 1091.93,
+            "nearest_center_m": 811.58,
+            "heard": true,
+            "n_bearings": 3
+          },
+          {
+            "channel": 20,
+            "x": 1569.93,
+            "y": 329.98,
+            "receive_m": 1490.65,
+            "nearest_center_m": 330.17,
+            "heard": true,
+            "n_bearings": 2
+          }
+        ],
+        "worst_nearest_m": 833.31,
+        "all_within_cover": true,
+        "missed_channels": []
+      },
+      "bearings_per_channel": {
+        "1": 3,
+        "2": 3,
+        "3": 3,
+        "4": 2,
+        "5": 2,
+        "6": 1,
+        "7": 1,
+        "8": 2,
+        "9": 2,
+        "10": 2,
+        "12": 1,
+        "13": 3,
+        "14": 3,
+        "16": 3,
+        "18": 3,
+        "20": 2
+      },
+      "cleared_channels": []
+    },
+    {
+      "episode": 2,
+      "seed": 1,
+      "n_sources": 11,
+      "waypoints_visited": 7,
+      "travel_m": 9353.074360871937,
+      "virtual_time_s": 2703.61487,
+      "n_measure": 139,
+      "n_clear": 0,
+      "channels_heard": 11,
+      "n_bearings": 20,
+      "waypoint_stats": [
+        {
+          "waypoint": 0,
+          "x": 0.0,
+          "y": 0.0,
+          "n_channels": 20,
+          "direction": 2,
+          "near": 0,
+          "no_signal": 18,
+          "virtual_time_s": 119.0,
+          "travel_m": 0.0
+        },
+        {
+          "waypoint": 3,
+          "x": -779.4228634059943,
+          "y": 1350.0,
+          "n_channels": 20,
+          "direction": 2,
+          "near": 0,
+          "no_signal": 18,
+          "virtual_time_s": 550.769,
+          "travel_m": 1558.85
+        },
+        {
+          "waypoint": 2,
+          "x": 779.4228634059949,
+          "y": 1349.9999999999998,
+          "n_channels": 20,
+          "direction": 3,
+          "near": 0,
+          "no_signal": 17,
+          "virtual_time_s": 982.538,
+          "travel_m": 3117.69
+        },
+        {
+          "waypoint": 1,
+          "x": 1558.8457268119894,
+          "y": 0.0,
+          "n_channels": 20,
+          "direction": 3,
+          "near": 0,
+          "no_signal": 17,
+          "virtual_time_s": 1414.307,
+          "travel_m": 4676.54
+        },
+        {
+          "waypoint": 6,
+          "x": 779.4228634059937,
+          "y": -1350.0000000000005,
+          "n_channels": 20,
+          "direction": 2,
+          "near": 0,
+          "no_signal": 18,
+          "virtual_time_s": 1846.077,
+          "travel_m": 6235.38
+        },
+        {
+          "waypoint": 5,
+          "x": -779.4228634059954,
+          "y": -1349.9999999999993,
+          "n_channels": 20,
+          "direction": 4,
+          "near": 0,
+          "no_signal": 16,
+          "virtual_time_s": 2277.846,
+          "travel_m": 7794.23
+        },
+        {
+          "waypoint": 4,
+          "x": -1558.8457268119894,
+          "y": 1.9090354297048322e-13,
+          "n_channels": 19,
+          "direction": 4,
+          "near": 0,
+          "no_signal": 15,
+          "virtual_time_s": 2703.615,
+          "travel_m": 9353.07
+        }
+      ],
+      "truth_check": {
+        "sources": [
+          {
+            "channel": 3,
+            "x": 1089.68,
+            "y": 815.24,
+            "receive_m": 1158.71,
+            "nearest_center_m": 618.25,
+            "heard": true,
+            "n_bearings": 2
+          },
+          {
+            "channel": 4,
+            "x": -156.05,
+            "y": -213.5,
+            "receive_m": 1004.6,
+            "nearest_center_m": 264.45,
+            "heard": true,
+            "n_bearings": 1
+          },
+          {
+            "channel": 7,
+            "x": -645.64,
+            "y": -1531.0,
+            "receive_m": 1484.52,
+            "nearest_center_m": 225.08,
+            "heard": true,
+            "n_bearings": 2
+          },
+          {
+            "channel": 8,
+            "x": -1485.32,
+            "y": -260.47,
+            "receive_m": 1381.85,
+            "nearest_center_m": 270.65,
+            "heard": true,
+            "n_bearings": 2
+          },
+          {
+            "channel": 9,
+            "x": -1621.58,
+            "y": -559.29,
+            "receive_m": 1172.85,
+            "nearest_center_m": 562.8,
+            "heard": true,
+            "n_bearings": 2
+          },
+          {
+            "channel": 11,
+            "x": 100.09,
+            "y": -1452.75,
+            "receive_m": 1476.12,
+            "nearest_center_m": 687.06,
+            "heard": true,
+            "n_bearings": 3
+          },
+          {
+            "channel": 13,
+            "x": -1472.85,
+            "y": 856.37,
+            "receive_m": 1458.13,
+            "nearest_center_m": 851.18,
+            "heard": true,
+            "n_bearings": 2
+          },
+          {
+            "channel": 14,
+            "x": 1375.12,
+            "y": 999.09,
+            "receive_m": 1314.68,
+            "nearest_center_m": 691.37,
+            "heard": true,
+            "n_bearings": 2
+          },
+          {
+            "channel": 16,
+            "x": -432.69,
+            "y": 1442.18,
+            "receive_m": 1371.57,
+            "nearest_center_m": 358.78,
+            "heard": true,
+            "n_bearings": 2
+          },
+          {
+            "channel": 17,
+            "x": 1651.44,
+            "y": -280.19,
+            "receive_m": 1250.4,
+            "nearest_center_m": 295.09,
+            "heard": true,
+            "n_bearings": 1
+          },
+          {
+            "channel": 19,
+            "x": -1738.69,
+            "y": -84.37,
+            "receive_m": 1455.09,
+            "nearest_center_m": 198.65,
+            "heard": true,
+            "n_bearings": 1
+          }
+        ],
+        "worst_nearest_m": 851.18,
+        "all_within_cover": true,
+        "missed_channels": []
+      },
+      "bearings_per_channel": {
+        "3": 2,
+        "4": 1,
+        "7": 2,
+        "8": 2,
+        "9": 2,
+        "11": 3,
+        "13": 2,
+        "14": 2,
+        "16": 2,
+        "17": 1,
+        "19": 1
+      },
+      "cleared_channels": []
+    }
+  ]
+}

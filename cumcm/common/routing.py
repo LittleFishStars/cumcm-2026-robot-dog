@@ -22,7 +22,8 @@ from typing import List, Sequence
 import numpy as np
 
 __all__ = ["dist_matrix", "path_len", "path_len_vec", "nearest_order_from_D",
-           "nearest_order", "open_path_length", "two_opt_first", "two_opt_greedy"]
+           "nearest_order", "open_path_length", "two_opt_first", "two_opt_greedy",
+           "exact_open_order", "exact_open_by_end"]
 
 _EPS = 1e-9
 
@@ -135,3 +136,94 @@ def two_opt_greedy(order: Sequence[int], D: np.ndarray) -> List[int]:
                 if cand_len < cur_len - _EPS:
                     best, cur_len, improved = cand, cand_len, True
     return best
+
+
+def _held_karp(n: int, D: np.ndarray):
+    """Held-Karp 动态规划，返回 (dp, prev)。
+
+    dp[mask, j] = 从起点出发、访问 mask 中的点、最后停在 j 的最短长度；
+    prev[mask, j] = 对应路径上 j 的前一个点（-1 表示起点）。
+    mask 的转移按 j 的候选集向量化，故 n=16（65536 个掩码、1.7e7 次松弛）也能秒级完成。
+    """
+    INF = float("inf")
+    full = 1 << n
+    bits = np.arange(n)
+    dp = np.full((full, n), INF)
+    prev = np.full((full, n), -1, dtype=np.int64)
+    dp[(1 << bits), bits] = D[0, bits]
+    for mask in range(1, full):
+        ins = (mask >> bits) & 1
+        cur = dp[mask]
+        js = np.flatnonzero(ins & (cur < INF))
+        if not len(js):
+            continue
+        ks = np.flatnonzero(~ins.astype(bool))
+        if not len(ks):
+            continue
+        cand = cur[js][:, None] + D[1 + js][:, ks]          # (|js|, |ks|)
+        best = np.argmin(cand, axis=0)
+        vals = cand[best, np.arange(len(ks))]
+        for t, k in enumerate(ks):
+            nm = mask | (1 << int(k))
+            if vals[t] < dp[nm, k] - _EPS:
+                dp[nm, k] = vals[t]
+                prev[nm, k] = js[best[t]]
+    return dp, prev
+
+
+def _hk_path(prev: np.ndarray, n: int, last: int) -> List[int]:
+    """从 prev 表回溯出路径（不含起点）。"""
+    order, mask, j = [], (1 << n) - 1, int(last)
+    while j >= 0:
+        order.append(j)
+        pj = int(prev[mask, j])
+        mask ^= (1 << j)
+        j = pj
+    order.reverse()
+    return order
+
+
+def exact_open_order(n: int, D: np.ndarray, limit: int = 16) -> List[int]:
+    """从起点出发访问全部 n 个点、终点任意的**精确**最短开放路径（Held-Karp）。
+
+    返回被访问点的编号序列（与 nearest_order / path_len 的约定一致，**不含**起点占位符）。
+    n > limit 时退化为最近邻 + 2-opt（精确解规模 O(2^n·n²)：n=16 约 1.7e7，已实测秒级；
+    本题最大的场景是 20 个频道，故 limit 留到 16，超出即降级）。
+
+    确定性：遍历顺序固定；最优值并列时取字典序最小的路径，故同一输入必得同一输出。
+    """
+    if n <= 0:
+        return []
+    if n == 1:
+        return [0]
+    if n > limit:
+        return two_opt_greedy(two_opt_first(nearest_order_from_D(n, D), D), D)
+    dp, prev = _held_karp(n, D)
+    last = min(range(n), key=lambda j: (dp[(1 << n) - 1, j], j))
+    return _hk_path(prev, n, last)
+
+
+def exact_open_by_end(n: int, D: np.ndarray, limit: int = 16):
+    """返回 (终点, 长度, 顺序) 列表：对每个可能的终点给出从起点出发的最短开放路径。
+
+    用于"终点本身也是决策变量"的场合 —— 例如巡视路线既要短，又希望终点落在一片指定区域
+    附近（终点决定后续行程的起点）。n > limit 时退化为最近邻 + 2-opt（只给一个终点）。
+
+    确定性：最优值并列时按 (长度, 终点编号) 排序，故同一输入必得同一输出。
+    """
+    if n <= 0:
+        return []
+    if n == 1:
+        return [(0, float(D[0, 0]), [0])]
+    if n > limit:
+        order = exact_open_order(n, D, limit)
+        return [(order[-1], path_len(order, D), order)]
+    dp, prev = _held_karp(n, D)
+    out = []
+    for last in range(n):
+        total = float(dp[(1 << n) - 1, last])
+        if total == float("inf"):
+            continue
+        out.append((last, total, _hk_path(prev, n, last)))
+    out.sort(key=lambda t: (t[1], t[0]))
+    return out

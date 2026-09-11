@@ -111,7 +111,7 @@ def run_practice(args: argparse.Namespace, res: CoverSolveResult, save_dir: Path
                                   for r in rows))
         print(f"  布局旋转：平均 {np.mean([r['rotation_deg'] for r in rows]):.1f}°"
               f"（起始扫描平均听到 {np.mean([r['n_face_scanned'] for r in rows]):.1f} 个源，"
-              f"旋转后 1 号环心正对源最密集的扇区）")
+              f"旋转把落脚站对准源最密集的方向；零成本）")
     else:
         print(f"汇总（{len(rows)} 局，仅巡视扫描）：平均里程 "
               f"{np.mean([r['travel_m'] for r in rows]):.0f} m，平均虚拟时间 "
@@ -172,8 +172,12 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--robot-id", default=ROBOT_ID, help="参赛队号（须与模拟器一致）")
     p.add_argument("--timeout", type=float, default=5.0, help="HTTP 超时 / s")
     p.add_argument("--ring-radius", type=float, default=None,
-                   help=f"覆盖圆环半径 d / m（缺省 {CHOSEN_RING_RADIUS:.0f}，时间优先、余量 31 m；"
-                        f"传 {optimal_ring_radius():.3f} 可取余量最大的 d*，里程增加约 2153 m）")
+                   help=f"（仅六边形族）覆盖圆环半径 d / m（缺省 {CHOSEN_RING_RADIUS:.0f}；"
+                        f"传 {optimal_ring_radius():.3f} 取余量最大的 d*，里程增加约 2153 m）。"
+                        f"指定本项即自动改用六边形族")
+    p.add_argument("--hex-layout", action="store_true",
+                   help="改用经典「1 中心 + 6 正六边形环心」布局（缺省是一般 7 点布局，"
+                        "里程 ~6167 m 对六边形族最优的 6737.7 m）")
     p.add_argument("--jammers-dir", default=None,
                    help="jammers-py 目录（缺省为本仓库根目录下的 jammers-py/）")
     p.add_argument("--console-port", type=int, default=8090,
@@ -202,7 +206,7 @@ def build_parser() -> argparse.ArgumentParser:
                    help=f"轨迹图输出子目录（相对 --save-dir；缺省 {TRAJ_DIR}，"
                         f"与 T3_ga.py 的 trajectory/ 分开以免互相覆盖）")
     p.add_argument("--no-rotate", action="store_true",
-                   help="不做起始扫描后的布局旋转（保持环心在 0°/60°/…，用于对照实验）")
+                   help="不做起始扫描后的布局旋转（保持设计基准朝向，用于对照实验）")
     p.add_argument("--no-plot", action="store_true",
                    help=f"不出逐局轨迹图（缺省每局在 <save-dir>/{TRAJ_DIR}/ 生成同名 png + csv）")
     p.add_argument("--quiet", action="store_true", help="只输出汇总，不打印过程")
@@ -214,7 +218,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     args = build_parser().parse_args(argv)
     save_dir = Path(args.save_dir)
 
-    res = solve_covering_circles(args.ring_radius)   # 第一步：求 1000 m 覆盖圆的位置
+    res = solve_covering_circles(args.ring_radius, use_hex=args.hex_layout)   # 第一步：求 1000 m 覆盖圆的位置
     if not args.quiet:
         print_cover_report(res)
     paths = save_plan(res, save_dir)

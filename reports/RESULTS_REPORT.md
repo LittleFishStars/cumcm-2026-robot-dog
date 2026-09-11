@@ -202,10 +202,10 @@ $$\max_{P\in \text{圆域}}\ \min_{W\in \mathcal{W}} \|P-W\| \le 962\ \text{m} <
 ```
 results/
 ├── t3/                        确定性方案（T3.py）
-│   ├── t3_cover_plan.json     覆盖圆方案（7 圆、最坏距离、可行区间、文献对照）
+│   ├── t3_cover_plan.json     覆盖圆方案（最少 7 圆、一般 7 点最优摆放、最坏距离、文献对照）
 │   ├── t3_cover_circles.csv   7 个圆心坐标
 │   ├── t3_survey.json         10 局巡视扫描 + 清除统计
-│   ├── t3_observations.csv    1118 条逐次测量（含 no_signal）
+│   ├── t3_observations.csv    1199 条逐次测量（含 no_signal）
 │   └── trajectory/            每局轨迹图 + 同名轨迹表（10 对）
 └── t3_ga/                      GA 对照方案（T3_ga.py）
     ├── ga_training.json       GA 训练记录 + 逐局统计（含真值）

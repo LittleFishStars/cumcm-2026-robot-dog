@@ -2,7 +2,8 @@
 
 > 求解程序 `T4.py`（实现见 `cumcm/t4/`），绘图脚本 `T4_figures.py`（`cumcm/analysis/figures_t4.py`）。
 > 全部结果由 `--practice` 离线演练模式自动拉起 `jammers-py` 模拟器产生；同一 `--seed` 逐字节可复现（见第 7 节）。
-> 分层约束：`cumcm/t4` 只依赖公共层 `common` 与问题一几何 `t1`，不导入问题三代码（同源手法以"复制 + 改导入"落在本包，见各模块文档）。
+> 分层约束：`cumcm/t4` 依赖公共层 `common`、问题一几何 `t1`，并**直接复用**问题三的补测选点模块
+> `t3.probing`（两题定位几何与所用常量完全一致，薄转发而非复制，见 `cumcm/t4/probing.py`）。
 
 ## 1. 运行环境
 
@@ -143,7 +144,8 @@ python T4.py                                 # 官方模式：连 http://127.0.0
 python T4_figures.py                         # 从 results/t4/ 生成论文图表
 ```
 
-分层与依赖：`cumcm/t4` → `common` + `t1`；不导入 `t3`。接口调用逐次落盘
+分层与依赖：`cumcm/t4` → `common` + `t1` + `t3.probing`（薄转发的补测选点，与 t3 同源不复制）。
+接口调用逐次落盘
 `results/t4/api_calls.jsonl`（20 局 8764 次调用，官方模式唯一证据链）。
 
 ## 8. 结果文件清单（`results/t4/`）

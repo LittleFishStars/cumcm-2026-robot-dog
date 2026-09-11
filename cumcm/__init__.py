@@ -20,8 +20,9 @@ T4.py / T4_figures.py / sim_api.py），所以原有的命令行用法一字不�
     python T4_figures.py
 
 分层原则：**依赖只能向下**。common 不 import 任何题目模块；t1/t3/t3ga/t4 可 import common，
-t4 另可 import t1（定位区域几何底座）；analysis 可 import 全部。t4 与 t3 是并列叶子，t4 不
-import t3 —— 与 t3 同源的 probing 手法以"复制 + 改导入"落在 t4 包内，避免叶子间横向依赖。
+t4 另可 import t1（定位区域几何底座）与 t3.probing（补测选点与 t3 完全同源，直接复用、不复制）。
+analysis 可 import 全部。t3 与 t4 是并列叶子，t4 复用 t3 时只 import 这一小段纯函数模块，
+不拖入 t3 的策略/覆盖/GA 逻辑。
 """
 
 __all__ = ["common", "t1", "t3", "t3ga", "t4", "analysis"]

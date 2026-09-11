@@ -173,25 +173,32 @@
     "boundary_samples": 20000
   },
   "clear_radius_m": 20.0,
-  "diam_precise_m": 40.0,
+  "receive_radius_m": [
+    1000.0,
+    1500.0
+  ],
   "summary": {
     "episodes": 10,
     "n_sources": 131,
     "n_cleared": 131,
     "clear_ratio": 1.0,
-    "avg_time_s": 328.562,
-    "virtual_time_s_mean": 4235.415,
-    "travel_m_mean": 16881.1,
-    "n_measure_mean": 132.1,
-    "n_probe_mean": 3.1,
-    "n_precise_at_survey": 30,
-    "n_refined": 29,
-    "localize_err_mean_m": 8.991,
+    "avg_time_s": 319.467,
+    "virtual_time_s_mean": 4099.975,
+    "travel_m_mean": 16819.4,
+    "n_measure_mean": 111.2,
+    "n_probe_mean": 2.6,
+    "n_precise_at_survey": 14,
+    "n_skip_measure": 188,
+    "n_inline_cleared": 34,
+    "n_inline_fail": 8,
+    "n_refined": 26,
+    "localize_err_mean_m": 9.902,
     "localize_err_max_m": 19.25,
     "n_within_clear_radius": 131,
     "methods": {
-      "try": 101,
-      "try-refined": 28,
+      "survey-inline": 34,
+      "try": 70,
+      "try-refined": 25,
       "multi": 2
     }
   },
@@ -201,71 +208,82 @@
       "seed": 0,
       "n_sources": 16,
       "clear_ratio": 1.0,
-      "localize_err_mean_m": 9.731,
-      "localize_err_max_m": 19.05,
+      "localize_err_mean_m": 10.581,
+      "localize_err_max_m": 19.14,
       "n_within_clear_radius": 16,
       "n_cleared_after_probe": 3,
       "waypoints_visited": 7,
-      "travel_m": 18480.80038145343,
-      "virtual_time_s": 4519.160065,
-      "n_measure": 123,
-      "n_clear": 18,
+      "travel_m": 16525.49162403493,
+      "virtual_time_s": 3957.098313,
+      "n_measure": 94,
+      "n_clear": 19,
       "channels_heard": 16,
-      "n_bearings": 41,
+      "n_bearings": 38,
       "cleared": 16,
-      "avg_time_s": 282.4475040625,
-      "n_precise_at_survey": 6,
+      "avg_time_s": 247.3186445625,
+      "n_precise_at_survey": 2,
+      "n_skip_measure": 31,
+      "initial_scan": {
+        "direction": 8,
+        "near": 0,
+        "no_signal": 12,
+        "skip": 0,
+        "n_channels": 20
+      },
+      "n_inline_cleared": 5,
+      "n_inline_fail": 1,
       "n_refined": 3,
       "n_probe": 3,
       "tracks": {
-        "1": {
-          "n_obs_survey": 3,
-          "diameter_survey_m": 56.455,
-          "bounded_survey": true,
-          "n_probe": 0,
+        "16": {
           "clear_point": [
-            -418.68419180023625,
-            959.6746075983742
+            802.864102556796,
+            510.3808252144913
           ],
-          "clear_radius_m": 28.227,
-          "diameter_final_m": 56.455,
-          "precise_final": false,
-          "mec_radius_m": 28.227,
-          "bounded_final": true,
-          "n_obs_total": 3,
-          "method": "try",
-          "cleared": true
+          "method": "survey-inline"
+        },
+        "14": {
+          "clear_point": [
+            227.73166644806074,
+            -749.3618119569752
+          ],
+          "method": "survey-inline"
         },
         "2": {
-          "n_obs_survey": 3,
-          "diameter_survey_m": 36.822,
-          "bounded_survey": true,
-          "n_probe": 0,
           "clear_point": [
-            -755.8990087142319,
-            -264.34236489097896
+            -755.332961123223,
+            -264.6593135891088
           ],
-          "clear_radius_m": 18.411,
-          "diameter_final_m": 36.822,
-          "precise_final": true,
-          "mec_radius_m": 18.411,
-          "bounded_final": true,
-          "n_obs_total": 3,
-          "method": "try",
-          "cleared": true
+          "method": "survey-inline"
+        },
+        "9": {
+          "clear_point": [
+            -640.016655263206,
+            -175.41563834999235
+          ],
+          "method": "survey-inline"
+        },
+        "1": {
+          "clear_point": [
+            -413.45053215671527,
+            958.869967952867
+          ],
+          "method": "survey-inline"
         },
         "3": {
           "n_obs_survey": 3,
+          "n_no_signal_survey": 0,
           "diameter_survey_m": 39.45,
+          "mec_radius_survey_m": 19.936,
           "bounded_survey": true,
           "n_probe": 0,
           "clear_point": [
-            1167.9769607136918,
-            500.66067711223627
+            1167.9769607136923,
+            500.6606771122362
           ],
           "clear_radius_m": 19.936,
           "diameter_final_m": 39.45,
-          "precise_final": true,
+          "precise_final": false,
           "mec_radius_m": 19.936,
           "bounded_final": true,
           "n_obs_total": 3,
@@ -274,12 +292,14 @@
         },
         "4": {
           "n_obs_survey": 2,
+          "n_no_signal_survey": 1,
           "diameter_survey_m": 45.801,
+          "mec_radius_survey_m": 22.901,
           "bounded_survey": true,
           "n_probe": 0,
           "clear_point": [
-            1398.8244100441839,
-            942.1727723509872
+            1398.8244100441848,
+            942.1727723509873
           ],
           "clear_radius_m": 22.901,
           "diameter_final_m": 45.801,
@@ -292,7 +312,9 @@
         },
         "5": {
           "n_obs_survey": 2,
+          "n_no_signal_survey": 2,
           "diameter_survey_m": 42.56,
+          "mec_radius_survey_m": 21.28,
           "bounded_survey": true,
           "n_probe": 0,
           "clear_point": [
@@ -310,17 +332,19 @@
         },
         "6": {
           "n_obs_survey": 1,
+          "n_no_signal_survey": 2,
           "diameter_survey_m": 612.884,
+          "mec_radius_survey_m": 306.442,
           "bounded_survey": false,
           "n_probe": 1,
           "clear_point": [
-            655.8625133911565,
-            -1227.0823754680491
+            652.0425678537466,
+            -1213.640102206354
           ],
-          "clear_radius_m": 10.596,
-          "diameter_final_m": 21.193,
+          "clear_radius_m": 19.321,
+          "diameter_final_m": 38.643,
           "precise_final": true,
-          "mec_radius_m": 10.596,
+          "mec_radius_m": 19.321,
           "bounded_final": true,
           "n_obs_total": 2,
           "method": "try-refined",
@@ -328,17 +352,19 @@
         },
         "7": {
           "n_obs_survey": 1,
+          "n_no_signal_survey": 2,
           "diameter_survey_m": 796.898,
+          "mec_radius_survey_m": 398.449,
           "bounded_survey": false,
           "n_probe": 1,
           "clear_point": [
-            -437.6284501865471,
-            -1451.905641942121
+            -436.92137726107995,
+            -1452.8027769297598
           ],
-          "clear_radius_m": 9.47,
-          "diameter_final_m": 18.939,
+          "clear_radius_m": 15.492,
+          "diameter_final_m": 30.985,
           "precise_final": true,
-          "mec_radius_m": 9.47,
+          "mec_radius_m": 15.492,
           "bounded_final": true,
           "n_obs_total": 2,
           "method": "try-refined",
@@ -346,7 +372,9 @@
         },
         "8": {
           "n_obs_survey": 2,
+          "n_no_signal_survey": 1,
           "diameter_survey_m": 48.079,
+          "mec_radius_survey_m": 24.04,
           "bounded_survey": true,
           "n_probe": 0,
           "clear_point": [
@@ -362,27 +390,11 @@
           "method": "try",
           "cleared": true
         },
-        "9": {
-          "n_obs_survey": 3,
-          "diameter_survey_m": 34.652,
-          "bounded_survey": true,
-          "n_probe": 0,
-          "clear_point": [
-            -640.4521376772113,
-            -174.97479854966218
-          ],
-          "clear_radius_m": 17.326,
-          "diameter_final_m": 34.652,
-          "precise_final": true,
-          "mec_radius_m": 17.326,
-          "bounded_final": true,
-          "n_obs_total": 3,
-          "method": "try",
-          "cleared": true
-        },
         "10": {
           "n_obs_survey": 2,
+          "n_no_signal_survey": 2,
           "diameter_survey_m": 49.942,
+          "mec_radius_survey_m": 25.036,
           "bounded_survey": false,
           "n_probe": 0,
           "k_clear": 3,
@@ -401,12 +413,14 @@
         },
         "12": {
           "n_obs_survey": 2,
+          "n_no_signal_survey": 1,
           "diameter_survey_m": 63.835,
+          "mec_radius_survey_m": 31.917,
           "bounded_survey": true,
           "n_probe": 1,
           "clear_point": [
-            -388.3573613869153,
-            1176.5477230757579
+            -388.35736138691567,
+            1176.5477230757583
           ],
           "clear_radius_m": 15.959,
           "diameter_final_m": 31.917,
@@ -419,53 +433,19 @@
         },
         "13": {
           "n_obs_survey": 3,
-          "diameter_survey_m": 39.059,
+          "n_no_signal_survey": 0,
+          "diameter_survey_m": 31.16,
+          "mec_radius_survey_m": 15.582,
           "bounded_survey": true,
           "n_probe": 0,
           "clear_point": [
-            -311.61594656293533,
-            544.408810948679
+            -311.72248586827146,
+            552.4897256453436
           ],
-          "clear_radius_m": 19.529,
-          "diameter_final_m": 39.059,
+          "clear_radius_m": 15.582,
+          "diameter_final_m": 31.16,
           "precise_final": true,
-          "mec_radius_m": 19.529,
-          "bounded_final": true,
-          "n_obs_total": 3,
-          "method": "try",
-          "cleared": true
-        },
-        "14": {
-          "n_obs_survey": 3,
-          "diameter_survey_m": 41.915,
-          "bounded_survey": true,
-          "n_probe": 0,
-          "clear_point": [
-            226.88429038976335,
-            -751.0138883815981
-          ],
-          "clear_radius_m": 20.958,
-          "diameter_final_m": 41.915,
-          "precise_final": false,
-          "mec_radius_m": 20.958,
-          "bounded_final": true,
-          "n_obs_total": 3,
-          "method": "try",
-          "cleared": true
-        },
-        "16": {
-          "n_obs_survey": 3,
-          "diameter_survey_m": 35.138,
-          "bounded_survey": true,
-          "n_probe": 0,
-          "clear_point": [
-            798.6713229600243,
-            506.7512316379313
-          ],
-          "clear_radius_m": 17.68,
-          "diameter_final_m": 35.138,
-          "precise_final": true,
-          "mec_radius_m": 17.68,
+          "mec_radius_m": 15.582,
           "bounded_final": true,
           "n_obs_total": 3,
           "method": "try",
@@ -473,12 +453,14 @@
         },
         "18": {
           "n_obs_survey": 3,
+          "n_no_signal_survey": 0,
           "diameter_survey_m": 37.812,
+          "mec_radius_survey_m": 18.922,
           "bounded_survey": true,
           "n_probe": 0,
           "clear_point": [
-            34.72430355757618,
-            994.5356541737467
+            34.72430355757617,
+            994.5356541737463
           ],
           "clear_radius_m": 18.922,
           "diameter_final_m": 37.812,
@@ -491,7 +473,9 @@
         },
         "20": {
           "n_obs_survey": 2,
+          "n_no_signal_survey": 1,
           "diameter_survey_m": 50.459,
+          "mec_radius_survey_m": 25.23,
           "bounded_survey": true,
           "n_probe": 0,
           "clear_point": [
@@ -517,19 +501,9 @@
           "direction": 8,
           "near": 0,
           "no_signal": 12,
+          "skip": 0,
           "virtual_time_s": 119.0,
           "travel_m": 0.0
-        },
-        {
-          "waypoint": 1,
-          "x": 1200.0,
-          "y": 0.0,
-          "n_channels": 20,
-          "direction": 6,
-          "near": 0,
-          "no_signal": 14,
-          "virtual_time_s": 479.0,
-          "travel_m": 1200.0
         },
         {
           "waypoint": 2,
@@ -539,19 +513,45 @@
           "direction": 9,
           "near": 0,
           "no_signal": 11,
-          "virtual_time_s": 839.0,
-          "travel_m": 2400.0
+          "skip": 0,
+          "virtual_time_s": 479.0,
+          "travel_m": 1200.0
         },
         {
-          "waypoint": 3,
-          "x": -599.9999999999998,
-          "y": 1039.2304845413264,
-          "n_channels": 18,
+          "waypoint": 1,
+          "x": 1200.0,
+          "y": 0.0,
+          "n_channels": 19,
           "direction": 5,
           "near": 0,
-          "no_signal": 13,
-          "virtual_time_s": 1187.0,
-          "travel_m": 3600.0
+          "no_signal": 11,
+          "skip": 3,
+          "virtual_time_s": 939.957,
+          "travel_m": 2984.78
+        },
+        {
+          "waypoint": 6,
+          "x": 599.9999999999992,
+          "y": -1039.2304845413269,
+          "n_channels": 18,
+          "direction": 4,
+          "near": 0,
+          "no_signal": 7,
+          "skip": 7,
+          "virtual_time_s": 1245.957,
+          "travel_m": 4184.78
+        },
+        {
+          "waypoint": 5,
+          "x": -600.0000000000006,
+          "y": -1039.230484541326,
+          "n_channels": 17,
+          "direction": 4,
+          "near": 0,
+          "no_signal": 5,
+          "skip": 8,
+          "virtual_time_s": 1574.723,
+          "travel_m": 5533.62
         },
         {
           "waypoint": 4,
@@ -560,31 +560,22 @@
           "n_channels": 15,
           "direction": 2,
           "near": 0,
-          "no_signal": 13,
-          "virtual_time_s": 1517.0,
-          "travel_m": 4800.0
+          "no_signal": 6,
+          "skip": 7,
+          "virtual_time_s": 1937.248,
+          "travel_m": 7056.24
         },
         {
-          "waypoint": 5,
-          "x": -600.0000000000006,
-          "y": -1039.230484541326,
-          "n_channels": 15,
-          "direction": 5,
-          "near": 0,
-          "no_signal": 10,
-          "virtual_time_s": 1847.0,
-          "travel_m": 6000.0
-        },
-        {
-          "waypoint": 6,
-          "x": 599.9999999999992,
-          "y": -1039.2304845413269,
-          "n_channels": 12,
+          "waypoint": 3,
+          "x": -599.9999999999998,
+          "y": 1039.2304845413264,
+          "n_channels": 13,
           "direction": 3,
           "near": 0,
-          "no_signal": 9,
-          "virtual_time_s": 2159.0,
-          "travel_m": 7200.0
+          "no_signal": 4,
+          "skip": 6,
+          "virtual_time_s": 2272.912,
+          "travel_m": 8499.56
         }
       ],
       "truth_check": {
@@ -598,13 +589,13 @@
             "heard": true,
             "n_bearings": 3,
             "cleared": true,
-            "diameter_survey_m": 56.455,
+            "diameter_survey_m": null,
             "n_probe": 0,
-            "diameter_final_m": 56.455,
-            "mec_radius_final_m": 28.227,
-            "clear_radius_m": 28.227,
-            "method": "try",
-            "localize_err_m": 7.49
+            "diameter_final_m": null,
+            "mec_radius_final_m": null,
+            "clear_radius_m": null,
+            "method": "survey-inline",
+            "localize_err_m": 12.63
           },
           {
             "channel": 2,
@@ -613,15 +604,15 @@
             "receive_m": 1221.35,
             "nearest_center_m": 513.18,
             "heard": true,
-            "n_bearings": 3,
+            "n_bearings": 2,
             "cleared": true,
-            "diameter_survey_m": 36.822,
+            "diameter_survey_m": null,
             "n_probe": 0,
-            "diameter_final_m": 36.822,
-            "mec_radius_final_m": 18.411,
-            "clear_radius_m": 18.411,
-            "method": "try",
-            "localize_err_m": 5.14
+            "diameter_final_m": null,
+            "mec_radius_final_m": null,
+            "clear_radius_m": null,
+            "method": "survey-inline",
+            "localize_err_m": 5.61
           },
           {
             "channel": 3,
@@ -685,11 +676,11 @@
             "cleared": true,
             "diameter_survey_m": 612.884,
             "n_probe": 1,
-            "diameter_final_m": 21.193,
-            "mec_radius_final_m": 10.596,
-            "clear_radius_m": 10.596,
+            "diameter_final_m": 38.643,
+            "mec_radius_final_m": 19.321,
+            "clear_radius_m": 19.321,
             "method": "try-refined",
-            "localize_err_m": 6.82
+            "localize_err_m": 7.69
           },
           {
             "channel": 7,
@@ -702,11 +693,11 @@
             "cleared": true,
             "diameter_survey_m": 796.898,
             "n_probe": 1,
-            "diameter_final_m": 18.939,
-            "mec_radius_final_m": 9.47,
-            "clear_radius_m": 9.47,
+            "diameter_final_m": 30.985,
+            "mec_radius_final_m": 15.492,
+            "clear_radius_m": 15.492,
             "method": "try-refined",
-            "localize_err_m": 4.45
+            "localize_err_m": 4.69
           },
           {
             "channel": 8,
@@ -732,15 +723,15 @@
             "receive_m": 1045.61,
             "nearest_center_m": 583.96,
             "heard": true,
-            "n_bearings": 3,
+            "n_bearings": 2,
             "cleared": true,
-            "diameter_survey_m": 34.652,
+            "diameter_survey_m": null,
             "n_probe": 0,
-            "diameter_final_m": 34.652,
-            "mec_radius_final_m": 17.326,
-            "clear_radius_m": 17.326,
-            "method": "try",
-            "localize_err_m": 4.8
+            "diameter_final_m": null,
+            "mec_radius_final_m": null,
+            "clear_radius_m": null,
+            "method": "survey-inline",
+            "localize_err_m": 4.85
           },
           {
             "channel": 10,
@@ -785,13 +776,13 @@
             "heard": true,
             "n_bearings": 3,
             "cleared": true,
-            "diameter_survey_m": 39.059,
+            "diameter_survey_m": 31.16,
             "n_probe": 0,
-            "diameter_final_m": 39.059,
-            "mec_radius_final_m": 19.529,
-            "clear_radius_m": 19.529,
+            "diameter_final_m": 31.16,
+            "mec_radius_final_m": 15.582,
+            "clear_radius_m": 15.582,
             "method": "try",
-            "localize_err_m": 1.97
+            "localize_err_m": 9.87
           },
           {
             "channel": 14,
@@ -802,13 +793,13 @@
             "heard": true,
             "n_bearings": 3,
             "cleared": true,
-            "diameter_survey_m": 41.915,
+            "diameter_survey_m": null,
             "n_probe": 0,
-            "diameter_final_m": 41.915,
-            "mec_radius_final_m": 20.958,
-            "clear_radius_m": 20.958,
-            "method": "try",
-            "localize_err_m": 19.05
+            "diameter_final_m": null,
+            "mec_radius_final_m": null,
+            "clear_radius_m": null,
+            "method": "survey-inline",
+            "localize_err_m": 19.14
           },
           {
             "channel": 16,
@@ -817,15 +808,15 @@
             "receive_m": 1398.97,
             "nearest_center_m": 558.03,
             "heard": true,
-            "n_bearings": 3,
+            "n_bearings": 2,
             "cleared": true,
-            "diameter_survey_m": 35.138,
+            "diameter_survey_m": null,
             "n_probe": 0,
-            "diameter_final_m": 35.138,
-            "mec_radius_final_m": 17.68,
-            "clear_radius_m": 17.68,
-            "method": "try",
-            "localize_err_m": 10.39
+            "diameter_final_m": null,
+            "mec_radius_final_m": null,
+            "clear_radius_m": null,
+            "method": "survey-inline",
+            "localize_err_m": 9.24
           },
           {
             "channel": 18,
@@ -866,26 +857,26 @@
         "all_within_cover": true,
         "missed_channels": [],
         "n_cleared": 16,
-        "localize_err_mean_m": 9.731,
-        "localize_err_max_m": 19.05,
+        "localize_err_mean_m": 10.581,
+        "localize_err_max_m": 19.14,
         "n_within_clear_radius": 16,
         "n_cleared_after_probe": 3
       },
       "bearings_per_channel": {
         "1": 3,
-        "2": 3,
+        "2": 2,
         "3": 3,
         "4": 2,
         "5": 2,
         "6": 2,
         "7": 2,
         "8": 2,
-        "9": 3,
+        "9": 2,
         "10": 2,
         "12": 3,
         "13": 3,
         "14": 3,
-        "16": 3,
+        "16": 2,
         "18": 3,
         "20": 2
       },
@@ -913,31 +904,43 @@
       "seed": 1,
       "n_sources": 11,
       "clear_ratio": 1.0,
-      "localize_err_mean_m": 11.476,
+      "localize_err_mean_m": 11.058,
       "localize_err_max_m": 18.95,
       "n_within_clear_radius": 11,
       "n_cleared_after_probe": 5,
       "waypoints_visited": 7,
-      "travel_m": 18068.02311476526,
-      "virtual_time_s": 4549.604612,
-      "n_measure": 145,
-      "n_clear": 15,
+      "travel_m": 18394.28719339965,
+      "virtual_time_s": 4491.857429,
+      "n_measure": 124,
+      "n_clear": 16,
       "channels_heard": 11,
       "n_bearings": 26,
       "cleared": 11,
-      "avg_time_s": 413.60041927272727,
+      "avg_time_s": 408.35067536363636,
       "n_precise_at_survey": 1,
+      "n_skip_measure": 21,
+      "initial_scan": {
+        "direction": 2,
+        "near": 0,
+        "no_signal": 18,
+        "skip": 0,
+        "n_channels": 20
+      },
+      "n_inline_cleared": 0,
+      "n_inline_fail": 1,
       "n_refined": 5,
       "n_probe": 5,
       "tracks": {
         "3": {
           "n_obs_survey": 2,
+          "n_no_signal_survey": 3,
           "diameter_survey_m": 50.009,
+          "mec_radius_survey_m": 25.005,
           "bounded_survey": true,
           "n_probe": 0,
           "clear_point": [
             1079.6730803582834,
-            817.3467504681615
+            817.3467504681613
           ],
           "clear_radius_m": 25.005,
           "diameter_final_m": 50.009,
@@ -950,14 +953,16 @@
         },
         "4": {
           "n_obs_survey": 2,
+          "n_no_signal_survey": 5,
           "diameter_survey_m": 363.272,
+          "mec_radius_survey_m": 181.636,
           "bounded_survey": true,
           "n_probe": 1,
           "k_clear": 3,
           "k_cover_leftover": 0.0,
           "clear_point": [
-            -168.32844580249812,
-            -227.93109083730695
+            -168.32844580249815,
+            -227.93109083730698
           ],
           "diameter_final_m": 93.457,
           "precise_final": false,
@@ -969,7 +974,9 @@
         },
         "7": {
           "n_obs_survey": 2,
+          "n_no_signal_survey": 5,
           "diameter_survey_m": 61.26,
+          "mec_radius_survey_m": 30.63,
           "bounded_survey": true,
           "n_probe": 1,
           "clear_point": [
@@ -987,12 +994,14 @@
         },
         "8": {
           "n_obs_survey": 2,
+          "n_no_signal_survey": 2,
           "diameter_survey_m": 44.527,
+          "mec_radius_survey_m": 22.264,
           "bounded_survey": true,
           "n_probe": 0,
           "clear_point": [
             -1473.0591284747843,
-            -246.39938125668317
+            -246.39938125668314
           ],
           "clear_radius_m": 22.264,
           "diameter_final_m": 44.527,
@@ -1005,12 +1014,14 @@
         },
         "9": {
           "n_obs_survey": 2,
+          "n_no_signal_survey": 2,
           "diameter_survey_m": 52.04,
+          "mec_radius_survey_m": 26.02,
           "bounded_survey": true,
           "n_probe": 0,
           "clear_point": [
             -1627.3882075654267,
-            -558.9479116615521
+            -558.9479116615522
           ],
           "clear_radius_m": 26.02,
           "diameter_final_m": 52.04,
@@ -1023,12 +1034,14 @@
         },
         "11": {
           "n_obs_survey": 3,
+          "n_no_signal_survey": 4,
           "diameter_survey_m": 33.424,
+          "mec_radius_survey_m": 17.238,
           "bounded_survey": true,
           "n_probe": 0,
           "clear_point": [
-            94.27985058552424,
-            -1462.6530593281027
+            94.27985058552427,
+            -1462.6530593281032
           ],
           "clear_radius_m": 17.238,
           "diameter_final_m": 33.424,
@@ -1041,7 +1054,9 @@
         },
         "13": {
           "n_obs_survey": 2,
+          "n_no_signal_survey": 1,
           "diameter_survey_m": 45.82,
+          "mec_radius_survey_m": 22.91,
           "bounded_survey": true,
           "n_probe": 0,
           "clear_point": [
@@ -1059,7 +1074,9 @@
         },
         "14": {
           "n_obs_survey": 2,
+          "n_no_signal_survey": 3,
           "diameter_survey_m": 47.121,
+          "mec_radius_survey_m": 23.56,
           "bounded_survey": true,
           "n_probe": 0,
           "clear_point": [
@@ -1077,7 +1094,9 @@
         },
         "16": {
           "n_obs_survey": 2,
+          "n_no_signal_survey": 2,
           "diameter_survey_m": 42.174,
+          "mec_radius_survey_m": 21.087,
           "bounded_survey": true,
           "n_probe": 1,
           "clear_point": [
@@ -1095,17 +1114,19 @@
         },
         "17": {
           "n_obs_survey": 1,
+          "n_no_signal_survey": 5,
           "diameter_survey_m": 672.308,
+          "mec_radius_survey_m": 336.154,
           "bounded_survey": false,
           "n_probe": 1,
           "clear_point": [
-            1652.1884669115775,
-            -286.86507676084193
+            1649.2460273523614,
+            -284.9220662766587
           ],
-          "clear_radius_m": 14.517,
-          "diameter_final_m": 29.035,
+          "clear_radius_m": 11.837,
+          "diameter_final_m": 23.674,
           "precise_final": true,
-          "mec_radius_m": 14.517,
+          "mec_radius_m": 11.837,
           "bounded_final": true,
           "n_obs_total": 2,
           "method": "try-refined",
@@ -1113,17 +1134,19 @@
         },
         "19": {
           "n_obs_survey": 1,
+          "n_no_signal_survey": 2,
           "diameter_survey_m": 604.932,
+          "mec_radius_survey_m": 302.466,
           "bounded_survey": false,
           "n_probe": 1,
           "clear_point": [
-            -1747.5531281954225,
-            -77.11327062087838
+            -1739.0480435774853,
+            -76.02411649134551
           ],
-          "clear_radius_m": 16.236,
-          "diameter_final_m": 32.473,
+          "clear_radius_m": 11.621,
+          "diameter_final_m": 23.243,
           "precise_final": true,
-          "mec_radius_m": 16.236,
+          "mec_radius_m": 11.621,
           "bounded_final": true,
           "n_obs_total": 2,
           "method": "try-refined",
@@ -1139,41 +1162,9 @@
           "direction": 2,
           "near": 0,
           "no_signal": 18,
+          "skip": 0,
           "virtual_time_s": 119.0,
           "travel_m": 0.0
-        },
-        {
-          "waypoint": 1,
-          "x": 1200.0,
-          "y": 0.0,
-          "n_channels": 20,
-          "direction": 3,
-          "near": 0,
-          "no_signal": 17,
-          "virtual_time_s": 479.0,
-          "travel_m": 1200.0
-        },
-        {
-          "waypoint": 2,
-          "x": 600.0000000000001,
-          "y": 1039.2304845413264,
-          "n_channels": 20,
-          "direction": 3,
-          "near": 0,
-          "no_signal": 17,
-          "virtual_time_s": 839.0,
-          "travel_m": 2400.0
-        },
-        {
-          "waypoint": 3,
-          "x": -599.9999999999998,
-          "y": 1039.2304845413264,
-          "n_channels": 20,
-          "direction": 2,
-          "near": 0,
-          "no_signal": 18,
-          "virtual_time_s": 1199.0,
-          "travel_m": 3600.0
         },
         {
           "waypoint": 4,
@@ -1183,19 +1174,45 @@
           "direction": 4,
           "near": 0,
           "no_signal": 16,
-          "virtual_time_s": 1559.0,
-          "travel_m": 4800.0
+          "skip": 0,
+          "virtual_time_s": 479.0,
+          "travel_m": 1200.0
         },
         {
-          "waypoint": 5,
-          "x": -600.0000000000006,
-          "y": -1039.230484541326,
+          "waypoint": 3,
+          "x": -599.9999999999998,
+          "y": 1039.2304845413264,
           "n_channels": 20,
-          "direction": 5,
+          "direction": 2,
           "near": 0,
-          "no_signal": 15,
-          "virtual_time_s": 1919.0,
-          "travel_m": 6000.0
+          "no_signal": 18,
+          "skip": 0,
+          "virtual_time_s": 839.0,
+          "travel_m": 2400.0
+        },
+        {
+          "waypoint": 2,
+          "x": 600.0000000000001,
+          "y": 1039.2304845413264,
+          "n_channels": 20,
+          "direction": 3,
+          "near": 0,
+          "no_signal": 13,
+          "skip": 4,
+          "virtual_time_s": 1175.0,
+          "travel_m": 3600.0
+        },
+        {
+          "waypoint": 1,
+          "x": 1200.0,
+          "y": 0.0,
+          "n_channels": 20,
+          "direction": 3,
+          "near": 0,
+          "no_signal": 12,
+          "skip": 5,
+          "virtual_time_s": 1505.0,
+          "travel_m": 4800.0
         },
         {
           "waypoint": 6,
@@ -1204,9 +1221,22 @@
           "n_channels": 20,
           "direction": 2,
           "near": 0,
-          "no_signal": 18,
-          "virtual_time_s": 2279.0,
-          "travel_m": 7200.0
+          "no_signal": 11,
+          "skip": 7,
+          "virtual_time_s": 1823.0,
+          "travel_m": 6000.0
+        },
+        {
+          "waypoint": 5,
+          "x": -600.0000000000006,
+          "y": -1039.230484541326,
+          "n_channels": 20,
+          "direction": 5,
+          "near": 0,
+          "no_signal": 10,
+          "skip": 5,
+          "virtual_time_s": 2212.242,
+          "travel_m": 7481.21
         }
       ],
       "truth_check": {
@@ -1375,11 +1405,11 @@
             "cleared": true,
             "diameter_survey_m": 672.308,
             "n_probe": 1,
-            "diameter_final_m": 29.035,
-            "mec_radius_final_m": 14.517,
-            "clear_radius_m": 14.517,
+            "diameter_final_m": 23.674,
+            "mec_radius_final_m": 11.837,
+            "clear_radius_m": 11.837,
             "method": "try-refined",
-            "localize_err_m": 6.72
+            "localize_err_m": 5.22
           },
           {
             "channel": 19,
@@ -1392,18 +1422,18 @@
             "cleared": true,
             "diameter_survey_m": 604.932,
             "n_probe": 1,
-            "diameter_final_m": 32.473,
-            "mec_radius_final_m": 16.236,
-            "clear_radius_m": 16.236,
+            "diameter_final_m": 23.243,
+            "mec_radius_final_m": 11.621,
+            "clear_radius_m": 11.621,
             "method": "try-refined",
-            "localize_err_m": 11.45
+            "localize_err_m": 8.35
           }
         ],
         "worst_nearest_m": 891.8,
         "all_within_cover": true,
         "missed_channels": [],
         "n_cleared": 11,
-        "localize_err_mean_m": 11.476,
+        "localize_err_mean_m": 11.058,
         "localize_err_max_m": 18.95,
         "n_within_clear_radius": 11,
         "n_cleared_after_probe": 5
@@ -1440,26 +1470,73 @@
       "seed": 2,
       "n_sources": 16,
       "clear_ratio": 1.0,
-      "localize_err_mean_m": 8.644,
-      "localize_err_max_m": 16.72,
+      "localize_err_mean_m": 9.075,
+      "localize_err_max_m": 17.78,
       "n_within_clear_radius": 16,
       "n_cleared_after_probe": 3,
       "waypoints_visited": 7,
-      "travel_m": 17715.447337396556,
-      "virtual_time_s": 4425.089455,
-      "n_measure": 134,
+      "travel_m": 18888.85654127783,
+      "virtual_time_s": 4479.771296,
+      "n_measure": 104,
       "n_clear": 16,
       "channels_heard": 16,
-      "n_bearings": 38,
+      "n_bearings": 33,
       "cleared": 16,
-      "avg_time_s": 276.5680909375,
-      "n_precise_at_survey": 1,
+      "avg_time_s": 279.985706,
+      "n_precise_at_survey": 0,
+      "n_skip_measure": 24,
+      "initial_scan": {
+        "direction": 6,
+        "near": 0,
+        "no_signal": 14,
+        "skip": 0,
+        "n_channels": 20
+      },
+      "n_inline_cleared": 5,
+      "n_inline_fail": 0,
       "n_refined": 3,
       "n_probe": 3,
       "tracks": {
+        "6": {
+          "clear_point": [
+            -1123.7216273785184,
+            -181.65517556958116
+          ],
+          "method": "survey-inline"
+        },
+        "3": {
+          "clear_point": [
+            377.1150528902037,
+            750.3104807996932
+          ],
+          "method": "survey-inline"
+        },
+        "13": {
+          "clear_point": [
+            -176.6423180026906,
+            878.3128629520955
+          ],
+          "method": "survey-inline"
+        },
+        "12": {
+          "clear_point": [
+            -88.23983997287932,
+            -1112.6836843956405
+          ],
+          "method": "survey-inline"
+        },
+        "14": {
+          "clear_point": [
+            352.06997883030255,
+            -1227.9215339360399
+          ],
+          "method": "survey-inline"
+        },
         "1": {
           "n_obs_survey": 2,
+          "n_no_signal_survey": 2,
           "diameter_survey_m": 47.205,
+          "mec_radius_survey_m": 23.603,
           "bounded_survey": true,
           "n_probe": 0,
           "clear_point": [
@@ -1477,43 +1554,29 @@
         },
         "2": {
           "n_obs_survey": 1,
+          "n_no_signal_survey": 2,
           "diameter_survey_m": 600.715,
+          "mec_radius_survey_m": 300.357,
           "bounded_survey": false,
           "n_probe": 1,
           "clear_point": [
-            851.2887715404237,
-            1432.1340269768712
+            851.2109464897928,
+            1431.9451987429563
           ],
-          "clear_radius_m": 11.793,
-          "diameter_final_m": 23.585,
+          "clear_radius_m": 10.387,
+          "diameter_final_m": 20.774,
           "precise_final": true,
-          "mec_radius_m": 11.793,
+          "mec_radius_m": 10.387,
           "bounded_final": true,
           "n_obs_total": 2,
           "method": "try-refined",
           "cleared": true
         },
-        "3": {
-          "n_obs_survey": 3,
-          "diameter_survey_m": 41.614,
-          "bounded_survey": true,
-          "n_probe": 0,
-          "clear_point": [
-            370.2885770076781,
-            752.2023470959208
-          ],
-          "clear_radius_m": 20.807,
-          "diameter_final_m": 41.614,
-          "precise_final": false,
-          "mec_radius_m": 20.807,
-          "bounded_final": true,
-          "n_obs_total": 3,
-          "method": "try",
-          "cleared": true
-        },
         "4": {
           "n_obs_survey": 2,
+          "n_no_signal_survey": 1,
           "diameter_survey_m": 54.463,
+          "mec_radius_survey_m": 27.231,
           "bounded_survey": true,
           "n_probe": 0,
           "clear_point": [
@@ -1531,43 +1594,29 @@
         },
         "5": {
           "n_obs_survey": 1,
+          "n_no_signal_survey": 2,
           "diameter_survey_m": 623.48,
+          "mec_radius_survey_m": 311.74,
           "bounded_survey": false,
           "n_probe": 1,
           "clear_point": [
-            1328.0326343960617,
-            -42.542471570816645
+            1321.5187965008124,
+            -40.245168979597615
           ],
-          "clear_radius_m": 10.976,
-          "diameter_final_m": 21.953,
+          "clear_radius_m": 17.54,
+          "diameter_final_m": 35.08,
           "precise_final": true,
-          "mec_radius_m": 10.976,
+          "mec_radius_m": 17.54,
           "bounded_final": true,
           "n_obs_total": 2,
           "method": "try-refined",
           "cleared": true
         },
-        "6": {
-          "n_obs_survey": 3,
-          "diameter_survey_m": 41.731,
-          "bounded_survey": true,
-          "n_probe": 0,
-          "clear_point": [
-            -1125.7303555848705,
-            -182.01624089243418
-          ],
-          "clear_radius_m": 20.866,
-          "diameter_final_m": 41.731,
-          "precise_final": false,
-          "mec_radius_m": 20.866,
-          "bounded_final": true,
-          "n_obs_total": 3,
-          "method": "try",
-          "cleared": true
-        },
         "10": {
           "n_obs_survey": 3,
+          "n_no_signal_survey": 0,
           "diameter_survey_m": 40.287,
+          "mec_radius_survey_m": 20.143,
           "bounded_survey": true,
           "n_probe": 0,
           "clear_point": [
@@ -1585,12 +1634,14 @@
         },
         "11": {
           "n_obs_survey": 2,
+          "n_no_signal_survey": 1,
           "diameter_survey_m": 44.282,
+          "mec_radius_survey_m": 22.141,
           "bounded_survey": true,
           "n_probe": 0,
           "clear_point": [
-            -1532.9139553944492,
-            540.5053656588447
+            -1532.9139553944494,
+            540.5053656588448
           ],
           "clear_radius_m": 22.141,
           "diameter_final_m": 44.282,
@@ -1601,63 +1652,11 @@
           "method": "try",
           "cleared": true
         },
-        "12": {
-          "n_obs_survey": 3,
-          "diameter_survey_m": 41.91,
-          "bounded_survey": true,
-          "n_probe": 0,
-          "clear_point": [
-            -89.03458817249718,
-            -1120.3413832978642
-          ],
-          "clear_radius_m": 20.977,
-          "diameter_final_m": 41.91,
-          "precise_final": false,
-          "mec_radius_m": 20.977,
-          "bounded_final": true,
-          "n_obs_total": 3,
-          "method": "try",
-          "cleared": true
-        },
-        "13": {
-          "n_obs_survey": 3,
-          "diameter_survey_m": 40.818,
-          "bounded_survey": true,
-          "n_probe": 0,
-          "clear_point": [
-            -175.37789152353417,
-            872.5378966370898
-          ],
-          "clear_radius_m": 20.409,
-          "diameter_final_m": 40.818,
-          "precise_final": false,
-          "mec_radius_m": 20.409,
-          "bounded_final": true,
-          "n_obs_total": 3,
-          "method": "try",
-          "cleared": true
-        },
-        "14": {
-          "n_obs_survey": 3,
-          "diameter_survey_m": 34.295,
-          "bounded_survey": true,
-          "n_probe": 0,
-          "clear_point": [
-            355.6717982896925,
-            -1217.9862187324782
-          ],
-          "clear_radius_m": 17.147,
-          "diameter_final_m": 34.295,
-          "precise_final": true,
-          "mec_radius_m": 17.147,
-          "bounded_final": true,
-          "n_obs_total": 3,
-          "method": "try",
-          "cleared": true
-        },
         "15": {
           "n_obs_survey": 2,
+          "n_no_signal_survey": 2,
           "diameter_survey_m": 89.558,
+          "mec_radius_survey_m": 44.779,
           "bounded_survey": true,
           "n_probe": 0,
           "clear_point": [
@@ -1675,7 +1674,9 @@
         },
         "16": {
           "n_obs_survey": 2,
+          "n_no_signal_survey": 1,
           "diameter_survey_m": 42.544,
+          "mec_radius_survey_m": 21.272,
           "bounded_survey": true,
           "n_probe": 0,
           "clear_point": [
@@ -1693,7 +1694,9 @@
         },
         "17": {
           "n_obs_survey": 2,
+          "n_no_signal_survey": 2,
           "diameter_survey_m": 44.67,
+          "mec_radius_survey_m": 22.335,
           "bounded_survey": true,
           "n_probe": 0,
           "clear_point": [
@@ -1711,7 +1714,9 @@
         },
         "19": {
           "n_obs_survey": 2,
+          "n_no_signal_survey": 2,
           "diameter_survey_m": 46.472,
+          "mec_radius_survey_m": 23.236,
           "bounded_survey": true,
           "n_probe": 0,
           "clear_point": [
@@ -1729,17 +1734,19 @@
         },
         "20": {
           "n_obs_survey": 1,
+          "n_no_signal_survey": 1,
           "diameter_survey_m": 665.347,
+          "mec_radius_survey_m": 332.674,
           "bounded_survey": false,
           "n_probe": 1,
           "clear_point": [
-            -1537.3632032711193,
-            200.94172936812456
+            -1542.7000911098603,
+            204.3866798518933
           ],
-          "clear_radius_m": 8.09,
-          "diameter_final_m": 16.179,
+          "clear_radius_m": 11.172,
+          "diameter_final_m": 22.343,
           "precise_final": true,
-          "mec_radius_m": 8.09,
+          "mec_radius_m": 11.172,
           "bounded_final": true,
           "n_obs_total": 2,
           "method": "try-refined",
@@ -1755,74 +1762,81 @@
           "direction": 6,
           "near": 0,
           "no_signal": 14,
+          "skip": 0,
           "virtual_time_s": 119.0,
           "travel_m": 0.0
-        },
-        {
-          "waypoint": 1,
-          "x": 1200.0,
-          "y": 0.0,
-          "n_channels": 20,
-          "direction": 5,
-          "near": 0,
-          "no_signal": 15,
-          "virtual_time_s": 479.0,
-          "travel_m": 1200.0
-        },
-        {
-          "waypoint": 2,
-          "x": 600.0000000000001,
-          "y": 1039.2304845413264,
-          "n_channels": 20,
-          "direction": 3,
-          "near": 0,
-          "no_signal": 17,
-          "virtual_time_s": 839.0,
-          "travel_m": 2400.0
-        },
-        {
-          "waypoint": 3,
-          "x": -599.9999999999998,
-          "y": 1039.2304845413264,
-          "n_channels": 20,
-          "direction": 5,
-          "near": 0,
-          "no_signal": 15,
-          "virtual_time_s": 1199.0,
-          "travel_m": 3600.0
         },
         {
           "waypoint": 4,
           "x": -1200.0,
           "y": 1.4695761589768238e-13,
-          "n_channels": 18,
+          "n_channels": 20,
           "direction": 6,
           "near": 0,
-          "no_signal": 12,
-          "virtual_time_s": 1547.0,
-          "travel_m": 4800.0
+          "no_signal": 14,
+          "skip": 0,
+          "virtual_time_s": 479.0,
+          "travel_m": 1200.0
         },
         {
-          "waypoint": 5,
-          "x": -600.0000000000006,
-          "y": -1039.230484541326,
-          "n_channels": 17,
+          "waypoint": 3,
+          "x": -599.9999999999998,
+          "y": 1039.2304845413264,
+          "n_channels": 19,
           "direction": 4,
           "near": 0,
-          "no_signal": 13,
-          "virtual_time_s": 1889.0,
-          "travel_m": 6000.0
+          "no_signal": 14,
+          "skip": 1,
+          "virtual_time_s": 897.099,
+          "travel_m": 2725.5
+        },
+        {
+          "waypoint": 2,
+          "x": 600.0000000000001,
+          "y": 1039.2304845413264,
+          "n_channels": 17,
+          "direction": 1,
+          "near": 0,
+          "no_signal": 12,
+          "skip": 4,
+          "virtual_time_s": 1461.185,
+          "travel_m": 5105.93
+        },
+        {
+          "waypoint": 1,
+          "x": 1200.0,
+          "y": 0.0,
+          "n_channels": 17,
+          "direction": 5,
+          "near": 0,
+          "no_signal": 7,
+          "skip": 5,
+          "virtual_time_s": 1773.185,
+          "travel_m": 6305.93
         },
         {
           "waypoint": 6,
           "x": 599.9999999999992,
           "y": -1039.2304845413269,
-          "n_channels": 16,
+          "n_channels": 17,
           "direction": 6,
           "near": 0,
-          "no_signal": 10,
-          "virtual_time_s": 2225.0,
-          "travel_m": 7200.0
+          "no_signal": 5,
+          "skip": 6,
+          "virtual_time_s": 2079.185,
+          "travel_m": 7505.93
+        },
+        {
+          "waypoint": 5,
+          "x": -600.0000000000006,
+          "y": -1039.230484541326,
+          "n_channels": 15,
+          "direction": 2,
+          "near": 0,
+          "no_signal": 5,
+          "skip": 8,
+          "virtual_time_s": 2554.761,
+          "travel_m": 9623.8
         }
       ],
       "truth_check": {
@@ -1855,11 +1869,11 @@
             "cleared": true,
             "diameter_survey_m": 600.715,
             "n_probe": 1,
-            "diameter_final_m": 23.585,
-            "mec_radius_final_m": 11.793,
-            "clear_radius_m": 11.793,
+            "diameter_final_m": 20.774,
+            "mec_radius_final_m": 10.387,
+            "clear_radius_m": 10.387,
             "method": "try-refined",
-            "localize_err_m": 2.43
+            "localize_err_m": 2.27
           },
           {
             "channel": 3,
@@ -1868,15 +1882,15 @@
             "receive_m": 1086.79,
             "nearest_center_m": 355.79,
             "heard": true,
-            "n_bearings": 3,
+            "n_bearings": 2,
             "cleared": true,
-            "diameter_survey_m": 41.614,
+            "diameter_survey_m": null,
             "n_probe": 0,
-            "diameter_final_m": 41.614,
-            "mec_radius_final_m": 20.807,
-            "clear_radius_m": 20.807,
-            "method": "try",
-            "localize_err_m": 11.84
+            "diameter_final_m": null,
+            "mec_radius_final_m": null,
+            "clear_radius_m": null,
+            "method": "survey-inline",
+            "localize_err_m": 11.16
           },
           {
             "channel": 4,
@@ -1906,11 +1920,11 @@
             "cleared": true,
             "diameter_survey_m": 623.48,
             "n_probe": 1,
-            "diameter_final_m": 21.953,
-            "mec_radius_final_m": 10.976,
-            "clear_radius_m": 10.976,
+            "diameter_final_m": 35.08,
+            "mec_radius_final_m": 17.54,
+            "clear_radius_m": 17.54,
             "method": "try-refined",
-            "localize_err_m": 4.87
+            "localize_err_m": 2.29
           },
           {
             "channel": 6,
@@ -1919,15 +1933,15 @@
             "receive_m": 1454.24,
             "nearest_center_m": 195.69,
             "heard": true,
-            "n_bearings": 3,
+            "n_bearings": 2,
             "cleared": true,
-            "diameter_survey_m": 41.731,
+            "diameter_survey_m": null,
             "n_probe": 0,
-            "diameter_final_m": 41.731,
-            "mec_radius_final_m": 20.866,
-            "clear_radius_m": 20.866,
-            "method": "try",
-            "localize_err_m": 1.19
+            "diameter_final_m": null,
+            "mec_radius_final_m": null,
+            "clear_radius_m": null,
+            "method": "survey-inline",
+            "localize_err_m": 1.8
           },
           {
             "channel": 10,
@@ -1970,15 +1984,15 @@
             "receive_m": 1327.46,
             "nearest_center_m": 525.52,
             "heard": true,
-            "n_bearings": 3,
+            "n_bearings": 2,
             "cleared": true,
-            "diameter_survey_m": 41.91,
+            "diameter_survey_m": null,
             "n_probe": 0,
-            "diameter_final_m": 41.91,
-            "mec_radius_final_m": 20.977,
-            "clear_radius_m": 20.977,
-            "method": "try",
-            "localize_err_m": 9.71
+            "diameter_final_m": null,
+            "mec_radius_final_m": null,
+            "clear_radius_m": null,
+            "method": "survey-inline",
+            "localize_err_m": 8.88
           },
           {
             "channel": 13,
@@ -1987,15 +2001,15 @@
             "receive_m": 1249.03,
             "nearest_center_m": 470.57,
             "heard": true,
-            "n_bearings": 3,
+            "n_bearings": 2,
             "cleared": true,
-            "diameter_survey_m": 40.818,
+            "diameter_survey_m": null,
             "n_probe": 0,
-            "diameter_final_m": 40.818,
-            "mec_radius_final_m": 20.409,
-            "clear_radius_m": 20.409,
-            "method": "try",
-            "localize_err_m": 14.7
+            "diameter_final_m": null,
+            "mec_radius_final_m": null,
+            "clear_radius_m": null,
+            "method": "survey-inline",
+            "localize_err_m": 17.78
           },
           {
             "channel": 14,
@@ -2004,15 +2018,15 @@
             "receive_m": 1330.84,
             "nearest_center_m": 295.9,
             "heard": true,
-            "n_bearings": 3,
+            "n_bearings": 2,
             "cleared": true,
-            "diameter_survey_m": 34.295,
+            "diameter_survey_m": null,
             "n_probe": 0,
-            "diameter_final_m": 34.295,
-            "mec_radius_final_m": 17.147,
-            "clear_radius_m": 17.147,
-            "method": "try",
-            "localize_err_m": 8.17
+            "diameter_final_m": null,
+            "mec_radius_final_m": null,
+            "clear_radius_m": null,
+            "method": "survey-inline",
+            "localize_err_m": 15.71
           },
           {
             "channel": 15,
@@ -2093,34 +2107,34 @@
             "cleared": true,
             "diameter_survey_m": 665.347,
             "n_probe": 1,
-            "diameter_final_m": 16.179,
-            "mec_radius_final_m": 8.09,
-            "clear_radius_m": 8.09,
+            "diameter_final_m": 22.343,
+            "mec_radius_final_m": 11.172,
+            "clear_radius_m": 11.172,
             "method": "try-refined",
-            "localize_err_m": 7.23
+            "localize_err_m": 7.14
           }
         ],
         "worst_nearest_m": 835.97,
         "all_within_cover": true,
         "missed_channels": [],
         "n_cleared": 16,
-        "localize_err_mean_m": 8.644,
-        "localize_err_max_m": 16.72,
+        "localize_err_mean_m": 9.075,
+        "localize_err_max_m": 17.78,
         "n_within_clear_radius": 16,
         "n_cleared_after_probe": 3
       },
       "bearings_per_channel": {
         "1": 2,
         "2": 2,
-        "3": 3,
+        "3": 2,
         "4": 2,
         "5": 2,
-        "6": 3,
+        "6": 2,
         "10": 3,
         "11": 2,
-        "12": 3,
-        "13": 3,
-        "14": 3,
+        "12": 2,
+        "13": 2,
+        "14": 2,
         "15": 2,
         "16": 2,
         "17": 2,
@@ -2151,90 +2165,76 @@
       "seed": 3,
       "n_sources": 11,
       "clear_ratio": 1.0,
-      "localize_err_mean_m": 10.111,
-      "localize_err_max_m": 18.4,
+      "localize_err_mean_m": 12.312,
+      "localize_err_max_m": 18.55,
       "n_within_clear_radius": 11,
-      "n_cleared_after_probe": 2,
+      "n_cleared_after_probe": 1,
       "waypoints_visited": 7,
-      "travel_m": 14767.755751155695,
-      "virtual_time_s": 3784.551142,
-      "n_measure": 129,
-      "n_clear": 12,
+      "travel_m": 14663.607047902255,
+      "virtual_time_s": 3688.721401,
+      "n_measure": 117,
+      "n_clear": 11,
       "channels_heard": 11,
-      "n_bearings": 28,
+      "n_bearings": 24,
       "cleared": 11,
-      "avg_time_s": 344.0501038181818,
-      "n_precise_at_survey": 1,
-      "n_refined": 2,
-      "n_probe": 2,
+      "avg_time_s": 335.33830918181815,
+      "n_precise_at_survey": 0,
+      "n_skip_measure": 14,
+      "initial_scan": {
+        "direction": 5,
+        "near": 0,
+        "no_signal": 15,
+        "skip": 0,
+        "n_channels": 20
+      },
+      "n_inline_cleared": 4,
+      "n_inline_fail": 0,
+      "n_refined": 1,
+      "n_probe": 1,
       "tracks": {
         "1": {
-          "n_obs_survey": 3,
-          "diameter_survey_m": 43.796,
-          "bounded_survey": true,
-          "n_probe": 0,
           "clear_point": [
-            497.3048197066016,
-            698.1370462048177
+            486.90833430573673,
+            677.5241576407492
           ],
-          "clear_radius_m": 21.898,
-          "diameter_final_m": 43.796,
-          "precise_final": false,
-          "mec_radius_m": 21.898,
-          "bounded_final": true,
-          "n_obs_total": 3,
-          "method": "try",
-          "cleared": true
+          "method": "survey-inline"
+        },
+        "16": {
+          "clear_point": [
+            -415.49687280725266,
+            -797.7699542640128
+          ],
+          "method": "survey-inline"
         },
         "2": {
-          "n_obs_survey": 3,
-          "diameter_survey_m": 52.004,
-          "bounded_survey": true,
-          "n_probe": 1,
           "clear_point": [
-            1093.4142011194863,
-            113.55438855146149
+            1099.0161139352654,
+            113.52515697284441
           ],
-          "clear_radius_m": 11.363,
-          "diameter_final_m": 22.726,
-          "precise_final": true,
-          "mec_radius_m": 11.363,
-          "bounded_final": true,
-          "n_obs_total": 4,
-          "method": "try-refined",
-          "cleared": true
+          "method": "survey-inline"
         },
         "5": {
-          "n_obs_survey": 3,
-          "diameter_survey_m": 34.673,
-          "bounded_survey": true,
-          "n_probe": 0,
           "clear_point": [
-            690.8047727776567,
-            -190.74773883985446
+            691.1915831054968,
+            -194.595927026193
           ],
-          "clear_radius_m": 17.498,
-          "diameter_final_m": 34.673,
-          "precise_final": true,
-          "mec_radius_m": 17.498,
-          "bounded_final": true,
-          "n_obs_total": 3,
-          "method": "try",
-          "cleared": true
+          "method": "survey-inline"
         },
         "8": {
           "n_obs_survey": 1,
+          "n_no_signal_survey": 2,
           "diameter_survey_m": 613.838,
+          "mec_radius_survey_m": 306.919,
           "bounded_survey": false,
           "n_probe": 1,
           "clear_point": [
-            702.9055566368943,
-            -1398.5411088419487
+            705.0335385272618,
+            -1405.5994471919712
           ],
-          "clear_radius_m": 7.826,
-          "diameter_final_m": 15.651,
+          "clear_radius_m": 12.238,
+          "diameter_final_m": 24.477,
           "precise_final": true,
-          "mec_radius_m": 7.826,
+          "mec_radius_m": 12.238,
           "bounded_final": true,
           "n_obs_total": 2,
           "method": "try-refined",
@@ -2242,7 +2242,9 @@
         },
         "10": {
           "n_obs_survey": 2,
+          "n_no_signal_survey": 2,
           "diameter_survey_m": 50.21,
+          "mec_radius_survey_m": 25.105,
           "bounded_survey": true,
           "n_probe": 0,
           "clear_point": [
@@ -2260,7 +2262,9 @@
         },
         "11": {
           "n_obs_survey": 2,
+          "n_no_signal_survey": 2,
           "diameter_survey_m": 42.189,
+          "mec_radius_survey_m": 21.095,
           "bounded_survey": true,
           "n_probe": 0,
           "clear_point": [
@@ -2278,11 +2282,13 @@
         },
         "12": {
           "n_obs_survey": 2,
+          "n_no_signal_survey": 2,
           "diameter_survey_m": 46.19,
+          "mec_radius_survey_m": 23.095,
           "bounded_survey": true,
           "n_probe": 0,
           "clear_point": [
-            1314.662133382307,
+            1314.6621333823064,
             -299.32812495506835
           ],
           "clear_radius_m": 23.095,
@@ -2296,7 +2302,9 @@
         },
         "14": {
           "n_obs_survey": 3,
+          "n_no_signal_survey": 0,
           "diameter_survey_m": 44.761,
+          "mec_radius_survey_m": 22.38,
           "bounded_survey": true,
           "n_probe": 0,
           "clear_point": [
@@ -2312,32 +2320,16 @@
           "method": "try",
           "cleared": true
         },
-        "16": {
-          "n_obs_survey": 3,
-          "diameter_survey_m": 42.494,
-          "bounded_survey": true,
-          "n_probe": 0,
-          "clear_point": [
-            -421.9623162722495,
-            -790.8496318212744
-          ],
-          "clear_radius_m": 21.247,
-          "diameter_final_m": 42.494,
-          "precise_final": false,
-          "mec_radius_m": 21.247,
-          "bounded_final": true,
-          "n_obs_total": 3,
-          "method": "try",
-          "cleared": true
-        },
         "18": {
           "n_obs_survey": 2,
+          "n_no_signal_survey": 2,
           "diameter_survey_m": 42.731,
+          "mec_radius_survey_m": 21.365,
           "bounded_survey": true,
           "n_probe": 0,
           "clear_point": [
-            -1451.656611936872,
-            784.7987694980885
+            -1451.6566119368713,
+            784.7987694980883
           ],
           "clear_radius_m": 21.365,
           "diameter_final_m": 42.731,
@@ -2350,7 +2342,9 @@
         },
         "19": {
           "n_obs_survey": 2,
+          "n_no_signal_survey": 2,
           "diameter_survey_m": 45.99,
+          "mec_radius_survey_m": 22.995,
           "bounded_survey": true,
           "n_probe": 0,
           "clear_point": [
@@ -2376,19 +2370,9 @@
           "direction": 5,
           "near": 0,
           "no_signal": 15,
+          "skip": 0,
           "virtual_time_s": 119.0,
           "travel_m": 0.0
-        },
-        {
-          "waypoint": 1,
-          "x": 1200.0,
-          "y": 0.0,
-          "n_channels": 20,
-          "direction": 6,
-          "near": 0,
-          "no_signal": 14,
-          "virtual_time_s": 479.0,
-          "travel_m": 1200.0
         },
         {
           "waypoint": 2,
@@ -2398,52 +2382,69 @@
           "direction": 3,
           "near": 0,
           "no_signal": 17,
-          "virtual_time_s": 839.0,
-          "travel_m": 2400.0
+          "skip": 0,
+          "virtual_time_s": 479.0,
+          "travel_m": 1200.0
         },
         {
           "waypoint": 3,
           "x": -599.9999999999998,
           "y": 1039.2304845413264,
-          "n_channels": 17,
+          "n_channels": 19,
           "direction": 2,
           "near": 0,
           "no_signal": 15,
-          "virtual_time_s": 1181.0,
-          "travel_m": 3600.0
+          "skip": 2,
+          "virtual_time_s": 890.897,
+          "travel_m": 2724.49
         },
         {
           "waypoint": 4,
           "x": -1200.0,
           "y": 1.4695761589768238e-13,
-          "n_channels": 17,
+          "n_channels": 19,
           "direction": 4,
           "near": 0,
           "no_signal": 13,
-          "virtual_time_s": 1523.0,
-          "travel_m": 4800.0
+          "skip": 2,
+          "virtual_time_s": 1232.897,
+          "travel_m": 3924.49
         },
         {
           "waypoint": 5,
           "x": -600.0000000000006,
           "y": -1039.230484541326,
-          "n_channels": 17,
-          "direction": 2,
+          "n_channels": 18,
+          "direction": 1,
           "near": 0,
-          "no_signal": 15,
-          "virtual_time_s": 1865.0,
-          "travel_m": 6000.0
+          "no_signal": 13,
+          "skip": 4,
+          "virtual_time_s": 1606.449,
+          "travel_m": 5347.25
         },
         {
           "waypoint": 6,
           "x": 599.9999999999992,
           "y": -1039.2304845413269,
-          "n_channels": 16,
-          "direction": 4,
+          "n_channels": 18,
+          "direction": 5,
           "near": 0,
-          "no_signal": 12,
-          "virtual_time_s": 2201.0,
-          "travel_m": 7200.0
+          "no_signal": 10,
+          "skip": 3,
+          "virtual_time_s": 1936.449,
+          "travel_m": 6547.25
+        },
+        {
+          "waypoint": 1,
+          "x": 1200.0,
+          "y": 0.0,
+          "n_channels": 16,
+          "direction": 3,
+          "near": 0,
+          "no_signal": 10,
+          "skip": 3,
+          "virtual_time_s": 2486.852,
+          "travel_m": 8859.26
         }
       ],
       "truth_check": {
@@ -2455,15 +2456,15 @@
             "receive_m": 1462.92,
             "nearest_center_m": 360.5,
             "heard": true,
-            "n_bearings": 3,
+            "n_bearings": 2,
             "cleared": true,
-            "diameter_survey_m": 43.796,
+            "diameter_survey_m": null,
             "n_probe": 0,
-            "diameter_final_m": 43.796,
-            "mec_radius_final_m": 21.898,
-            "clear_radius_m": 21.898,
-            "method": "try",
-            "localize_err_m": 4.8
+            "diameter_final_m": null,
+            "mec_radius_final_m": null,
+            "clear_radius_m": null,
+            "method": "survey-inline",
+            "localize_err_m": 18.55
           },
           {
             "channel": 2,
@@ -2472,15 +2473,15 @@
             "receive_m": 1388.62,
             "nearest_center_m": 144.84,
             "heard": true,
-            "n_bearings": 4,
+            "n_bearings": 3,
             "cleared": true,
-            "diameter_survey_m": 52.004,
-            "n_probe": 1,
-            "diameter_final_m": 22.726,
-            "mec_radius_final_m": 11.363,
-            "clear_radius_m": 11.363,
-            "method": "try-refined",
-            "localize_err_m": 10.94
+            "diameter_survey_m": null,
+            "n_probe": 0,
+            "diameter_final_m": null,
+            "mec_radius_final_m": null,
+            "clear_radius_m": null,
+            "method": "survey-inline",
+            "localize_err_m": 8.59
           },
           {
             "channel": 5,
@@ -2489,15 +2490,15 @@
             "receive_m": 1021.39,
             "nearest_center_m": 550.9,
             "heard": true,
-            "n_bearings": 3,
+            "n_bearings": 2,
             "cleared": true,
-            "diameter_survey_m": 34.673,
+            "diameter_survey_m": null,
             "n_probe": 0,
-            "diameter_final_m": 34.673,
-            "mec_radius_final_m": 17.498,
-            "clear_radius_m": 17.498,
-            "method": "try",
-            "localize_err_m": 10.13
+            "diameter_final_m": null,
+            "mec_radius_final_m": null,
+            "clear_radius_m": null,
+            "method": "survey-inline",
+            "localize_err_m": 12.55
           },
           {
             "channel": 8,
@@ -2510,11 +2511,11 @@
             "cleared": true,
             "diameter_survey_m": 613.838,
             "n_probe": 1,
-            "diameter_final_m": 15.651,
-            "mec_radius_final_m": 7.826,
-            "clear_radius_m": 7.826,
+            "diameter_final_m": 24.477,
+            "mec_radius_final_m": 12.238,
+            "clear_radius_m": 12.238,
             "method": "try-refined",
-            "localize_err_m": 5.77
+            "localize_err_m": 10.11
           },
           {
             "channel": 10,
@@ -2591,15 +2592,15 @@
             "receive_m": 1389.49,
             "nearest_center_m": 303.03,
             "heard": true,
-            "n_bearings": 3,
+            "n_bearings": 2,
             "cleared": true,
-            "diameter_survey_m": 42.494,
+            "diameter_survey_m": null,
             "n_probe": 0,
-            "diameter_final_m": 42.494,
-            "mec_radius_final_m": 21.247,
-            "clear_radius_m": 21.247,
-            "method": "try",
-            "localize_err_m": 2.65
+            "diameter_final_m": null,
+            "mec_radius_final_m": null,
+            "clear_radius_m": null,
+            "method": "survey-inline",
+            "localize_err_m": 8.7
           },
           {
             "channel": 18,
@@ -2640,21 +2641,21 @@
         "all_within_cover": true,
         "missed_channels": [],
         "n_cleared": 11,
-        "localize_err_mean_m": 10.111,
-        "localize_err_max_m": 18.4,
+        "localize_err_mean_m": 12.312,
+        "localize_err_max_m": 18.55,
         "n_within_clear_radius": 11,
-        "n_cleared_after_probe": 2
+        "n_cleared_after_probe": 1
       },
       "bearings_per_channel": {
-        "1": 3,
-        "2": 4,
-        "5": 3,
+        "1": 2,
+        "2": 3,
+        "5": 2,
         "8": 2,
         "10": 2,
         "11": 2,
         "12": 2,
         "14": 3,
-        "16": 3,
+        "16": 2,
         "18": 2,
         "19": 2
       },
@@ -2677,26 +2678,73 @@
       "seed": 4,
       "n_sources": 11,
       "clear_ratio": 1.0,
-      "localize_err_mean_m": 8.367,
+      "localize_err_mean_m": 9.028,
       "localize_err_max_m": 19.25,
       "n_within_clear_radius": 11,
       "n_cleared_after_probe": 1,
       "waypoints_visited": 7,
-      "travel_m": 14998.992142546616,
-      "virtual_time_s": 3821.798419,
-      "n_measure": 128,
+      "travel_m": 14564.762504115124,
+      "virtual_time_s": 3620.952494,
+      "n_measure": 109,
       "n_clear": 11,
       "channels_heard": 11,
-      "n_bearings": 28,
+      "n_bearings": 26,
       "cleared": 11,
-      "avg_time_s": 347.43621990909094,
-      "n_precise_at_survey": 5,
+      "avg_time_s": 329.17749945454545,
+      "n_precise_at_survey": 1,
+      "n_skip_measure": 20,
+      "initial_scan": {
+        "direction": 6,
+        "near": 0,
+        "no_signal": 14,
+        "skip": 0,
+        "n_channels": 20
+      },
+      "n_inline_cleared": 5,
+      "n_inline_fail": 0,
       "n_refined": 1,
       "n_probe": 1,
       "tracks": {
+        "9": {
+          "clear_point": [
+            484.21552579376475,
+            -207.04865088155103
+          ],
+          "method": "survey-inline"
+        },
+        "13": {
+          "clear_point": [
+            987.8054146927539,
+            -889.2100637553476
+          ],
+          "method": "survey-inline"
+        },
+        "5": {
+          "clear_point": [
+            -410.1171490455435,
+            -316.1796637526729
+          ],
+          "method": "survey-inline"
+        },
+        "2": {
+          "clear_point": [
+            -295.58627369148195,
+            722.2610417319112
+          ],
+          "method": "survey-inline"
+        },
+        "15": {
+          "clear_point": [
+            -1090.907876788128,
+            652.8064981860423
+          ],
+          "method": "survey-inline"
+        },
         "1": {
           "n_obs_survey": 2,
+          "n_no_signal_survey": 3,
           "diameter_survey_m": 55.236,
+          "mec_radius_survey_m": 27.618,
           "bounded_survey": true,
           "n_probe": 0,
           "clear_point": [
@@ -2712,27 +2760,11 @@
           "method": "try",
           "cleared": true
         },
-        "2": {
-          "n_obs_survey": 3,
-          "diameter_survey_m": 34.309,
-          "bounded_survey": true,
-          "n_probe": 0,
-          "clear_point": [
-            -286.1107432559648,
-            718.2493626454898
-          ],
-          "clear_radius_m": 17.155,
-          "diameter_final_m": 34.309,
-          "precise_final": true,
-          "mec_radius_m": 17.155,
-          "bounded_final": true,
-          "n_obs_total": 3,
-          "method": "try",
-          "cleared": true
-        },
         "4": {
           "n_obs_survey": 2,
+          "n_no_signal_survey": 2,
           "diameter_survey_m": 49.006,
+          "mec_radius_survey_m": 24.503,
           "bounded_survey": true,
           "n_probe": 0,
           "clear_point": [
@@ -2748,27 +2780,11 @@
           "method": "try",
           "cleared": true
         },
-        "5": {
-          "n_obs_survey": 3,
-          "diameter_survey_m": 35.494,
-          "bounded_survey": true,
-          "n_probe": 0,
-          "clear_point": [
-            -414.63291763112375,
-            -326.51811862488813
-          ],
-          "clear_radius_m": 17.758,
-          "diameter_final_m": 35.494,
-          "precise_final": true,
-          "mec_radius_m": 17.758,
-          "bounded_final": true,
-          "n_obs_total": 3,
-          "method": "try",
-          "cleared": true
-        },
         "7": {
           "n_obs_survey": 2,
+          "n_no_signal_survey": 2,
           "diameter_survey_m": 45.636,
+          "mec_radius_survey_m": 22.818,
           "bounded_survey": true,
           "n_probe": 0,
           "clear_point": [
@@ -2784,32 +2800,16 @@
           "method": "try",
           "cleared": true
         },
-        "9": {
-          "n_obs_survey": 3,
-          "diameter_survey_m": 26.124,
-          "bounded_survey": true,
-          "n_probe": 0,
-          "clear_point": [
-            484.21552579376475,
-            -207.048650881551
-          ],
-          "clear_radius_m": 13.803,
-          "diameter_final_m": 26.124,
-          "precise_final": true,
-          "mec_radius_m": 13.803,
-          "bounded_final": true,
-          "n_obs_total": 3,
-          "method": "try",
-          "cleared": true
-        },
         "10": {
           "n_obs_survey": 3,
+          "n_no_signal_survey": 0,
           "diameter_survey_m": 23.465,
+          "mec_radius_survey_m": 11.733,
           "bounded_survey": true,
           "n_probe": 0,
           "clear_point": [
-            -402.39495391939084,
-            1250.1611887029812
+            -402.3949539193908,
+            1250.1611887029815
           ],
           "clear_radius_m": 11.733,
           "diameter_final_m": 23.465,
@@ -2820,50 +2820,16 @@
           "method": "try",
           "cleared": true
         },
-        "13": {
-          "n_obs_survey": 3,
-          "diameter_survey_m": 39.422,
-          "bounded_survey": true,
-          "n_probe": 0,
-          "clear_point": [
-            985.8410338092094,
-            -893.9292601069017
-          ],
-          "clear_radius_m": 19.711,
-          "diameter_final_m": 39.422,
-          "precise_final": true,
-          "mec_radius_m": 19.711,
-          "bounded_final": true,
-          "n_obs_total": 3,
-          "method": "try",
-          "cleared": true
-        },
-        "15": {
-          "n_obs_survey": 3,
-          "diameter_survey_m": 44.965,
-          "bounded_survey": true,
-          "n_probe": 0,
-          "clear_point": [
-            -1090.0036057578268,
-            651.7068652899263
-          ],
-          "clear_radius_m": 22.484,
-          "diameter_final_m": 44.965,
-          "precise_final": false,
-          "mec_radius_m": 22.484,
-          "bounded_final": true,
-          "n_obs_total": 3,
-          "method": "try",
-          "cleared": true
-        },
         "16": {
           "n_obs_survey": 2,
+          "n_no_signal_survey": 1,
           "diameter_survey_m": 145.485,
+          "mec_radius_survey_m": 72.743,
           "bounded_survey": true,
           "n_probe": 0,
           "clear_point": [
-            619.6230457206242,
-            969.1846872287699
+            619.6230457206243,
+            969.1846872287701
           ],
           "clear_radius_m": 72.743,
           "diameter_final_m": 145.485,
@@ -2876,17 +2842,19 @@
         },
         "17": {
           "n_obs_survey": 1,
+          "n_no_signal_survey": 2,
           "diameter_survey_m": 797.753,
+          "mec_radius_survey_m": 398.876,
           "bounded_survey": false,
           "n_probe": 1,
           "clear_point": [
-            1540.1806343210533,
-            428.7787143518489
+            1539.313654744491,
+            428.24139093187307
           ],
-          "clear_radius_m": 13.515,
-          "diameter_final_m": 27.03,
+          "clear_radius_m": 13.99,
+          "diameter_final_m": 27.98,
           "precise_final": true,
-          "mec_radius_m": 13.515,
+          "mec_radius_m": 13.99,
           "bounded_final": true,
           "n_obs_total": 2,
           "method": "try-refined",
@@ -2902,19 +2870,9 @@
           "direction": 6,
           "near": 0,
           "no_signal": 14,
+          "skip": 0,
           "virtual_time_s": 119.0,
           "travel_m": 0.0
-        },
-        {
-          "waypoint": 1,
-          "x": 1200.0,
-          "y": 0.0,
-          "n_channels": 20,
-          "direction": 5,
-          "near": 0,
-          "no_signal": 15,
-          "virtual_time_s": 479.0,
-          "travel_m": 1200.0
         },
         {
           "waypoint": 2,
@@ -2924,19 +2882,45 @@
           "direction": 5,
           "near": 0,
           "no_signal": 15,
-          "virtual_time_s": 839.0,
+          "skip": 0,
+          "virtual_time_s": 479.0,
+          "travel_m": 1200.0
+        },
+        {
+          "waypoint": 1,
+          "x": 1200.0,
+          "y": 0.0,
+          "n_channels": 20,
+          "direction": 5,
+          "near": 0,
+          "no_signal": 13,
+          "skip": 2,
+          "virtual_time_s": 827.0,
           "travel_m": 2400.0
         },
         {
-          "waypoint": 3,
-          "x": -599.9999999999998,
-          "y": 1039.2304845413264,
-          "n_channels": 19,
-          "direction": 4,
+          "waypoint": 6,
+          "x": 599.9999999999992,
+          "y": -1039.2304845413269,
+          "n_channels": 18,
+          "direction": 3,
           "near": 0,
-          "no_signal": 15,
-          "virtual_time_s": 1193.0,
-          "travel_m": 3600.0
+          "no_signal": 11,
+          "skip": 4,
+          "virtual_time_s": 1322.769,
+          "travel_m": 4408.85
+        },
+        {
+          "waypoint": 5,
+          "x": -600.0000000000006,
+          "y": -1039.230484541326,
+          "n_channels": 18,
+          "direction": 2,
+          "near": 0,
+          "no_signal": 10,
+          "skip": 6,
+          "virtual_time_s": 1634.769,
+          "travel_m": 5608.85
         },
         {
           "waypoint": 4,
@@ -2945,31 +2929,22 @@
           "n_channels": 17,
           "direction": 2,
           "near": 0,
-          "no_signal": 15,
-          "virtual_time_s": 1535.0,
-          "travel_m": 4800.0
+          "no_signal": 10,
+          "skip": 5,
+          "virtual_time_s": 2031.446,
+          "travel_m": 7207.23
         },
         {
-          "waypoint": 5,
-          "x": -600.0000000000006,
-          "y": -1039.230484541326,
-          "n_channels": 16,
+          "waypoint": 3,
+          "x": -599.9999999999998,
+          "y": 1039.2304845413264,
+          "n_channels": 15,
           "direction": 2,
           "near": 0,
-          "no_signal": 14,
-          "virtual_time_s": 1871.0,
-          "travel_m": 6000.0
-        },
-        {
-          "waypoint": 6,
-          "x": 599.9999999999992,
-          "y": -1039.2304845413269,
-          "n_channels": 15,
-          "direction": 3,
-          "near": 0,
-          "no_signal": 12,
-          "virtual_time_s": 2201.0,
-          "travel_m": 7200.0
+          "no_signal": 10,
+          "skip": 3,
+          "virtual_time_s": 2629.55,
+          "travel_m": 9787.75
         }
       ],
       "truth_check": {
@@ -3000,13 +2975,13 @@
             "heard": true,
             "n_bearings": 3,
             "cleared": true,
-            "diameter_survey_m": 34.309,
+            "diameter_survey_m": null,
             "n_probe": 0,
-            "diameter_final_m": 34.309,
-            "mec_radius_final_m": 17.155,
-            "clear_radius_m": 17.155,
-            "method": "try",
-            "localize_err_m": 5.82
+            "diameter_final_m": null,
+            "mec_radius_final_m": null,
+            "clear_radius_m": null,
+            "method": "survey-inline",
+            "localize_err_m": 9.86
           },
           {
             "channel": 4,
@@ -3034,13 +3009,13 @@
             "heard": true,
             "n_bearings": 3,
             "cleared": true,
-            "diameter_survey_m": 35.494,
+            "diameter_survey_m": null,
             "n_probe": 0,
-            "diameter_final_m": 35.494,
-            "mec_radius_final_m": 17.758,
-            "clear_radius_m": 17.758,
-            "method": "try",
-            "localize_err_m": 6.62
+            "diameter_final_m": null,
+            "mec_radius_final_m": null,
+            "clear_radius_m": null,
+            "method": "survey-inline",
+            "localize_err_m": 5.48
           },
           {
             "channel": 7,
@@ -3068,12 +3043,12 @@
             "heard": true,
             "n_bearings": 3,
             "cleared": true,
-            "diameter_survey_m": 26.124,
+            "diameter_survey_m": null,
             "n_probe": 0,
-            "diameter_final_m": 26.124,
-            "mec_radius_final_m": 13.803,
-            "clear_radius_m": 13.803,
-            "method": "try",
+            "diameter_final_m": null,
+            "mec_radius_final_m": null,
+            "clear_radius_m": null,
+            "method": "survey-inline",
             "localize_err_m": 4.39
           },
           {
@@ -3100,15 +3075,15 @@
             "receive_m": 1424.02,
             "nearest_center_m": 412.75,
             "heard": true,
-            "n_bearings": 3,
+            "n_bearings": 2,
             "cleared": true,
-            "diameter_survey_m": 39.422,
+            "diameter_survey_m": null,
             "n_probe": 0,
-            "diameter_final_m": 39.422,
-            "mec_radius_final_m": 19.711,
-            "clear_radius_m": 19.711,
-            "method": "try",
-            "localize_err_m": 9.15
+            "diameter_final_m": null,
+            "mec_radius_final_m": null,
+            "clear_radius_m": null,
+            "method": "survey-inline",
+            "localize_err_m": 13.25
           },
           {
             "channel": 15,
@@ -3117,15 +3092,15 @@
             "receive_m": 1299.46,
             "nearest_center_m": 619.78,
             "heard": true,
-            "n_bearings": 3,
+            "n_bearings": 2,
             "cleared": true,
-            "diameter_survey_m": 44.965,
+            "diameter_survey_m": null,
             "n_probe": 0,
-            "diameter_final_m": 44.965,
-            "mec_radius_final_m": 22.484,
-            "clear_radius_m": 22.484,
-            "method": "try",
-            "localize_err_m": 8.29
+            "diameter_final_m": null,
+            "mec_radius_final_m": null,
+            "clear_radius_m": null,
+            "method": "survey-inline",
+            "localize_err_m": 9.48
           },
           {
             "channel": 16,
@@ -3155,18 +3130,18 @@
             "cleared": true,
             "diameter_survey_m": 797.753,
             "n_probe": 1,
-            "diameter_final_m": 27.03,
-            "mec_radius_final_m": 13.515,
-            "clear_radius_m": 13.515,
+            "diameter_final_m": 27.98,
+            "mec_radius_final_m": 13.99,
+            "clear_radius_m": 13.99,
             "method": "try-refined",
-            "localize_err_m": 3.21
+            "localize_err_m": 2.29
           }
         ],
         "worst_nearest_m": 619.78,
         "all_within_cover": true,
         "missed_channels": [],
         "n_cleared": 11,
-        "localize_err_mean_m": 8.367,
+        "localize_err_mean_m": 9.028,
         "localize_err_max_m": 19.25,
         "n_within_clear_radius": 11,
         "n_cleared_after_probe": 1
@@ -3179,8 +3154,8 @@
         "7": 2,
         "9": 3,
         "10": 3,
-        "13": 3,
-        "15": 3,
+        "13": 2,
+        "15": 2,
         "16": 2,
         "17": 2
       },
@@ -3203,54 +3178,69 @@
       "seed": 5,
       "n_sources": 14,
       "clear_ratio": 1.0,
-      "localize_err_mean_m": 7.287,
+      "localize_err_mean_m": 8.474,
       "localize_err_max_m": 16.27,
       "n_within_clear_radius": 14,
       "n_cleared_after_probe": 5,
       "waypoints_visited": 7,
-      "travel_m": 17899.280015733795,
-      "virtual_time_s": 4457.855992,
-      "n_measure": 135,
+      "travel_m": 18247.252336961064,
+      "virtual_time_s": 4420.450456,
+      "n_measure": 117,
       "n_clear": 14,
       "channels_heard": 14,
-      "n_bearings": 37,
+      "n_bearings": 34,
       "cleared": 14,
-      "avg_time_s": 318.41828514285714,
-      "n_precise_at_survey": 2,
+      "avg_time_s": 315.74646114285713,
+      "n_precise_at_survey": 0,
+      "n_skip_measure": 15,
+      "initial_scan": {
+        "direction": 8,
+        "near": 0,
+        "no_signal": 12,
+        "skip": 0,
+        "n_channels": 20
+      },
+      "n_inline_cleared": 3,
+      "n_inline_fail": 0,
       "n_refined": 5,
-      "n_probe": 6,
+      "n_probe": 5,
       "tracks": {
-        "1": {
-          "n_obs_survey": 3,
-          "diameter_survey_m": 37.428,
-          "bounded_survey": true,
-          "n_probe": 0,
+        "15": {
           "clear_point": [
-            208.88665635329764,
-            -675.2246452046684
+            -987.3351465165769,
+            107.02171630735512
           ],
-          "clear_radius_m": 18.714,
-          "diameter_final_m": 37.428,
-          "precise_final": true,
-          "mec_radius_m": 18.714,
-          "bounded_final": true,
-          "n_obs_total": 3,
-          "method": "try",
-          "cleared": true
+          "method": "survey-inline"
+        },
+        "1": {
+          "clear_point": [
+            208.25731115038332,
+            -675.0322015042052
+          ],
+          "method": "survey-inline"
+        },
+        "13": {
+          "clear_point": [
+            413.7614474029576,
+            -904.480996600507
+          ],
+          "method": "survey-inline"
         },
         "2": {
           "n_obs_survey": 1,
-          "diameter_survey_m": 964.717,
+          "n_no_signal_survey": 3,
+          "diameter_survey_m": 939.26,
+          "mec_radius_survey_m": 469.63,
           "bounded_survey": false,
           "n_probe": 1,
           "clear_point": [
-            969.3239401796285,
-            993.9950723186028
+            966.5939983085475,
+            994.2576400977337
           ],
-          "clear_radius_m": 10.714,
-          "diameter_final_m": 21.428,
+          "clear_radius_m": 14.101,
+          "diameter_final_m": 28.202,
           "precise_final": true,
-          "mec_radius_m": 10.714,
+          "mec_radius_m": 14.101,
           "bounded_final": true,
           "n_obs_total": 2,
           "method": "try-refined",
@@ -3258,17 +3248,19 @@
         },
         "3": {
           "n_obs_survey": 1,
+          "n_no_signal_survey": 3,
           "diameter_survey_m": 762.475,
+          "mec_radius_survey_m": 381.238,
           "bounded_survey": false,
           "n_probe": 1,
           "clear_point": [
-            425.2964272366386,
-            1600.6754115748693
+            424.5089599829455,
+            1603.6976116043306
           ],
-          "clear_radius_m": 17.667,
-          "diameter_final_m": 35.335,
+          "clear_radius_m": 11.981,
+          "diameter_final_m": 23.962,
           "precise_final": true,
-          "mec_radius_m": 17.667,
+          "mec_radius_m": 11.981,
           "bounded_final": true,
           "n_obs_total": 2,
           "method": "try-refined",
@@ -3276,30 +3268,34 @@
         },
         "4": {
           "n_obs_survey": 1,
+          "n_no_signal_survey": 4,
           "diameter_survey_m": 720.629,
+          "mec_radius_survey_m": 360.314,
           "bounded_survey": false,
-          "n_probe": 2,
+          "n_probe": 1,
           "clear_point": [
-            1218.9491514851184,
-            -1259.3729831911444
+            1220.4465657661246,
+            -1249.9668170688656
           ],
-          "clear_radius_m": 4.029,
-          "diameter_final_m": 7.957,
+          "clear_radius_m": 13.245,
+          "diameter_final_m": 26.489,
           "precise_final": true,
-          "mec_radius_m": 4.029,
+          "mec_radius_m": 13.245,
           "bounded_final": true,
-          "n_obs_total": 3,
+          "n_obs_total": 2,
           "method": "try-refined",
           "cleared": true
         },
         "6": {
           "n_obs_survey": 2,
+          "n_no_signal_survey": 4,
           "diameter_survey_m": 57.01,
+          "mec_radius_survey_m": 28.505,
           "bounded_survey": true,
           "n_probe": 0,
           "clear_point": [
-            -1669.6041915190483,
-            -418.08099188632855
+            -1669.604191519049,
+            -418.08099188632866
           ],
           "clear_radius_m": 28.505,
           "diameter_final_m": 57.01,
@@ -3312,7 +3308,9 @@
         },
         "7": {
           "n_obs_survey": 3,
+          "n_no_signal_survey": 0,
           "diameter_survey_m": 47.318,
+          "mec_radius_survey_m": 23.659,
           "bounded_survey": true,
           "n_probe": 0,
           "clear_point": [
@@ -3330,7 +3328,9 @@
         },
         "8": {
           "n_obs_survey": 2,
+          "n_no_signal_survey": 2,
           "diameter_survey_m": 51.708,
+          "mec_radius_survey_m": 25.854,
           "bounded_survey": true,
           "n_probe": 0,
           "clear_point": [
@@ -3348,12 +3348,14 @@
         },
         "9": {
           "n_obs_survey": 2,
+          "n_no_signal_survey": 2,
           "diameter_survey_m": 890.758,
+          "mec_radius_survey_m": 445.379,
           "bounded_survey": true,
           "n_probe": 1,
           "clear_point": [
             532.5672013210395,
-            914.8815556200775
+            914.8815556200773
           ],
           "clear_radius_m": 18.608,
           "diameter_final_m": 37.217,
@@ -3366,7 +3368,9 @@
         },
         "11": {
           "n_obs_survey": 3,
+          "n_no_signal_survey": 1,
           "diameter_survey_m": 41.972,
+          "mec_radius_survey_m": 20.986,
           "bounded_survey": true,
           "n_probe": 0,
           "clear_point": [
@@ -3384,12 +3388,14 @@
         },
         "12": {
           "n_obs_survey": 3,
+          "n_no_signal_survey": 3,
           "diameter_survey_m": 44.962,
+          "mec_radius_survey_m": 22.481,
           "bounded_survey": true,
           "n_probe": 0,
           "clear_point": [
-            -46.22077488840761,
-            -93.87444048232273
+            -46.22077488840764,
+            -93.87444048232278
           ],
           "clear_radius_m": 22.481,
           "diameter_final_m": 44.962,
@@ -3400,50 +3406,16 @@
           "method": "try",
           "cleared": true
         },
-        "13": {
-          "n_obs_survey": 3,
-          "diameter_survey_m": 45.961,
-          "bounded_survey": true,
-          "n_probe": 0,
-          "clear_point": [
-            413.7614474029576,
-            -904.480996600507
-          ],
-          "clear_radius_m": 23.062,
-          "diameter_final_m": 45.961,
-          "precise_final": false,
-          "mec_radius_m": 23.062,
-          "bounded_final": true,
-          "n_obs_total": 3,
-          "method": "try",
-          "cleared": true
-        },
-        "15": {
-          "n_obs_survey": 3,
-          "diameter_survey_m": 36.417,
-          "bounded_survey": true,
-          "n_probe": 0,
-          "clear_point": [
-            -990.659704178505,
-            114.56298050063012
-          ],
-          "clear_radius_m": 18.209,
-          "diameter_final_m": 36.417,
-          "precise_final": true,
-          "mec_radius_m": 18.209,
-          "bounded_final": true,
-          "n_obs_total": 3,
-          "method": "try",
-          "cleared": true
-        },
         "17": {
           "n_obs_survey": 3,
+          "n_no_signal_survey": 2,
           "diameter_survey_m": 44.962,
+          "mec_radius_survey_m": 22.481,
           "bounded_survey": true,
           "n_probe": 0,
           "clear_point": [
             401.6040313109533,
-            -69.67461860034119
+            -69.6746186003412
           ],
           "clear_radius_m": 22.481,
           "diameter_final_m": 44.962,
@@ -3456,17 +3428,19 @@
         },
         "18": {
           "n_obs_survey": 1,
+          "n_no_signal_survey": 4,
           "diameter_survey_m": 625.493,
+          "mec_radius_survey_m": 312.746,
           "bounded_survey": false,
           "n_probe": 1,
           "clear_point": [
-            865.8631999282992,
-            -1268.2024900894805
+            864.467923272907,
+            -1266.8237495440237
           ],
-          "clear_radius_m": 7.776,
-          "diameter_final_m": 15.551,
+          "clear_radius_m": 13.86,
+          "diameter_final_m": 27.721,
           "precise_final": true,
-          "mec_radius_m": 7.776,
+          "mec_radius_m": 13.86,
           "bounded_final": true,
           "n_obs_total": 2,
           "method": "try-refined",
@@ -3482,6 +3456,7 @@
           "direction": 8,
           "near": 0,
           "no_signal": 12,
+          "skip": 0,
           "virtual_time_s": 119.0,
           "travel_m": 0.0
         },
@@ -3493,6 +3468,7 @@
           "direction": 4,
           "near": 0,
           "no_signal": 16,
+          "skip": 0,
           "virtual_time_s": 479.0,
           "travel_m": 1200.0
         },
@@ -3503,8 +3479,9 @@
           "n_channels": 20,
           "direction": 5,
           "near": 0,
-          "no_signal": 15,
-          "virtual_time_s": 839.0,
+          "no_signal": 14,
+          "skip": 1,
+          "virtual_time_s": 833.0,
           "travel_m": 2400.0
         },
         {
@@ -3514,20 +3491,22 @@
           "n_channels": 19,
           "direction": 2,
           "near": 0,
-          "no_signal": 17,
-          "virtual_time_s": 1193.0,
+          "no_signal": 15,
+          "skip": 2,
+          "virtual_time_s": 1175.0,
           "travel_m": 3600.0
         },
         {
           "waypoint": 4,
           "x": -1200.0,
           "y": 1.4695761589768238e-13,
-          "n_channels": 18,
-          "direction": 3,
+          "n_channels": 17,
+          "direction": 2,
           "near": 0,
-          "no_signal": 15,
-          "virtual_time_s": 1541.0,
-          "travel_m": 4800.0
+          "no_signal": 10,
+          "skip": 5,
+          "virtual_time_s": 1501.51,
+          "travel_m": 4847.55
         },
         {
           "waypoint": 5,
@@ -3536,20 +3515,22 @@
           "n_channels": 17,
           "direction": 4,
           "near": 0,
-          "no_signal": 13,
-          "virtual_time_s": 1883.0,
-          "travel_m": 6000.0
+          "no_signal": 9,
+          "skip": 4,
+          "virtual_time_s": 1819.51,
+          "travel_m": 6047.55
         },
         {
           "waypoint": 6,
           "x": 599.9999999999992,
           "y": -1039.2304845413269,
-          "n_channels": 15,
-          "direction": 5,
+          "n_channels": 14,
+          "direction": 4,
           "near": 0,
-          "no_signal": 10,
-          "virtual_time_s": 2213.0,
-          "travel_m": 7200.0
+          "no_signal": 7,
+          "skip": 3,
+          "virtual_time_s": 2180.394,
+          "travel_m": 7471.97
         }
       ],
       "truth_check": {
@@ -3561,15 +3542,15 @@
             "receive_m": 1069.38,
             "nearest_center_m": 535.36,
             "heard": true,
-            "n_bearings": 3,
+            "n_bearings": 2,
             "cleared": true,
-            "diameter_survey_m": 37.428,
+            "diameter_survey_m": null,
             "n_probe": 0,
-            "diameter_final_m": 37.428,
-            "mec_radius_final_m": 18.714,
-            "clear_radius_m": 18.714,
-            "method": "try",
-            "localize_err_m": 2.7
+            "diameter_final_m": null,
+            "mec_radius_final_m": null,
+            "clear_radius_m": null,
+            "method": "survey-inline",
+            "localize_err_m": 2.24
           },
           {
             "channel": 2,
@@ -3580,13 +3561,13 @@
             "heard": true,
             "n_bearings": 2,
             "cleared": true,
-            "diameter_survey_m": 964.717,
+            "diameter_survey_m": 939.26,
             "n_probe": 1,
-            "diameter_final_m": 21.428,
-            "mec_radius_final_m": 10.714,
-            "clear_radius_m": 10.714,
+            "diameter_final_m": 28.202,
+            "mec_radius_final_m": 14.101,
+            "clear_radius_m": 14.101,
             "method": "try-refined",
-            "localize_err_m": 3.59
+            "localize_err_m": 6.33
           },
           {
             "channel": 3,
@@ -3599,11 +3580,11 @@
             "cleared": true,
             "diameter_survey_m": 762.475,
             "n_probe": 1,
-            "diameter_final_m": 35.335,
-            "mec_radius_final_m": 17.667,
-            "clear_radius_m": 17.667,
+            "diameter_final_m": 23.962,
+            "mec_radius_final_m": 11.981,
+            "clear_radius_m": 11.981,
             "method": "try-refined",
-            "localize_err_m": 9.09
+            "localize_err_m": 9.42
           },
           {
             "channel": 4,
@@ -3612,15 +3593,15 @@
             "receive_m": 1144.65,
             "nearest_center_m": 658.48,
             "heard": true,
-            "n_bearings": 3,
+            "n_bearings": 2,
             "cleared": true,
             "diameter_survey_m": 720.629,
-            "n_probe": 2,
-            "diameter_final_m": 7.957,
-            "mec_radius_final_m": 4.029,
-            "clear_radius_m": 4.029,
+            "n_probe": 1,
+            "diameter_final_m": 26.489,
+            "mec_radius_final_m": 13.245,
+            "clear_radius_m": 13.245,
             "method": "try-refined",
-            "localize_err_m": 1.7
+            "localize_err_m": 10.61
           },
           {
             "channel": 6,
@@ -3733,12 +3714,12 @@
             "heard": true,
             "n_bearings": 3,
             "cleared": true,
-            "diameter_survey_m": 45.961,
+            "diameter_survey_m": null,
             "n_probe": 0,
-            "diameter_final_m": 45.961,
-            "mec_radius_final_m": 23.062,
-            "clear_radius_m": 23.062,
-            "method": "try",
+            "diameter_final_m": null,
+            "mec_radius_final_m": null,
+            "clear_radius_m": null,
+            "method": "survey-inline",
             "localize_err_m": 9.32
           },
           {
@@ -3748,15 +3729,15 @@
             "receive_m": 1352.33,
             "nearest_center_m": 242.42,
             "heard": true,
-            "n_bearings": 3,
+            "n_bearings": 2,
             "cleared": true,
-            "diameter_survey_m": 36.417,
+            "diameter_survey_m": null,
             "n_probe": 0,
-            "diameter_final_m": 36.417,
-            "mec_radius_final_m": 18.209,
-            "clear_radius_m": 18.209,
-            "method": "try",
-            "localize_err_m": 3.87
+            "diameter_final_m": null,
+            "mec_radius_final_m": null,
+            "clear_radius_m": null,
+            "method": "survey-inline",
+            "localize_err_m": 10.1
           },
           {
             "channel": 17,
@@ -3786,27 +3767,27 @@
             "cleared": true,
             "diameter_survey_m": 625.493,
             "n_probe": 1,
-            "diameter_final_m": 15.551,
-            "mec_radius_final_m": 7.776,
-            "clear_radius_m": 7.776,
+            "diameter_final_m": 27.721,
+            "mec_radius_final_m": 13.86,
+            "clear_radius_m": 13.86,
             "method": "try-refined",
-            "localize_err_m": 5.33
+            "localize_err_m": 4.2
           }
         ],
         "worst_nearest_m": 767.47,
         "all_within_cover": true,
         "missed_channels": [],
         "n_cleared": 14,
-        "localize_err_mean_m": 7.287,
+        "localize_err_mean_m": 8.474,
         "localize_err_max_m": 16.27,
         "n_within_clear_radius": 14,
         "n_cleared_after_probe": 5
       },
       "bearings_per_channel": {
-        "1": 3,
+        "1": 2,
         "2": 2,
         "3": 2,
-        "4": 3,
+        "4": 2,
         "6": 2,
         "7": 3,
         "8": 2,
@@ -3814,7 +3795,7 @@
         "11": 3,
         "12": 3,
         "13": 3,
-        "15": 3,
+        "15": 2,
         "17": 3,
         "18": 2
       },
@@ -3840,49 +3821,71 @@
       "seed": 6,
       "n_sources": 16,
       "clear_ratio": 1.0,
-      "localize_err_mean_m": 6.465,
-      "localize_err_max_m": 16.66,
+      "localize_err_mean_m": 9.225,
+      "localize_err_max_m": 18.17,
       "n_within_clear_radius": 16,
-      "n_cleared_after_probe": 3,
+      "n_cleared_after_probe": 2,
       "waypoints_visited": 7,
-      "travel_m": 18844.68804141004,
-      "virtual_time_s": 4651.937597,
-      "n_measure": 134,
-      "n_clear": 16,
+      "travel_m": 17905.21606689982,
+      "virtual_time_s": 4278.043202,
+      "n_measure": 102,
+      "n_clear": 18,
       "channels_heard": 16,
-      "n_bearings": 40,
+      "n_bearings": 36,
       "cleared": 16,
-      "avg_time_s": 290.7460998125,
-      "n_precise_at_survey": 5,
-      "n_refined": 3,
-      "n_probe": 3,
+      "avg_time_s": 267.377700125,
+      "n_precise_at_survey": 4,
+      "n_skip_measure": 21,
+      "initial_scan": {
+        "direction": 8,
+        "near": 0,
+        "no_signal": 12,
+        "skip": 0,
+        "n_channels": 20
+      },
+      "n_inline_cleared": 4,
+      "n_inline_fail": 2,
+      "n_refined": 2,
+      "n_probe": 2,
       "tracks": {
         "1": {
-          "n_obs_survey": 3,
-          "diameter_survey_m": 41.881,
-          "bounded_survey": true,
-          "n_probe": 0,
           "clear_point": [
-            -891.6661692964241,
-            584.1350882242106
+            -891.3171171141505,
+            583.9838598450814
           ],
-          "clear_radius_m": 20.941,
-          "diameter_final_m": 41.881,
-          "precise_final": false,
-          "mec_radius_m": 20.941,
-          "bounded_final": true,
-          "n_obs_total": 3,
-          "method": "try",
-          "cleared": true
+          "method": "survey-inline"
+        },
+        "10": {
+          "clear_point": [
+            -773.8346828069671,
+            377.09502709587383
+          ],
+          "method": "survey-inline"
+        },
+        "15": {
+          "clear_point": [
+            684.0567785773397,
+            -1196.0607967279361
+          ],
+          "method": "survey-inline"
+        },
+        "20": {
+          "clear_point": [
+            -402.20065404550274,
+            -867.5649507315361
+          ],
+          "method": "survey-inline"
         },
         "2": {
           "n_obs_survey": 2,
+          "n_no_signal_survey": 2,
           "diameter_survey_m": 43.615,
+          "mec_radius_survey_m": 21.808,
           "bounded_survey": true,
           "n_probe": 0,
           "clear_point": [
-            51.60441002057396,
-            -1487.0430411042705
+            51.60441002057393,
+            -1487.0430411042707
           ],
           "clear_radius_m": 21.808,
           "diameter_final_m": 43.615,
@@ -3895,12 +3898,14 @@
         },
         "3": {
           "n_obs_survey": 2,
+          "n_no_signal_survey": 2,
           "diameter_survey_m": 42.035,
+          "mec_radius_survey_m": 21.017,
           "bounded_survey": true,
           "n_probe": 0,
           "clear_point": [
-            1279.941418370634,
-            920.1342782750102
+            1279.9414183706344,
+            920.1342782750105
           ],
           "clear_radius_m": 21.017,
           "diameter_final_m": 42.035,
@@ -3913,17 +3918,19 @@
         },
         "4": {
           "n_obs_survey": 1,
+          "n_no_signal_survey": 2,
           "diameter_survey_m": 603.259,
+          "mec_radius_survey_m": 301.629,
           "bounded_survey": false,
           "n_probe": 1,
           "clear_point": [
-            794.7327623553214,
-            -1485.6301222850293
+            793.0242589224415,
+            -1482.032476017057
           ],
-          "clear_radius_m": 12.301,
-          "diameter_final_m": 24.602,
+          "clear_radius_m": 9.421,
+          "diameter_final_m": 18.841,
           "precise_final": true,
-          "mec_radius_m": 12.301,
+          "mec_radius_m": 9.421,
           "bounded_final": true,
           "n_obs_total": 2,
           "method": "try-refined",
@@ -3931,17 +3938,19 @@
         },
         "6": {
           "n_obs_survey": 1,
+          "n_no_signal_survey": 2,
           "diameter_survey_m": 605.315,
+          "mec_radius_survey_m": 302.657,
           "bounded_survey": false,
           "n_probe": 1,
           "clear_point": [
-            614.1530057429361,
-            -1074.2614975924025
+            614.5523223074257,
+            -1076.7908861308824
           ],
-          "clear_radius_m": 13.593,
-          "diameter_final_m": 27.185,
+          "clear_radius_m": 18.611,
+          "diameter_final_m": 37.221,
           "precise_final": true,
-          "mec_radius_m": 13.593,
+          "mec_radius_m": 18.611,
           "bounded_final": true,
           "n_obs_total": 2,
           "method": "try-refined",
@@ -3949,7 +3958,9 @@
         },
         "8": {
           "n_obs_survey": 3,
+          "n_no_signal_survey": 1,
           "diameter_survey_m": 23.596,
+          "mec_radius_survey_m": 11.83,
           "bounded_survey": true,
           "n_probe": 0,
           "clear_point": [
@@ -3967,12 +3978,14 @@
         },
         "9": {
           "n_obs_survey": 3,
+          "n_no_signal_survey": 1,
           "diameter_survey_m": 14.029,
+          "mec_radius_survey_m": 7.44,
           "bounded_survey": true,
           "n_probe": 0,
           "clear_point": [
             1087.2947019919857,
-            -630.2930319445043
+            -630.2930319445046
           ],
           "clear_radius_m": 7.44,
           "diameter_final_m": 14.029,
@@ -3983,32 +3996,16 @@
           "method": "try",
           "cleared": true
         },
-        "10": {
-          "n_obs_survey": 3,
-          "diameter_survey_m": 35.19,
-          "bounded_survey": true,
-          "n_probe": 0,
-          "clear_point": [
-            -780.1333088611461,
-            379.4394532927574
-          ],
-          "clear_radius_m": 17.665,
-          "diameter_final_m": 35.19,
-          "precise_final": true,
-          "mec_radius_m": 17.665,
-          "bounded_final": true,
-          "n_obs_total": 3,
-          "method": "try",
-          "cleared": true
-        },
         "11": {
           "n_obs_survey": 3,
+          "n_no_signal_survey": 0,
           "diameter_survey_m": 37.863,
+          "mec_radius_survey_m": 18.932,
           "bounded_survey": true,
           "n_probe": 0,
           "clear_point": [
             -611.7977213729625,
-            3.1304453864951114
+            3.1304453864949244
           ],
           "clear_radius_m": 18.932,
           "diameter_final_m": 37.863,
@@ -4021,7 +4018,9 @@
         },
         "12": {
           "n_obs_survey": 3,
+          "n_no_signal_survey": 0,
           "diameter_survey_m": 35.063,
+          "mec_radius_survey_m": 17.532,
           "bounded_survey": true,
           "n_probe": 0,
           "clear_point": [
@@ -4039,12 +4038,14 @@
         },
         "14": {
           "n_obs_survey": 2,
+          "n_no_signal_survey": 1,
           "diameter_survey_m": 42.267,
+          "mec_radius_survey_m": 21.134,
           "bounded_survey": true,
           "n_probe": 0,
           "clear_point": [
             -1081.892104064622,
-            1028.545376819011
+            1028.5453768190107
           ],
           "clear_radius_m": 21.134,
           "diameter_final_m": 42.267,
@@ -4055,45 +4056,31 @@
           "method": "try",
           "cleared": true
         },
-        "15": {
-          "n_obs_survey": 3,
-          "diameter_survey_m": 55.967,
+        "16": {
+          "n_obs_survey": 1,
+          "n_no_signal_survey": 2,
+          "diameter_survey_m": 406.623,
+          "mec_radius_survey_m": 203.311,
           "bounded_survey": true,
           "n_probe": 0,
           "clear_point": [
-            683.8441956244463,
-            -1182.0746271484893
+            473.4634046451328,
+            1198.365788967365
           ],
-          "clear_radius_m": 29.303,
-          "diameter_final_m": 55.967,
+          "clear_radius_m": 203.311,
+          "diameter_final_m": 406.623,
           "precise_final": false,
-          "mec_radius_m": 29.303,
+          "mec_radius_m": 203.311,
           "bounded_final": true,
-          "n_obs_total": 3,
+          "n_obs_total": 1,
           "method": "try",
-          "cleared": true
-        },
-        "16": {
-          "n_obs_survey": 1,
-          "diameter_survey_m": 999.386,
-          "bounded_survey": false,
-          "n_probe": 1,
-          "clear_point": [
-            479.8586870560485,
-            1185.3650050114604
-          ],
-          "clear_radius_m": 12.806,
-          "diameter_final_m": 25.613,
-          "precise_final": true,
-          "mec_radius_m": 12.806,
-          "bounded_final": true,
-          "n_obs_total": 2,
-          "method": "try-refined",
           "cleared": true
         },
         "18": {
           "n_obs_survey": 2,
+          "n_no_signal_survey": 1,
           "diameter_survey_m": 44.802,
+          "mec_radius_survey_m": 22.401,
           "bounded_survey": true,
           "n_probe": 0,
           "clear_point": [
@@ -4111,7 +4098,9 @@
         },
         "19": {
           "n_obs_survey": 2,
+          "n_no_signal_survey": 1,
           "diameter_survey_m": 44.886,
+          "mec_radius_survey_m": 22.443,
           "bounded_survey": true,
           "n_probe": 0,
           "clear_point": [
@@ -4126,24 +4115,6 @@
           "n_obs_total": 2,
           "method": "try",
           "cleared": true
-        },
-        "20": {
-          "n_obs_survey": 3,
-          "diameter_survey_m": 41.893,
-          "bounded_survey": true,
-          "n_probe": 0,
-          "clear_point": [
-            -411.9330025124439,
-            -857.0754367245045
-          ],
-          "clear_radius_m": 20.947,
-          "diameter_final_m": 41.893,
-          "precise_final": false,
-          "mec_radius_m": 20.947,
-          "bounded_final": true,
-          "n_obs_total": 3,
-          "method": "try",
-          "cleared": true
         }
       },
       "waypoint_stats": [
@@ -4155,41 +4126,9 @@
           "direction": 8,
           "near": 0,
           "no_signal": 12,
+          "skip": 0,
           "virtual_time_s": 119.0,
           "travel_m": 0.0
-        },
-        {
-          "waypoint": 1,
-          "x": 1200.0,
-          "y": 0.0,
-          "n_channels": 20,
-          "direction": 4,
-          "near": 0,
-          "no_signal": 16,
-          "virtual_time_s": 479.0,
-          "travel_m": 1200.0
-        },
-        {
-          "waypoint": 2,
-          "x": 600.0000000000001,
-          "y": 1039.2304845413264,
-          "n_channels": 20,
-          "direction": 2,
-          "near": 0,
-          "no_signal": 18,
-          "virtual_time_s": 839.0,
-          "travel_m": 2400.0
-        },
-        {
-          "waypoint": 3,
-          "x": -599.9999999999998,
-          "y": 1039.2304845413264,
-          "n_channels": 20,
-          "direction": 5,
-          "near": 0,
-          "no_signal": 15,
-          "virtual_time_s": 1199.0,
-          "travel_m": 3600.0
         },
         {
           "waypoint": 4,
@@ -4199,30 +4138,69 @@
           "direction": 8,
           "near": 0,
           "no_signal": 12,
-          "virtual_time_s": 1559.0,
-          "travel_m": 4800.0
+          "skip": 0,
+          "virtual_time_s": 479.0,
+          "travel_m": 1200.0
         },
         {
-          "waypoint": 5,
-          "x": -600.0000000000006,
-          "y": -1039.230484541326,
-          "n_channels": 17,
-          "direction": 5,
+          "waypoint": 3,
+          "x": -599.9999999999998,
+          "y": 1039.2304845413264,
+          "n_channels": 18,
+          "direction": 3,
           "near": 0,
-          "no_signal": 12,
-          "virtual_time_s": 1901.0,
-          "travel_m": 6000.0
+          "no_signal": 13,
+          "skip": 2,
+          "virtual_time_s": 901.608,
+          "travel_m": 2783.04
+        },
+        {
+          "waypoint": 2,
+          "x": 600.0000000000001,
+          "y": 1039.2304845413264,
+          "n_channels": 17,
+          "direction": 2,
+          "near": 0,
+          "no_signal": 10,
+          "skip": 5,
+          "virtual_time_s": 1213.608,
+          "travel_m": 3983.04
+        },
+        {
+          "waypoint": 1,
+          "x": 1200.0,
+          "y": 0.0,
+          "n_channels": 17,
+          "direction": 4,
+          "near": 0,
+          "no_signal": 8,
+          "skip": 5,
+          "virtual_time_s": 1525.608,
+          "travel_m": 5183.04
         },
         {
           "waypoint": 6,
           "x": 599.9999999999992,
           "y": -1039.2304845413269,
-          "n_channels": 14,
-          "direction": 5,
+          "n_channels": 16,
+          "direction": 6,
           "near": 0,
-          "no_signal": 9,
-          "virtual_time_s": 2225.0,
-          "travel_m": 7200.0
+          "no_signal": 5,
+          "skip": 5,
+          "virtual_time_s": 1923.666,
+          "travel_m": 6788.33
+        },
+        {
+          "waypoint": 5,
+          "x": -600.0000000000006,
+          "y": -1039.230484541326,
+          "n_channels": 13,
+          "direction": 3,
+          "near": 0,
+          "no_signal": 6,
+          "skip": 4,
+          "virtual_time_s": 2238.406,
+          "travel_m": 8067.03
         }
       ],
       "truth_check": {
@@ -4234,15 +4212,15 @@
             "receive_m": 1125.24,
             "nearest_center_m": 555.59,
             "heard": true,
-            "n_bearings": 3,
+            "n_bearings": 2,
             "cleared": true,
-            "diameter_survey_m": 41.881,
+            "diameter_survey_m": null,
             "n_probe": 0,
-            "diameter_final_m": 41.881,
-            "mec_radius_final_m": 20.941,
-            "clear_radius_m": 20.941,
-            "method": "try",
-            "localize_err_m": 15.07
+            "diameter_final_m": null,
+            "mec_radius_final_m": null,
+            "clear_radius_m": null,
+            "method": "survey-inline",
+            "localize_err_m": 15.12
           },
           {
             "channel": 2,
@@ -4289,11 +4267,11 @@
             "cleared": true,
             "diameter_survey_m": 603.259,
             "n_probe": 1,
-            "diameter_final_m": 24.602,
-            "mec_radius_final_m": 12.301,
-            "clear_radius_m": 12.301,
+            "diameter_final_m": 18.841,
+            "mec_radius_final_m": 9.421,
+            "clear_radius_m": 9.421,
             "method": "try-refined",
-            "localize_err_m": 4.25
+            "localize_err_m": 3.22
           },
           {
             "channel": 6,
@@ -4306,11 +4284,11 @@
             "cleared": true,
             "diameter_survey_m": 605.315,
             "n_probe": 1,
-            "diameter_final_m": 27.185,
-            "mec_radius_final_m": 13.593,
-            "clear_radius_m": 13.593,
+            "diameter_final_m": 37.221,
+            "mec_radius_final_m": 18.611,
+            "clear_radius_m": 18.611,
             "method": "try-refined",
-            "localize_err_m": 2.65
+            "localize_err_m": 5.19
           },
           {
             "channel": 8,
@@ -4353,15 +4331,15 @@
             "receive_m": 1178.69,
             "nearest_center_m": 553.95,
             "heard": true,
-            "n_bearings": 3,
+            "n_bearings": 2,
             "cleared": true,
-            "diameter_survey_m": 35.19,
+            "diameter_survey_m": null,
             "n_probe": 0,
-            "diameter_final_m": 35.19,
-            "mec_radius_final_m": 17.665,
-            "clear_radius_m": 17.665,
-            "method": "try",
-            "localize_err_m": 12.69
+            "diameter_final_m": null,
+            "mec_radius_final_m": null,
+            "clear_radius_m": null,
+            "method": "survey-inline",
+            "localize_err_m": 18.17
           },
           {
             "channel": 11,
@@ -4421,15 +4399,15 @@
             "receive_m": 1437.99,
             "nearest_center_m": 168.08,
             "heard": true,
-            "n_bearings": 3,
+            "n_bearings": 2,
             "cleared": true,
-            "diameter_survey_m": 55.967,
+            "diameter_survey_m": null,
             "n_probe": 0,
-            "diameter_final_m": 55.967,
-            "mec_radius_final_m": 29.303,
-            "clear_radius_m": 29.303,
-            "method": "try",
-            "localize_err_m": 5.14
+            "diameter_final_m": null,
+            "mec_radius_final_m": null,
+            "clear_radius_m": null,
+            "method": "survey-inline",
+            "localize_err_m": 15.06
           },
           {
             "channel": 16,
@@ -4438,15 +4416,15 @@
             "receive_m": 1084.57,
             "nearest_center_m": 189.03,
             "heard": true,
-            "n_bearings": 2,
+            "n_bearings": 1,
             "cleared": true,
-            "diameter_survey_m": 999.386,
-            "n_probe": 1,
-            "diameter_final_m": 25.613,
-            "mec_radius_final_m": 12.806,
-            "clear_radius_m": 12.806,
-            "method": "try-refined",
-            "localize_err_m": 0.33
+            "diameter_survey_m": 406.623,
+            "n_probe": 0,
+            "diameter_final_m": 406.623,
+            "mec_radius_final_m": 203.311,
+            "clear_radius_m": 203.311,
+            "method": "try",
+            "localize_err_m": 14.58
           },
           {
             "channel": 18,
@@ -4491,38 +4469,38 @@
             "heard": true,
             "n_bearings": 3,
             "cleared": true,
-            "diameter_survey_m": 41.893,
+            "diameter_survey_m": null,
             "n_probe": 0,
-            "diameter_final_m": 41.893,
-            "mec_radius_final_m": 20.947,
-            "clear_radius_m": 20.947,
-            "method": "try",
-            "localize_err_m": 0.87
+            "diameter_final_m": null,
+            "mec_radius_final_m": null,
+            "clear_radius_m": null,
+            "method": "survey-inline",
+            "localize_err_m": 13.82
           }
         ],
         "worst_nearest_m": 704.25,
         "all_within_cover": true,
         "missed_channels": [],
         "n_cleared": 16,
-        "localize_err_mean_m": 6.465,
-        "localize_err_max_m": 16.66,
+        "localize_err_mean_m": 9.225,
+        "localize_err_max_m": 18.17,
         "n_within_clear_radius": 16,
-        "n_cleared_after_probe": 3
+        "n_cleared_after_probe": 2
       },
       "bearings_per_channel": {
-        "1": 3,
+        "1": 2,
         "2": 2,
         "3": 2,
         "4": 2,
         "6": 2,
         "8": 3,
         "9": 3,
-        "10": 3,
+        "10": 2,
         "11": 3,
         "12": 3,
         "14": 2,
-        "15": 3,
-        "16": 2,
+        "15": 2,
+        "16": 1,
         "18": 2,
         "19": 2,
         "20": 3
@@ -4551,72 +4529,69 @@
       "seed": 7,
       "n_sources": 12,
       "clear_ratio": 1.0,
-      "localize_err_mean_m": 10.057,
+      "localize_err_mean_m": 10.235,
       "localize_err_max_m": 18.71,
       "n_within_clear_radius": 12,
       "n_cleared_after_probe": 2,
       "waypoints_visited": 7,
-      "travel_m": 16022.340388065542,
-      "virtual_time_s": 4025.468069,
-      "n_measure": 127,
-      "n_clear": 12,
+      "travel_m": 17157.482364750464,
+      "virtual_time_s": 4195.496462,
+      "n_measure": 117,
+      "n_clear": 13,
       "channels_heard": 12,
-      "n_bearings": 30,
+      "n_bearings": 28,
       "cleared": 12,
-      "avg_time_s": 335.4556724166667,
-      "n_precise_at_survey": 2,
+      "avg_time_s": 349.6247051666667,
+      "n_precise_at_survey": 1,
+      "n_skip_measure": 9,
+      "initial_scan": {
+        "direction": 6,
+        "near": 0,
+        "no_signal": 14,
+        "skip": 0,
+        "n_channels": 20
+      },
+      "n_inline_cleared": 3,
+      "n_inline_fail": 1,
       "n_refined": 2,
       "n_probe": 2,
       "tracks": {
-        "1": {
-          "n_obs_survey": 3,
-          "diameter_survey_m": 47.396,
-          "bounded_survey": true,
-          "n_probe": 0,
+        "3": {
           "clear_point": [
-            -1064.7233768601188,
-            812.4859368019556
+            497.0034449335513,
+            448.09362968706114
           ],
-          "clear_radius_m": 23.698,
-          "diameter_final_m": 47.396,
-          "precise_final": false,
-          "mec_radius_m": 23.698,
-          "bounded_final": true,
-          "n_obs_total": 3,
-          "method": "try",
-          "cleared": true
+          "method": "survey-inline"
+        },
+        "1": {
+          "clear_point": [
+            -1065.4494782386569,
+            813.7553955555494
+          ],
+          "method": "survey-inline"
+        },
+        "19": {
+          "clear_point": [
+            -542.0756960222338,
+            307.2179450687384
+          ],
+          "method": "survey-inline"
         },
         "2": {
           "n_obs_survey": 3,
-          "diameter_survey_m": 40.546,
+          "n_no_signal_survey": 1,
+          "diameter_survey_m": 40.716,
+          "mec_radius_survey_m": 20.358,
           "bounded_survey": true,
           "n_probe": 0,
           "clear_point": [
-            230.61158549840673,
-            -285.6736180955743
+            235.0987446717904,
+            -285.4462253427042
           ],
-          "clear_radius_m": 20.273,
-          "diameter_final_m": 40.546,
+          "clear_radius_m": 20.358,
+          "diameter_final_m": 40.716,
           "precise_final": false,
-          "mec_radius_m": 20.273,
-          "bounded_final": true,
-          "n_obs_total": 3,
-          "method": "try",
-          "cleared": true
-        },
-        "3": {
-          "n_obs_survey": 3,
-          "diameter_survey_m": 33.558,
-          "bounded_survey": true,
-          "n_probe": 0,
-          "clear_point": [
-            502.99072811941846,
-            455.23085601869263
-          ],
-          "clear_radius_m": 16.94,
-          "diameter_final_m": 33.558,
-          "precise_final": true,
-          "mec_radius_m": 16.94,
+          "mec_radius_m": 20.358,
           "bounded_final": true,
           "n_obs_total": 3,
           "method": "try",
@@ -4624,17 +4599,19 @@
         },
         "4": {
           "n_obs_survey": 1,
+          "n_no_signal_survey": 1,
           "diameter_survey_m": 626.63,
+          "mec_radius_survey_m": 313.315,
           "bounded_survey": false,
           "n_probe": 1,
           "clear_point": [
-            674.3124289448131,
-            1447.1814715827225
+            673.7163184451576,
+            1445.1660889583966
           ],
-          "clear_radius_m": 9.23,
-          "diameter_final_m": 18.46,
+          "clear_radius_m": 10.189,
+          "diameter_final_m": 20.378,
           "precise_final": true,
-          "mec_radius_m": 9.23,
+          "mec_radius_m": 10.189,
           "bounded_final": true,
           "n_obs_total": 2,
           "method": "try-refined",
@@ -4642,12 +4619,14 @@
         },
         "5": {
           "n_obs_survey": 2,
+          "n_no_signal_survey": 2,
           "diameter_survey_m": 43.611,
+          "mec_radius_survey_m": 21.806,
           "bounded_survey": true,
           "n_probe": 0,
           "clear_point": [
-            -970.1652288463549,
-            1016.4206214818173
+            -970.1652288463548,
+            1016.420621481817
           ],
           "clear_radius_m": 21.806,
           "diameter_final_m": 43.611,
@@ -4660,11 +4639,13 @@
         },
         "6": {
           "n_obs_survey": 3,
+          "n_no_signal_survey": 0,
           "diameter_survey_m": 41.489,
+          "mec_radius_survey_m": 20.744,
           "bounded_survey": true,
           "n_probe": 0,
           "clear_point": [
-            395.58632339382376,
+            395.5863233938238,
             154.85659100337014
           ],
           "clear_radius_m": 20.744,
@@ -4678,7 +4659,9 @@
         },
         "9": {
           "n_obs_survey": 2,
+          "n_no_signal_survey": 2,
           "diameter_survey_m": 44.477,
+          "mec_radius_survey_m": 22.239,
           "bounded_survey": true,
           "n_probe": 0,
           "clear_point": [
@@ -4696,11 +4679,13 @@
         },
         "10": {
           "n_obs_survey": 2,
+          "n_no_signal_survey": 2,
           "diameter_survey_m": 48.047,
+          "mec_radius_survey_m": 24.023,
           "bounded_survey": true,
           "n_probe": 0,
           "clear_point": [
-            -1295.3140182838533,
+            -1295.314018283853,
             375.28730814241493
           ],
           "clear_radius_m": 24.023,
@@ -4714,17 +4699,19 @@
         },
         "13": {
           "n_obs_survey": 1,
+          "n_no_signal_survey": 2,
           "diameter_survey_m": 734.336,
+          "mec_radius_survey_m": 367.168,
           "bounded_survey": false,
           "n_probe": 1,
           "clear_point": [
-            -491.0248522600793,
-            -1497.7568212546328
+            -491.57649870404697,
+            -1495.2430748742238
           ],
-          "clear_radius_m": 12.196,
-          "diameter_final_m": 24.392,
+          "clear_radius_m": 14.119,
+          "diameter_final_m": 28.237,
           "precise_final": true,
-          "mec_radius_m": 12.196,
+          "mec_radius_m": 14.119,
           "bounded_final": true,
           "n_obs_total": 2,
           "method": "try-refined",
@@ -4732,12 +4719,14 @@
         },
         "16": {
           "n_obs_survey": 3,
+          "n_no_signal_survey": 1,
           "diameter_survey_m": 20.576,
+          "mec_radius_survey_m": 10.395,
           "bounded_survey": true,
           "n_probe": 0,
           "clear_point": [
-            -1331.135419199856,
-            -214.23424963652982
+            -1331.1354191998553,
+            -214.23424963652974
           ],
           "clear_radius_m": 10.395,
           "diameter_final_m": 20.576,
@@ -4750,12 +4739,14 @@
         },
         "18": {
           "n_obs_survey": 2,
+          "n_no_signal_survey": 1,
           "diameter_survey_m": 42.141,
+          "mec_radius_survey_m": 21.071,
           "bounded_survey": true,
           "n_probe": 0,
           "clear_point": [
-            -360.85016914868214,
-            1455.6247348616223
+            -360.85016914868197,
+            1455.624734861622
           ],
           "clear_radius_m": 21.071,
           "diameter_final_m": 42.141,
@@ -4763,24 +4754,6 @@
           "mec_radius_m": 21.071,
           "bounded_final": true,
           "n_obs_total": 2,
-          "method": "try",
-          "cleared": true
-        },
-        "19": {
-          "n_obs_survey": 3,
-          "diameter_survey_m": 45.019,
-          "bounded_survey": true,
-          "n_probe": 0,
-          "clear_point": [
-            -523.0002069986014,
-            306.8855868927441
-          ],
-          "clear_radius_m": 22.531,
-          "diameter_final_m": 45.019,
-          "precise_final": false,
-          "mec_radius_m": 22.531,
-          "bounded_final": true,
-          "n_obs_total": 3,
           "method": "try",
           "cleared": true
         }
@@ -4794,19 +4767,9 @@
           "direction": 6,
           "near": 0,
           "no_signal": 14,
+          "skip": 0,
           "virtual_time_s": 119.0,
           "travel_m": 0.0
-        },
-        {
-          "waypoint": 1,
-          "x": 1200.0,
-          "y": 0.0,
-          "n_channels": 20,
-          "direction": 3,
-          "near": 0,
-          "no_signal": 17,
-          "virtual_time_s": 479.0,
-          "travel_m": 1200.0
         },
         {
           "waypoint": 2,
@@ -4816,52 +4779,69 @@
           "direction": 5,
           "near": 0,
           "no_signal": 15,
-          "virtual_time_s": 839.0,
-          "travel_m": 2400.0
+          "skip": 0,
+          "virtual_time_s": 479.0,
+          "travel_m": 1200.0
         },
         {
-          "waypoint": 3,
-          "x": -599.9999999999998,
-          "y": 1039.2304845413264,
-          "n_channels": 18,
-          "direction": 6,
+          "waypoint": 1,
+          "x": 1200.0,
+          "y": 0.0,
+          "n_channels": 19,
+          "direction": 2,
           "near": 0,
-          "no_signal": 12,
-          "virtual_time_s": 1187.0,
-          "travel_m": 3600.0
-        },
-        {
-          "waypoint": 4,
-          "x": -1200.0,
-          "y": 1.4695761589768238e-13,
-          "n_channels": 17,
-          "direction": 5,
-          "near": 0,
-          "no_signal": 12,
-          "virtual_time_s": 1529.0,
-          "travel_m": 4800.0
-        },
-        {
-          "waypoint": 5,
-          "x": -600.0000000000006,
-          "y": -1039.230484541326,
-          "n_channels": 16,
-          "direction": 3,
-          "near": 0,
-          "no_signal": 13,
-          "virtual_time_s": 1865.0,
-          "travel_m": 6000.0
+          "no_signal": 16,
+          "skip": 1,
+          "virtual_time_s": 878.741,
+          "travel_m": 2633.7
         },
         {
           "waypoint": 6,
           "x": 599.9999999999992,
           "y": -1039.2304845413269,
-          "n_channels": 14,
-          "direction": 0,
+          "n_channels": 18,
+          "direction": 1,
           "near": 0,
           "no_signal": 14,
-          "virtual_time_s": 2189.0,
-          "travel_m": 7200.0
+          "skip": 3,
+          "virtual_time_s": 1208.741,
+          "travel_m": 3833.7
+        },
+        {
+          "waypoint": 5,
+          "x": -600.0000000000006,
+          "y": -1039.230484541326,
+          "n_channels": 17,
+          "direction": 3,
+          "near": 0,
+          "no_signal": 12,
+          "skip": 2,
+          "virtual_time_s": 1538.741,
+          "travel_m": 5033.7
+        },
+        {
+          "waypoint": 4,
+          "x": -1200.0,
+          "y": 1.4695761589768238e-13,
+          "n_channels": 16,
+          "direction": 5,
+          "near": 0,
+          "no_signal": 9,
+          "skip": 2,
+          "virtual_time_s": 1902.832,
+          "travel_m": 6419.16
+        },
+        {
+          "waypoint": 3,
+          "x": -599.9999999999998,
+          "y": 1039.2304845413264,
+          "n_channels": 14,
+          "direction": 4,
+          "near": 0,
+          "no_signal": 9,
+          "skip": 1,
+          "virtual_time_s": 2448.324,
+          "travel_m": 8706.62
         }
       ],
       "truth_check": {
@@ -4873,15 +4853,15 @@
             "receive_m": 1488.13,
             "nearest_center_m": 522.67,
             "heard": true,
-            "n_bearings": 3,
+            "n_bearings": 2,
             "cleared": true,
-            "diameter_survey_m": 47.396,
+            "diameter_survey_m": null,
             "n_probe": 0,
-            "diameter_final_m": 47.396,
-            "mec_radius_final_m": 23.698,
-            "clear_radius_m": 23.698,
-            "method": "try",
-            "localize_err_m": 6.39
+            "diameter_final_m": null,
+            "mec_radius_final_m": null,
+            "clear_radius_m": null,
+            "method": "survey-inline",
+            "localize_err_m": 5.72
           },
           {
             "channel": 2,
@@ -4892,13 +4872,13 @@
             "heard": true,
             "n_bearings": 3,
             "cleared": true,
-            "diameter_survey_m": 40.546,
+            "diameter_survey_m": 40.716,
             "n_probe": 0,
-            "diameter_final_m": 40.546,
-            "mec_radius_final_m": 20.273,
-            "clear_radius_m": 20.273,
+            "diameter_final_m": 40.716,
+            "mec_radius_final_m": 20.358,
+            "clear_radius_m": 20.358,
             "method": "try",
-            "localize_err_m": 14.9
+            "localize_err_m": 12.53
           },
           {
             "channel": 3,
@@ -4907,15 +4887,15 @@
             "receive_m": 1154.24,
             "nearest_center_m": 594.97,
             "heard": true,
-            "n_bearings": 3,
+            "n_bearings": 2,
             "cleared": true,
-            "diameter_survey_m": 33.558,
+            "diameter_survey_m": null,
             "n_probe": 0,
-            "diameter_final_m": 33.558,
-            "mec_radius_final_m": 16.94,
-            "clear_radius_m": 16.94,
-            "method": "try",
-            "localize_err_m": 6.86
+            "diameter_final_m": null,
+            "mec_radius_final_m": null,
+            "clear_radius_m": null,
+            "method": "survey-inline",
+            "localize_err_m": 5.29
           },
           {
             "channel": 4,
@@ -4928,11 +4908,11 @@
             "cleared": true,
             "diameter_survey_m": 626.63,
             "n_probe": 1,
-            "diameter_final_m": 18.46,
-            "mec_radius_final_m": 9.23,
-            "clear_radius_m": 9.23,
+            "diameter_final_m": 20.378,
+            "mec_radius_final_m": 10.189,
+            "clear_radius_m": 10.189,
             "method": "try-refined",
-            "localize_err_m": 2.74
+            "localize_err_m": 4.78
           },
           {
             "channel": 5,
@@ -5013,11 +4993,11 @@
             "cleared": true,
             "diameter_survey_m": 734.336,
             "n_probe": 1,
-            "diameter_final_m": 24.392,
-            "mec_radius_final_m": 12.196,
-            "clear_radius_m": 12.196,
+            "diameter_final_m": 28.237,
+            "mec_radius_final_m": 14.119,
+            "clear_radius_m": 14.119,
             "method": "try-refined",
-            "localize_err_m": 5.96
+            "localize_err_m": 5.74
           },
           {
             "channel": 16,
@@ -5062,28 +5042,28 @@
             "heard": true,
             "n_bearings": 3,
             "cleared": true,
-            "diameter_survey_m": 45.019,
+            "diameter_survey_m": null,
             "n_probe": 0,
-            "diameter_final_m": 45.019,
-            "mec_radius_final_m": 22.531,
-            "clear_radius_m": 22.531,
-            "method": "try",
-            "localize_err_m": 9.99
+            "diameter_final_m": null,
+            "mec_radius_final_m": null,
+            "clear_radius_m": null,
+            "method": "survey-inline",
+            "localize_err_m": 14.92
           }
         ],
         "worst_nearest_m": 651.17,
         "all_within_cover": true,
         "missed_channels": [],
         "n_cleared": 12,
-        "localize_err_mean_m": 10.057,
+        "localize_err_mean_m": 10.235,
         "localize_err_max_m": 18.71,
         "n_within_clear_radius": 12,
         "n_cleared_after_probe": 2
       },
       "bearings_per_channel": {
-        "1": 3,
+        "1": 2,
         "2": 3,
-        "3": 3,
+        "3": 2,
         "4": 2,
         "5": 2,
         "6": 3,
@@ -5114,48 +5094,63 @@
       "seed": 8,
       "n_sources": 11,
       "clear_ratio": 1.0,
-      "localize_err_mean_m": 10.84,
+      "localize_err_mean_m": 11.307,
       "localize_err_max_m": 18.69,
       "n_within_clear_radius": 11,
       "n_cleared_after_probe": 2,
       "waypoints_visited": 7,
-      "travel_m": 14540.70099585466,
-      "virtual_time_s": 3745.140191,
-      "n_measure": 130,
-      "n_clear": 12,
+      "travel_m": 16472.960488211793,
+      "virtual_time_s": 4044.592089,
+      "n_measure": 114,
+      "n_clear": 15,
       "channels_heard": 11,
-      "n_bearings": 30,
+      "n_bearings": 28,
       "cleared": 11,
-      "avg_time_s": 340.4672900909091,
-      "n_precise_at_survey": 3,
+      "avg_time_s": 367.6901899090909,
+      "n_precise_at_survey": 2,
+      "n_skip_measure": 14,
+      "initial_scan": {
+        "direction": 7,
+        "near": 0,
+        "no_signal": 13,
+        "skip": 0,
+        "n_channels": 20
+      },
+      "n_inline_cleared": 3,
+      "n_inline_fail": 3,
       "n_refined": 2,
       "n_probe": 2,
       "tracks": {
-        "2": {
-          "n_obs_survey": 3,
-          "diameter_survey_m": 44.245,
-          "bounded_survey": true,
-          "n_probe": 0,
+        "7": {
           "clear_point": [
-            77.88116958407846,
-            -1222.6472479937013
+            551.1408190684214,
+            203.37538023044948
           ],
-          "clear_radius_m": 22.122,
-          "diameter_final_m": 44.245,
-          "precise_final": false,
-          "mec_radius_m": 22.122,
-          "bounded_final": true,
-          "n_obs_total": 3,
-          "method": "try",
-          "cleared": true
+          "method": "survey-inline"
+        },
+        "2": {
+          "clear_point": [
+            78.41226498720357,
+            -1223.6542113884877
+          ],
+          "method": "survey-inline"
+        },
+        "12": {
+          "clear_point": [
+            294.8386551743371,
+            -741.5136329827556
+          ],
+          "method": "survey-inline"
         },
         "3": {
           "n_obs_survey": 3,
+          "n_no_signal_survey": 1,
           "diameter_survey_m": 47.516,
+          "mec_radius_survey_m": 23.758,
           "bounded_survey": true,
           "n_probe": 1,
           "clear_point": [
-            -1259.0829352553715,
+            -1259.082935255371,
             195.20012135531067
           ],
           "clear_radius_m": 11.322,
@@ -5169,17 +5164,19 @@
         },
         "4": {
           "n_obs_survey": 1,
+          "n_no_signal_survey": 2,
           "diameter_survey_m": 603.936,
+          "mec_radius_survey_m": 301.968,
           "bounded_survey": false,
           "n_probe": 1,
           "clear_point": [
-            -788.8562350553947,
-            -1288.852351808375
+            -788.3884797135131,
+            -1287.7588084203624
           ],
-          "clear_radius_m": 8.302,
-          "diameter_final_m": 16.603,
+          "clear_radius_m": 11.563,
+          "diameter_final_m": 23.126,
           "precise_final": true,
-          "mec_radius_m": 8.302,
+          "mec_radius_m": 11.563,
           "bounded_final": true,
           "n_obs_total": 2,
           "method": "try-refined",
@@ -5187,7 +5184,9 @@
         },
         "5": {
           "n_obs_survey": 2,
+          "n_no_signal_survey": 2,
           "diameter_survey_m": 41.884,
+          "mec_radius_survey_m": 20.946,
           "bounded_survey": true,
           "n_probe": 0,
           "clear_point": [
@@ -5203,27 +5202,11 @@
           "method": "try",
           "cleared": true
         },
-        "7": {
-          "n_obs_survey": 3,
-          "diameter_survey_m": 34.03,
-          "bounded_survey": true,
-          "n_probe": 0,
-          "clear_point": [
-            545.5382423154779,
-            205.4308324214567
-          ],
-          "clear_radius_m": 17.015,
-          "diameter_final_m": 34.03,
-          "precise_final": true,
-          "mec_radius_m": 17.015,
-          "bounded_final": true,
-          "n_obs_total": 3,
-          "method": "try",
-          "cleared": true
-        },
         "9": {
           "n_obs_survey": 3,
+          "n_no_signal_survey": 0,
           "diameter_survey_m": 36.998,
+          "mec_radius_survey_m": 18.499,
           "bounded_survey": true,
           "n_probe": 0,
           "clear_point": [
@@ -5239,27 +5222,11 @@
           "method": "try",
           "cleared": true
         },
-        "12": {
-          "n_obs_survey": 3,
-          "diameter_survey_m": 41.952,
-          "bounded_survey": true,
-          "n_probe": 0,
-          "clear_point": [
-            294.8386551743371,
-            -741.5136329827556
-          ],
-          "clear_radius_m": 20.982,
-          "diameter_final_m": 41.952,
-          "precise_final": false,
-          "mec_radius_m": 20.982,
-          "bounded_final": true,
-          "n_obs_total": 3,
-          "method": "try",
-          "cleared": true
-        },
         "13": {
           "n_obs_survey": 3,
+          "n_no_signal_survey": 0,
           "diameter_survey_m": 27.3,
+          "mec_radius_survey_m": 13.657,
           "bounded_survey": true,
           "n_probe": 0,
           "clear_point": [
@@ -5277,7 +5244,9 @@
         },
         "16": {
           "n_obs_survey": 3,
+          "n_no_signal_survey": 0,
           "diameter_survey_m": 40.788,
+          "mec_radius_survey_m": 20.394,
           "bounded_survey": true,
           "n_probe": 0,
           "clear_point": [
@@ -5295,7 +5264,9 @@
         },
         "17": {
           "n_obs_survey": 2,
+          "n_no_signal_survey": 2,
           "diameter_survey_m": 49.987,
+          "mec_radius_survey_m": 24.993,
           "bounded_survey": true,
           "n_probe": 0,
           "clear_point": [
@@ -5313,7 +5284,9 @@
         },
         "19": {
           "n_obs_survey": 2,
+          "n_no_signal_survey": 2,
           "diameter_survey_m": 42.108,
+          "mec_radius_survey_m": 21.054,
           "bounded_survey": true,
           "n_probe": 0,
           "clear_point": [
@@ -5339,6 +5312,7 @@
           "direction": 7,
           "near": 0,
           "no_signal": 13,
+          "skip": 0,
           "virtual_time_s": 119.0,
           "travel_m": 0.0
         },
@@ -5350,6 +5324,7 @@
           "direction": 5,
           "near": 0,
           "no_signal": 15,
+          "skip": 0,
           "virtual_time_s": 479.0,
           "travel_m": 1200.0
         },
@@ -5357,12 +5332,13 @@
           "waypoint": 2,
           "x": 600.0000000000001,
           "y": 1039.2304845413264,
-          "n_channels": 20,
-          "direction": 2,
+          "n_channels": 19,
+          "direction": 1,
           "near": 0,
-          "no_signal": 18,
-          "virtual_time_s": 839.0,
-          "travel_m": 2400.0
+          "no_signal": 16,
+          "skip": 2,
+          "virtual_time_s": 1065.041,
+          "travel_m": 3580.21
         },
         {
           "waypoint": 3,
@@ -5371,9 +5347,10 @@
           "n_channels": 18,
           "direction": 4,
           "near": 0,
-          "no_signal": 14,
-          "virtual_time_s": 1187.0,
-          "travel_m": 3600.0
+          "no_signal": 11,
+          "skip": 3,
+          "virtual_time_s": 1395.041,
+          "travel_m": 4780.21
         },
         {
           "waypoint": 4,
@@ -5382,9 +5359,10 @@
           "n_channels": 18,
           "direction": 4,
           "near": 0,
-          "no_signal": 14,
-          "virtual_time_s": 1535.0,
-          "travel_m": 4800.0
+          "no_signal": 11,
+          "skip": 3,
+          "virtual_time_s": 1742.662,
+          "travel_m": 6053.31
         },
         {
           "waypoint": 5,
@@ -5393,20 +5371,22 @@
           "n_channels": 17,
           "direction": 4,
           "near": 0,
-          "no_signal": 13,
-          "virtual_time_s": 1877.0,
-          "travel_m": 6000.0
+          "no_signal": 10,
+          "skip": 3,
+          "virtual_time_s": 2145.972,
+          "travel_m": 7634.86
         },
         {
           "waypoint": 6,
           "x": 599.9999999999992,
           "y": -1039.2304845413269,
-          "n_channels": 15,
-          "direction": 2,
+          "n_channels": 14,
+          "direction": 1,
           "near": 0,
-          "no_signal": 13,
-          "virtual_time_s": 2207.0,
-          "travel_m": 7200.0
+          "no_signal": 10,
+          "skip": 3,
+          "virtual_time_s": 2553.543,
+          "travel_m": 9292.71
         }
       ],
       "truth_check": {
@@ -5418,15 +5398,15 @@
             "receive_m": 1350.58,
             "nearest_center_m": 563.69,
             "heard": true,
-            "n_bearings": 3,
+            "n_bearings": 2,
             "cleared": true,
-            "diameter_survey_m": 44.245,
+            "diameter_survey_m": null,
             "n_probe": 0,
-            "diameter_final_m": 44.245,
-            "mec_radius_final_m": 22.122,
-            "clear_radius_m": 22.122,
-            "method": "try",
-            "localize_err_m": 11.44
+            "diameter_final_m": null,
+            "mec_radius_final_m": null,
+            "clear_radius_m": null,
+            "method": "survey-inline",
+            "localize_err_m": 11.15
           },
           {
             "channel": 3,
@@ -5456,11 +5436,11 @@
             "cleared": true,
             "diameter_survey_m": 603.936,
             "n_probe": 1,
-            "diameter_final_m": 16.603,
-            "mec_radius_final_m": 8.302,
-            "clear_radius_m": 8.302,
+            "diameter_final_m": 23.126,
+            "mec_radius_final_m": 11.563,
+            "clear_radius_m": 11.563,
             "method": "try-refined",
-            "localize_err_m": 4.64
+            "localize_err_m": 4.15
           },
           {
             "channel": 5,
@@ -5486,15 +5466,15 @@
             "receive_m": 1117.21,
             "nearest_center_m": 580.95,
             "heard": true,
-            "n_bearings": 3,
+            "n_bearings": 2,
             "cleared": true,
-            "diameter_survey_m": 34.03,
+            "diameter_survey_m": null,
             "n_probe": 0,
-            "diameter_final_m": 34.03,
-            "mec_radius_final_m": 17.015,
-            "clear_radius_m": 17.015,
-            "method": "try",
-            "localize_err_m": 3.34
+            "diameter_final_m": null,
+            "mec_radius_final_m": null,
+            "clear_radius_m": null,
+            "method": "survey-inline",
+            "localize_err_m": 9.26
           },
           {
             "channel": 9,
@@ -5522,12 +5502,12 @@
             "heard": true,
             "n_bearings": 3,
             "cleared": true,
-            "diameter_survey_m": 41.952,
+            "diameter_survey_m": null,
             "n_probe": 0,
-            "diameter_final_m": 41.952,
-            "mec_radius_final_m": 20.982,
-            "clear_radius_m": 20.982,
-            "method": "try",
+            "diameter_final_m": null,
+            "mec_radius_final_m": null,
+            "clear_radius_m": null,
+            "method": "survey-inline",
             "localize_err_m": 13.0
           },
           {
@@ -5603,17 +5583,17 @@
         "all_within_cover": true,
         "missed_channels": [],
         "n_cleared": 11,
-        "localize_err_mean_m": 10.84,
+        "localize_err_mean_m": 11.307,
         "localize_err_max_m": 18.69,
         "n_within_clear_radius": 11,
         "n_cleared_after_probe": 2
       },
       "bearings_per_channel": {
-        "2": 3,
+        "2": 2,
         "3": 4,
         "4": 2,
         "5": 2,
-        "7": 3,
+        "7": 2,
         "9": 3,
         "12": 3,
         "13": 3,
@@ -5640,36 +5620,62 @@
       "seed": 9,
       "n_sources": 13,
       "clear_ratio": 1.0,
-      "localize_err_mean_m": 8.382,
+      "localize_err_mean_m": 8.684,
       "localize_err_max_m": 17.68,
       "n_within_clear_radius": 13,
-      "n_cleared_after_probe": 3,
+      "n_cleared_after_probe": 2,
       "waypoints_visited": 7,
-      "travel_m": 17472.706531817006,
-      "virtual_time_s": 4373.541296,
-      "n_measure": 136,
+      "travel_m": 15373.821817791151,
+      "virtual_time_s": 3822.764354,
+      "n_measure": 114,
       "n_clear": 13,
       "channels_heard": 13,
-      "n_bearings": 32,
+      "n_bearings": 28,
       "cleared": 13,
-      "avg_time_s": 336.42625353846154,
-      "n_precise_at_survey": 4,
-      "n_refined": 3,
-      "n_probe": 4,
+      "avg_time_s": 294.05879646153846,
+      "n_precise_at_survey": 3,
+      "n_skip_measure": 19,
+      "initial_scan": {
+        "direction": 5,
+        "near": 0,
+        "no_signal": 15,
+        "skip": 0,
+        "n_channels": 20
+      },
+      "n_inline_cleared": 2,
+      "n_inline_fail": 0,
+      "n_refined": 2,
+      "n_probe": 2,
       "tracks": {
+        "8": {
+          "clear_point": [
+            -48.286130914085874,
+            517.7212479303845
+          ],
+          "method": "survey-inline"
+        },
+        "9": {
+          "clear_point": [
+            345.30807570404806,
+            -875.5537284054567
+          ],
+          "method": "survey-inline"
+        },
         "1": {
           "n_obs_survey": 3,
-          "diameter_survey_m": 39.171,
+          "n_no_signal_survey": 0,
+          "diameter_survey_m": 30.336,
+          "mec_radius_survey_m": 15.168,
           "bounded_survey": true,
           "n_probe": 0,
           "clear_point": [
-            -590.0325801076038,
-            -22.609142073907147
+            -597.7162838468184,
+            -18.66290533887516
           ],
-          "clear_radius_m": 19.589,
-          "diameter_final_m": 39.171,
+          "clear_radius_m": 15.168,
+          "diameter_final_m": 30.336,
           "precise_final": true,
-          "mec_radius_m": 19.589,
+          "mec_radius_m": 15.168,
           "bounded_final": true,
           "n_obs_total": 3,
           "method": "try",
@@ -5677,11 +5683,13 @@
         },
         "2": {
           "n_obs_survey": 2,
+          "n_no_signal_survey": 2,
           "diameter_survey_m": 48.832,
+          "mec_radius_survey_m": 24.416,
           "bounded_survey": true,
           "n_probe": 0,
           "clear_point": [
-            194.9498429673492,
+            194.94984296734927,
             -1350.8855378657456
           ],
           "clear_radius_m": 24.416,
@@ -5695,12 +5703,14 @@
         },
         "5": {
           "n_obs_survey": 2,
+          "n_no_signal_survey": 2,
           "diameter_survey_m": 42.663,
+          "mec_radius_survey_m": 21.332,
           "bounded_survey": true,
           "n_probe": 0,
           "clear_point": [
-            1218.8646076147709,
-            904.9883272907223
+            1218.864607614771,
+            904.9883272907225
           ],
           "clear_radius_m": 21.332,
           "diameter_final_m": 42.663,
@@ -5713,11 +5723,13 @@
         },
         "6": {
           "n_obs_survey": 2,
+          "n_no_signal_survey": 2,
           "diameter_survey_m": 43.833,
+          "mec_radius_survey_m": 21.916,
           "bounded_survey": true,
           "n_probe": 0,
           "clear_point": [
-            -233.17398326112348,
+            -233.17398326112342,
             -1436.5252559048768
           ],
           "clear_radius_m": 21.916,
@@ -5729,55 +5741,21 @@
           "method": "try",
           "cleared": true
         },
-        "8": {
-          "n_obs_survey": 3,
-          "diameter_survey_m": 33.958,
-          "bounded_survey": true,
-          "n_probe": 0,
-          "clear_point": [
-            -56.11300973089618,
-            530.4657945430047
-          ],
-          "clear_radius_m": 17.115,
-          "diameter_final_m": 33.958,
-          "precise_final": true,
-          "mec_radius_m": 17.115,
-          "bounded_final": true,
-          "n_obs_total": 3,
-          "method": "try",
-          "cleared": true
-        },
-        "9": {
-          "n_obs_survey": 3,
-          "diameter_survey_m": 46.078,
-          "bounded_survey": true,
-          "n_probe": 0,
-          "clear_point": [
-            337.5934710631766,
-            -864.8219806601063
-          ],
-          "clear_radius_m": 23.039,
-          "diameter_final_m": 46.078,
-          "precise_final": false,
-          "mec_radius_m": 23.039,
-          "bounded_final": true,
-          "n_obs_total": 3,
-          "method": "try",
-          "cleared": true
-        },
         "11": {
           "n_obs_survey": 1,
+          "n_no_signal_survey": 2,
           "diameter_survey_m": 792.527,
+          "mec_radius_survey_m": 396.264,
           "bounded_survey": false,
           "n_probe": 1,
           "clear_point": [
-            1208.3603673931652,
-            -1136.0476891910625
+            1213.869135150748,
+            -1136.572312070889
           ],
-          "clear_radius_m": 17.53,
-          "diameter_final_m": 35.06,
+          "clear_radius_m": 12.374,
+          "diameter_final_m": 24.747,
           "precise_final": true,
-          "mec_radius_m": 17.53,
+          "mec_radius_m": 12.374,
           "bounded_final": true,
           "n_obs_total": 2,
           "method": "try-refined",
@@ -5785,30 +5763,34 @@
         },
         "12": {
           "n_obs_survey": 1,
-          "diameter_survey_m": 2788.334,
-          "bounded_survey": false,
-          "n_probe": 2,
+          "n_no_signal_survey": 2,
+          "diameter_survey_m": 236.288,
+          "mec_radius_survey_m": 118.144,
+          "bounded_survey": true,
+          "n_probe": 0,
           "clear_point": [
-            -1087.7784887976438,
-            57.397993043391736
+            -1096.430100158271,
+            56.843912060670974
           ],
-          "clear_radius_m": 1.715,
-          "diameter_final_m": 3.408,
-          "precise_final": true,
-          "mec_radius_m": 1.715,
+          "clear_radius_m": 118.144,
+          "diameter_final_m": 236.288,
+          "precise_final": false,
+          "mec_radius_m": 118.144,
           "bounded_final": true,
-          "n_obs_total": 3,
-          "method": "try-refined",
+          "n_obs_total": 1,
+          "method": "try",
           "cleared": true
         },
         "14": {
           "n_obs_survey": 2,
+          "n_no_signal_survey": 2,
           "diameter_survey_m": 114.828,
+          "mec_radius_survey_m": 57.414,
           "bounded_survey": true,
           "n_probe": 0,
           "clear_point": [
-            959.2830573934149,
-            -638.3074461342693
+            959.2830573934145,
+            -638.3074461342694
           ],
           "clear_radius_m": 57.414,
           "diameter_final_m": 114.828,
@@ -5821,12 +5803,14 @@
         },
         "16": {
           "n_obs_survey": 2,
+          "n_no_signal_survey": 2,
           "diameter_survey_m": 46.735,
+          "mec_radius_survey_m": 23.368,
           "bounded_survey": true,
           "n_probe": 0,
           "clear_point": [
-            974.0656965789404,
-            952.3320182415532
+            974.0656965789403,
+            952.3320182415533
           ],
           "clear_radius_m": 23.368,
           "diameter_final_m": 46.735,
@@ -5839,17 +5823,19 @@
         },
         "18": {
           "n_obs_survey": 1,
+          "n_no_signal_survey": 2,
           "diameter_survey_m": 720.287,
+          "mec_radius_survey_m": 360.144,
           "bounded_survey": false,
           "n_probe": 1,
           "clear_point": [
-            488.09933172484057,
-            1606.1613256464848
+            488.673757013584,
+            1601.4239246306959
           ],
-          "clear_radius_m": 17.38,
-          "diameter_final_m": 34.76,
+          "clear_radius_m": 11.787,
+          "diameter_final_m": 23.573,
           "precise_final": true,
-          "mec_radius_m": 17.38,
+          "mec_radius_m": 11.787,
           "bounded_final": true,
           "n_obs_total": 2,
           "method": "try-refined",
@@ -5857,7 +5843,9 @@
         },
         "19": {
           "n_obs_survey": 3,
+          "n_no_signal_survey": 1,
           "diameter_survey_m": 38.893,
+          "mec_radius_survey_m": 19.447,
           "bounded_survey": true,
           "n_probe": 0,
           "clear_point": [
@@ -5875,17 +5863,19 @@
         },
         "20": {
           "n_obs_survey": 3,
-          "diameter_survey_m": 39.339,
+          "n_no_signal_survey": 0,
+          "diameter_survey_m": 25.377,
+          "mec_radius_survey_m": 12.706,
           "bounded_survey": true,
           "n_probe": 0,
           "clear_point": [
-            -523.5229624007726,
-            16.859598771723924
+            -514.1899004291572,
+            18.89702544326247
           ],
-          "clear_radius_m": 19.67,
-          "diameter_final_m": 39.339,
+          "clear_radius_m": 12.706,
+          "diameter_final_m": 25.377,
           "precise_final": true,
-          "mec_radius_m": 19.67,
+          "mec_radius_m": 12.706,
           "bounded_final": true,
           "n_obs_total": 3,
           "method": "try",
@@ -5901,30 +5891,9 @@
           "direction": 5,
           "near": 0,
           "no_signal": 15,
+          "skip": 0,
           "virtual_time_s": 119.0,
           "travel_m": 0.0
-        },
-        {
-          "waypoint": 1,
-          "x": 1200.0,
-          "y": 0.0,
-          "n_channels": 20,
-          "direction": 3,
-          "near": 0,
-          "no_signal": 17,
-          "virtual_time_s": 479.0,
-          "travel_m": 1200.0
-        },
-        {
-          "waypoint": 2,
-          "x": 600.0000000000001,
-          "y": 1039.2304845413264,
-          "n_channels": 20,
-          "direction": 4,
-          "near": 0,
-          "no_signal": 16,
-          "virtual_time_s": 839.0,
-          "travel_m": 2400.0
         },
         {
           "waypoint": 3,
@@ -5934,41 +5903,69 @@
           "direction": 3,
           "near": 0,
           "no_signal": 17,
-          "virtual_time_s": 1199.0,
-          "travel_m": 3600.0
+          "skip": 0,
+          "virtual_time_s": 479.0,
+          "travel_m": 1200.0
         },
         {
-          "waypoint": 4,
-          "x": -1200.0,
-          "y": 1.4695761589768238e-13,
+          "waypoint": 2,
+          "x": 600.0000000000001,
+          "y": 1039.2304845413264,
           "n_channels": 19,
-          "direction": 4,
+          "direction": 3,
           "near": 0,
           "no_signal": 15,
-          "virtual_time_s": 1553.0,
-          "travel_m": 4800.0
+          "skip": 1,
+          "virtual_time_s": 910.24,
+          "travel_m": 2791.2
         },
         {
-          "waypoint": 5,
-          "x": -600.0000000000006,
-          "y": -1039.230484541326,
-          "n_channels": 17,
-          "direction": 4,
+          "waypoint": 1,
+          "x": 1200.0,
+          "y": 0.0,
+          "n_channels": 19,
+          "direction": 3,
           "near": 0,
-          "no_signal": 13,
-          "virtual_time_s": 1895.0,
-          "travel_m": 6000.0
+          "no_signal": 14,
+          "skip": 2,
+          "virtual_time_s": 1252.24,
+          "travel_m": 3991.2
         },
         {
           "waypoint": 6,
           "x": 599.9999999999992,
           "y": -1039.2304845413269,
-          "n_channels": 16,
+          "n_channels": 19,
           "direction": 5,
           "near": 0,
-          "no_signal": 11,
-          "virtual_time_s": 2231.0,
-          "travel_m": 7200.0
+          "no_signal": 9,
+          "skip": 5,
+          "virtual_time_s": 1576.24,
+          "travel_m": 5191.2
+        },
+        {
+          "waypoint": 5,
+          "x": -600.0000000000006,
+          "y": -1039.230484541326,
+          "n_channels": 18,
+          "direction": 5,
+          "near": 0,
+          "no_signal": 9,
+          "skip": 4,
+          "virtual_time_s": 1917.664,
+          "travel_m": 6453.32
+        },
+        {
+          "waypoint": 4,
+          "x": -1200.0,
+          "y": 1.4695761589768238e-13,
+          "n_channels": 16,
+          "direction": 2,
+          "near": 0,
+          "no_signal": 7,
+          "skip": 7,
+          "virtual_time_s": 2211.664,
+          "travel_m": 7653.32
         }
       ],
       "truth_check": {
@@ -5982,13 +5979,13 @@
             "heard": true,
             "n_bearings": 3,
             "cleared": true,
-            "diameter_survey_m": 39.171,
+            "diameter_survey_m": 30.336,
             "n_probe": 0,
-            "diameter_final_m": 39.171,
-            "mec_radius_final_m": 19.589,
-            "clear_radius_m": 19.589,
+            "diameter_final_m": 30.336,
+            "mec_radius_final_m": 15.168,
+            "clear_radius_m": 15.168,
             "method": "try",
-            "localize_err_m": 1.11
+            "localize_err_m": 9.74
           },
           {
             "channel": 2,
@@ -6048,15 +6045,15 @@
             "receive_m": 1104.95,
             "nearest_center_m": 524.2,
             "heard": true,
-            "n_bearings": 3,
+            "n_bearings": 2,
             "cleared": true,
-            "diameter_survey_m": 33.958,
+            "diameter_survey_m": null,
             "n_probe": 0,
-            "diameter_final_m": 33.958,
-            "mec_radius_final_m": 17.115,
-            "clear_radius_m": 17.115,
-            "method": "try",
-            "localize_err_m": 9.22
+            "diameter_final_m": null,
+            "mec_radius_final_m": null,
+            "clear_radius_m": null,
+            "method": "survey-inline",
+            "localize_err_m": 7.62
           },
           {
             "channel": 9,
@@ -6065,15 +6062,15 @@
             "receive_m": 1099.74,
             "nearest_center_m": 305.83,
             "heard": true,
-            "n_bearings": 3,
+            "n_bearings": 2,
             "cleared": true,
-            "diameter_survey_m": 46.078,
+            "diameter_survey_m": null,
             "n_probe": 0,
-            "diameter_final_m": 46.078,
-            "mec_radius_final_m": 23.039,
-            "clear_radius_m": 23.039,
-            "method": "try",
-            "localize_err_m": 10.32
+            "diameter_final_m": null,
+            "mec_radius_final_m": null,
+            "clear_radius_m": null,
+            "method": "survey-inline",
+            "localize_err_m": 3.08
           },
           {
             "channel": 11,
@@ -6086,11 +6083,11 @@
             "cleared": true,
             "diameter_survey_m": 792.527,
             "n_probe": 1,
-            "diameter_final_m": 35.06,
-            "mec_radius_final_m": 17.53,
-            "clear_radius_m": 17.53,
+            "diameter_final_m": 24.747,
+            "mec_radius_final_m": 12.374,
+            "clear_radius_m": 12.374,
             "method": "try-refined",
-            "localize_err_m": 9.67
+            "localize_err_m": 9.65
           },
           {
             "channel": 12,
@@ -6099,15 +6096,15 @@
             "receive_m": 1011.74,
             "nearest_center_m": 125.61,
             "heard": true,
-            "n_bearings": 3,
+            "n_bearings": 1,
             "cleared": true,
-            "diameter_survey_m": 2788.334,
-            "n_probe": 2,
-            "diameter_final_m": 3.408,
-            "mec_radius_final_m": 1.715,
-            "clear_radius_m": 1.715,
-            "method": "try-refined",
-            "localize_err_m": 0.7
+            "diameter_survey_m": 236.288,
+            "n_probe": 0,
+            "diameter_final_m": 236.288,
+            "mec_radius_final_m": 118.144,
+            "clear_radius_m": 118.144,
+            "method": "try",
+            "localize_err_m": 8.51
           },
           {
             "channel": 14,
@@ -6154,11 +6151,11 @@
             "cleared": true,
             "diameter_survey_m": 720.287,
             "n_probe": 1,
-            "diameter_final_m": 34.76,
-            "mec_radius_final_m": 17.38,
-            "clear_radius_m": 17.38,
+            "diameter_final_m": 23.573,
+            "mec_radius_final_m": 11.787,
+            "clear_radius_m": 11.787,
             "method": "try-refined",
-            "localize_err_m": 3.9
+            "localize_err_m": 2.06
           },
           {
             "channel": 19,
@@ -6186,33 +6183,33 @@
             "heard": true,
             "n_bearings": 3,
             "cleared": true,
-            "diameter_survey_m": 39.339,
+            "diameter_survey_m": 25.377,
             "n_probe": 0,
-            "diameter_final_m": 39.339,
-            "mec_radius_final_m": 19.67,
-            "clear_radius_m": 19.67,
+            "diameter_final_m": 25.377,
+            "mec_radius_final_m": 12.706,
+            "clear_radius_m": 12.706,
             "method": "try",
-            "localize_err_m": 10.26
+            "localize_err_m": 8.44
           }
         ],
         "worst_nearest_m": 640.25,
         "all_within_cover": true,
         "missed_channels": [],
         "n_cleared": 13,
-        "localize_err_mean_m": 8.382,
+        "localize_err_mean_m": 8.684,
         "localize_err_max_m": 17.68,
         "n_within_clear_radius": 13,
-        "n_cleared_after_probe": 3
+        "n_cleared_after_probe": 2
       },
       "bearings_per_channel": {
         "1": 3,
         "2": 2,
         "5": 2,
         "6": 2,
-        "8": 3,
-        "9": 3,
+        "8": 2,
+        "9": 2,
         "11": 2,
-        "12": 3,
+        "12": 1,
         "14": 2,
         "16": 2,
         "18": 2,

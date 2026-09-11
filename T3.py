@@ -82,62 +82,69 @@ d/√3 随 d 单调增，g₂ 在 d = √3R/2 处取最小值 R/2，两者恰在
 
 第二部分：定位与清除（阶段二）
 -----------------------------
-**定位区域与位置估计。** 直接复用问题 1 的 `TriangulationRegion`：检测点处 ±1° 的示向度误差
-使干扰源必落在以该点为顶点、张角 2° 的楔形内，故"定位区域 = 所有楔形之交 ∩ 目标圆域"，它是
-凸多边形；区域直径按问题 1 的定义取区域内任意两点距离的最大值。估计点取区域的最小覆盖圆
-圆心 —— 它必落在区域（凸包）内，且区域内任一点（含真实干扰源）到它的距离 ≤ 最小覆盖圆半径
-r ≤ 直径/2。求交时圆域用内接 256 边形（与真圆的偏差 0.14 m），所有判据都额外扣掉 2 × 0.14 m。
+**位置估计：把"听不到"也当成证据。** 直接复用问题 1 的交会定位区域：检测点处 ±1° 的示向度误差
+使干扰源必落在以该点为顶点、张角 2° 的楔形内，故
+
+    可能源集合 = 所有楔形之交 ∩ 目标圆域 ∩ （接收半径给出的圆盘约束）
+
+求交时圆域用内接 256 边形（与真圆的偏差 0.14 m）。关键补充是**每次测量结果都是一条可证明的硬
+约束** —— 问题三只有全向源、且有效接收半径 R_rec ∈ [1000, 1500] m，于是
+
+    direction ：收得到 ⇒ d ≤ R_rec ≤ 1500        ⇒ 源在"以测量点为心、1500 m"的圆盘**内**；
+    near      ：d ≤ 5 m（题目近距阈值）          ⇒ 源在"以测量点为心、5 m"的圆盘**内**；
+    no_signal ：收不到 ⇒ d > R_rec ≥ 1000        ⇒ 源在"以测量点为心、1000 m"的圆盘**外**。
+
+这三条都不是启发式。no_signal 尤其宝贵：它把"什么都没听到"变成一条实质的排除约束，让那些
+只拿到一条射线的频道从"贯穿圆域的长带"缩到有限的一段，也直接支撑了下面的"跳过必然无信号的
+测量"。保守性靠两种近似方向保证：交（"在内"）用**外接**多边形、差（"在外"）用**内接**多边形，
+于是真源永远不会被切掉。
+
+估计点取可能源集合的最小覆盖圆圆心 —— 真源必在集合内 ⊆ 覆盖圆内，故到圆心的距离 ≤ 覆盖圆半径。
+**清除判据一律用最小覆盖圆半径，不用"直径 < 40 m"**：直径判据的依据是"凸集合的覆盖圆半径 ≤
+直径/2"，而减去禁区后集合可能非凸、甚至裂成多块，凸性不再成立（这一点在实现中踩过，故写死）。
 
 **清除一律"就近试清"，不设直径门槛。** 清除半径只有 20 m，**走到源的近处是清除的必要动作**，
-绕不过去；所以到达估计点后顺手试一次 /clear 的边际代价只有失败时的 3 s，命中却能省掉整轮补测
-（一轮补测要绕几百米、约 100 s 量级的里程）。反过来，"先把定位区域压到直径 < 40 m 保证必中、
-再决定清除"要额外花探针去换那个确定性，反而更贵。因此本程序不再用直径判据决定清不清除：
+绕不过去；所以到达估计点后顺手试一次 /clear 的边际代价只有失败时的 3 s，命中却省掉整轮补测
+（一轮补测要绕几百米、约 100 s 量级的里程）。反过来，"先把可能源集合压到覆盖圆半径 < 20 m
+保证必中、再决定清除"要额外花探针去换那个确定性，反而更贵。因此覆盖圆半径 < 20 m 只表示
+"估计已够准"，用来决定**还要不要继续补测**，不决定清不清除。
 
-    直径 < 40 m（⇔ 最小覆盖圆半径 < 20 m）只表示"估计已够准"，用来决定**还要不要继续补测**。
+**清除流程（无门槛、四级递进 + 巡视途中顺路清）。** 每个频道依次做：
 
-唯一的前提是"就近"：估计点不能太离谱 —— 最小覆盖圆半径 ≤ 400 m 时才值得跑过去试；否则先按
-文献准则就地补测一次把区域压小，再过去（跑一趟很远的错点更贵）。未命中时的那次就地复测也不
-白花：该点是区域内"离源最近"的位置，按 Fisher 信息口径权重最大，一条近距离射线往往直接把区域
-压到 40 m 以内，于是"试清 → 复测 → 补测"三级递进，绝大多数源在第一步或第二步就解决。
+① **就近试清**：走到估计点 /clear 一次。失败只花 3 s，命中即完成（10 局实测 70/131 个在这一步解决）。
+② **多清几次**：未命中就在集合内取细网格为覆盖目标，贪心选至多 `--k-clear-max`（缺省 4）个补充
+   清缺点，使这些半径 20 m 的圆把集合盖满，再由近及远逐个清 —— 盖满即保证命中，可省掉一轮补测；
+   盖不满（集合被作业圆域截断、需要十几个圆）就不赌，直接进入 ③。实测这一步只覆盖到 2/131 个
+   频道：试清未中的 30 个里 24 个集合被圆域截断、直径 > 320 m（需 K = 10~70 个圆），而补测一次
+   约 120 s、K=16 个点硬清约 170 s，所以大区域仍是补测更划算。
+③ **补测**：就地复测一次（该点是集合内离源最近、Fisher 权重最大的位置），若估计仍不够准则按
+   文献准则选点补测，直到覆盖圆半径 < 20 m 或达到轮次上限，再到新的估计点清。
+④ **兜底**：万一仍未清除，沿最新实测示向度以 16 m 步长逼近（步数按到集合最远顶点的距离自适应）。
 
-**补测选点（文献方法）。** 对直径仍 ≥ 40 m 的频道，在候选点中选"最能让定位区域变小"的位置去
-补测一次。评价用测向的 Fisher 信息矩阵（1° 误差）：
+此外，**巡视途中顺路清除**：每站扫描完，若某频道的估计点顺路（绕行 ≤ `--inline-detour`，缺省
+400 m）且估计不太离谱（覆盖圆半径 ≤ `--inline-try-radius`，缺省 150 m），就当场清掉 —— 巡视本来
+就要路过，绕一下的代价远小于留到阶段二专程跑一趟，清掉后该频道后续各站也不再测量。10 局实测
+顺路清掉 34/131 个（26%）、白跑 8 次（每次 3 s）。参数由 4 组对照实验选出：半径 150 与 300 结果
+相同（说明 150 已覆盖全部机会），绕行放宽到 600/700 m 反而更慢。
 
-    J = Σᵢ (1/σ²) · (1/rᵢ²) · nᵢnᵢᵀ ,   σ_pos = √tr(J⁻¹)
+**行进线路。**
+* 巡视：7 个圆心的访问长度恒为 6d（原点 → 一个环顶点 = d，再沿正六边形走 5 条边 = 5d），所以
+  "从哪个环顶点开始、顺时针还是逆时针"共 12 条路径**长度完全相同**。第 1 站（原点）的起始
+  全频道扫描一结束，就用它锚定到的源方位挑选落脚点 —— 让巡视终点靠近这些最先能清的源，
+  清除阶段即可从那里开始，不必为它们单独折返（实测终点到已听源的估计距离由 1845 m 降到 1237 m）。
+* 清除：按各频道估计点到当前位置的距离做最近邻 + 2-opt 的开放路径（清完不回原点）。实测
+  "每清一个就重排"与"一次定序"结果完全一致，故保留更简单的一次定序。
 
-其中 rᵢ 为假设源位置到第 i 个检测点的距离；σ 是常数因子，不影响候选排序。该准则同时实现了
-文献的两条结论：
+**最省的那一步：起始全频道扫描。** 第 1 站就在原点，一次把 20 个频道全测一遍（20 次测向 ≈
+20×5 s + 19×1 s 切换 ≈ 119 s），换来的是"哪些频道在 1000 m 内"这批最便宜的信息 —— 10 局实测
+平均直接锚定 6.1 个源的方向（占全部源的三分之一），同时把其余频道标记为"源在 1000 m 之外"。
+它还给后续带来两项收益：① 巡视绕向与落脚点由它决定（见上）；② 这些源只需再补一条射线就能
+定位，于是很多站可以少测甚至不测。
 
-* 任叶童《基于到达角信息的无源定位算法研究》（天津大学硕士论文, 2016）：多站交会的极大似然
-  估计等价于以 1/(σᵢRᵢ) 为权的加权最小二乘（最小化到各示向度线的垂距加权平方和），本程序
-  的 J 与之一致；该文还给出定位模糊区面积 S = 4R²Δθ²sinα₁sinα₂/sin³(α₁+α₂)（基线 R 固定、
-  目标位置自由的口径），代码里保留 ambiguity_area() 以便对照。
-* Chen X, Xu Z, Rui L. An optimization algorithm of multi-observer trajectories for
-  cooperative bearings-only target localization[C]//ICICS 2009：滤波均方位置误差与观测站到
-  目标的距离呈平方反比（∝ 1/(σ²r²)），最优观测轨迹是"贴近目标"与"拉开角度分集"的折衷。
-  在 J 的口径下即：**距离越近、与已有射线的交角越接近正交，预测 σ 越小**（两观测等距 r 时
-  tr(J⁻¹) = 2σ²r²/sin²φ，交角 φ = 90° 最优）。
-
-候选点取每个假设源位置周围若干半径（150~800 m，保证落在源的有效接收半径内）× 24 个方位角
-（15° 一格）的环上点；共线候选（与已有射线夹角 ≈ 0，σ = ∞，无法定距）直接剔除；对全部假设
-源位置求平均 σ 后排序，并在 σ 与最优值相差 2% 以内的候选里取里程最短者。单射线频道的假设
-源位置沿该射线按 200~1400 m 枚举（源的距离未知，只能枚举假设）。
-
-**清除流程（无门槛、四级递进）。** 每个频道依次做：
-
-① **就近试清**：走到估计点 /clear 一次。失败只花 3 s，命中即完成（实测 101/131 个在这一步解决）。
-② **多清几次**：未命中就在区域内取细网格为覆盖目标，贪心选至多 `--k-clear-max`（缺省 4）个补充
-   清缺点，使这些半径 20 m 的圆把定位区域盖满，然后由近及远逐个清 —— 盖满即保证命中，可省掉
-   一轮补测；盖不满（区域被作业圆域截断、需要十几个圆）就不赌，直接进入 ③。补清一个点的边际
-   代价只有一个点间距的移动（≤ 40 m ≈ 8 s）加失败时的 3 s，比补测便宜一个量级。
-   实测这一步只覆盖到 2/131 个频道：试清未中的 30 个里 24 个区域被圆域截断、直径 > 320 m
-   （需 K = 10~70 个圆），另 4 个在就地复测后区域已缩到 40 m 以内（K = 1 即可）。它真正的价值是
-   把"区域不大不小"这一档从"必须补测"变成"多跑几十米即可"，代价近乎为零。
-③ **补测**：就地复测一次（该点是区域内离源最近、Fisher 权重最大的位置），若估计仍不够准则按
-   文献准则选点补测，直到直径 < 40 m 或达到轮次上限，再到新的估计点清。
-④ **兜底**：万一仍未清除，沿最新实测示向度以 16 m 步长逼近（步数按到区域最远顶点的距离自适应）。
-
-10 局演练中 131 个源全部清除，其中 ① 101 个、② 2 个、③ 28 个，从未走到 ④。
+**跳过"必然无信号"的测量。** 可能源集合是真实源位置的超集，故"集合到测量点的最小距离 > 1500 m"
+⇒ 真源也在 1500 m 之外 ⇒ 必然收不到信号。此时这次测量不带来任何新信息，直接跳过。10 局实测
+平均每局跳过 19 次测量（≈ 110 s）。加上"估计已够准就不再测"，每局测量次数由最初的 132 次降到
+111 次。
 
 与参考文献（覆盖圆部分）的关系
 ------------------------------
@@ -156,13 +163,16 @@ r ≤ 直径/2。求交时圆域用内接 256 边形（与真圆的偏差 0.14 m
     python T3.py --ring-radius 1558.846             # 切回余量最大的 d*（里程更长）
     python T3.py --practice 10 --seed 0             # 本地演练 10 局（自动拉起 jammers-py）
     python T3.py --practice 3 --survey-only         # 只做阶段一（巡视扫描 + 覆盖核对）
+    python T3.py --practice 5 --no-reuse --console-port 8095 --robot-port 2027
+                                                    # 另起独占演练实例（多会话并行时避免抢端口）
     python T3.py --base-url http://127.0.0.1:2026   # 官方评测接口模式（赛期，先开模拟器）
 
 结果落盘（--save-dir，缺省 results/，文件名固定便于论文与绘图引用）
     t3_cover_plan.json    覆盖圆求解结果（环半径、圆心、最坏距离、覆盖重数、巡视顺序、权衡表）
     t3_cover_circles.csv  7 个覆盖圆的圆心坐标（序号、类型、x、y）
     t3_survey.json        逐局统计 + 逐源真值核对 + 逐频道定位/清除档案 + 整批汇总
-    t3_observations.csv   逐条示向度观测（局号、频道、阶段、检测点坐标、示向度）
+    t3_observations.csv   逐条测量记录（局号、频道、阶段、检测点坐标、结果类型、示向度）
+                          —— 含 no_signal，便于逐条复核"为什么这里必然听不到"
 
 依赖：numpy（覆盖校验）、shapely（定位区域，经 T1.py）、matplotlib 不需要；
 HTTP 层复用同目录 sim_api.py；本地演练用同目录 jammers-py/（纯标准库）。
@@ -187,6 +197,8 @@ from pathlib import Path
 from typing import Any, Dict, Iterator, List, NamedTuple, Optional, Sequence, Tuple
 
 import numpy as np
+import shapely
+from shapely import Point
 
 import sim_api
 from T1 import TriangulationRegion      # 问题 1 的交会定位区域（楔形交 ∩ 圆域）
@@ -196,6 +208,14 @@ from T1 import TriangulationRegion      # 问题 1 的交会定位区域（楔�
 # ----------------------------------------------------------------------------
 REGION_RADIUS = 1800.0          # 目标圆域半径 / m
 COVER_RADIUS = 1000.0           # 覆盖圆半径 = 有效接收半径下界 / m
+RECEIVE_MAX = 1500.0            # 有效接收半径上界 / m（题目给定 1000~1500）
+RECEIVE_MID = 0.5 * (COVER_RADIUS + RECEIVE_MAX)   # 接收半径中值，用于估源距离 / m
+INLINE_TRY_RADIUS = 150.0       # 巡视途中顺路试清：估计点覆盖圆半径 ≤ 该值才值得绕 / m
+INLINE_DETOUR = 400.0           # 巡视途中顺路试清允许的最大绕行里程 / m
+                                # （两者缺省值由 5 局 × 4 组参数实测选出：半径 150 与 300 结果相同，
+                                #   说明 150 已覆盖全部机会；绕行放宽到 600/700 m 反而更慢 ——
+                                #   绕得越远，试清失败时就越是纯粹白跑）
+EXCL_QUAD = 16                  # 圆盘约束的近似精度：正 4×EXCL_QUAD 边形（见 ProbRegion）
 CHANNELS: Tuple[int, ...] = tuple(range(1, 21))      # 20 个频道
 COORD_LIMIT = 2.0e6             # 坐标分量绝对值上限 / m（协议规定）
 REGION_MARGIN = 1.0             # 坐标裁剪保留的数值余量 / m
@@ -231,7 +251,7 @@ CLEAR_RADIUS = 20.0             # 清除半径 / m（光学精确定位要求 �
 NEAR_RADIUS = 5.0               # 近距阈值 / m（≤ 5 m 可跳过测向直接清除）
 CLIP_SIDES = 256                # 定位区域求交时目标圆域的内接多边形边数
 CLIP_ERR = REGION_RADIUS * (1.0 - math.cos(math.pi / CLIP_SIDES))   # 内接多边形与真圆的偏差 / m
-DIAM_PRECISE = 2.0 * CLEAR_RADIUS   # "估计已够准"的判据：直径 < 40 m ⇔ 最小覆盖圆半径 < 20 m
+DIAM_PRECISE = 2.0 * CLEAR_RADIUS   # 仅供报告参考：凸区域下与"最小覆盖圆半径 < 20 m"等价
                                     # （只用来决定"要不要继续补测"，不作清除门槛，见 RobotDog 说明）
 PROBE_RADII = (150.0, 300.0, 450.0, 600.0, 800.0)   # 补测候选点到假设源位置的距离 / m
 PROBE_ANGLES = 24               # 补测候选点的方位角格数（15° 一格）
@@ -662,6 +682,138 @@ class Obs(NamedTuple):
     stage: str = "survey"
 
 
+class Meas(NamedTuple):
+    """一次测量的完整记录（**含 no_signal**）。
+
+    no_signal 在问题三里是一条实质证据：源既然收不到，就必然在接收半径下界 1000 m 之外。
+    只记录 direction 观测会丢掉这部分信息，故本程序记录全部测量。
+    """
+
+    channel: int
+    x: float
+    y: float
+    outcome: str                        # direction / near / no_signal
+    theta: Optional[float] = None       # 仅 direction 时有值
+    stage: str = "survey"
+
+
+class ProbRegion(TriangulationRegion):
+    """问题三的"可能源集合"：交会楔形 ∩ 目标圆域，再叠加接收半径给出的**硬约束**。
+
+    为什么可以叠加。问题三只有全向源（模拟器对 problem_no=3 硬校验禁止定向源），且有效接收
+    半径 R_rec ∈ [1000, 1500] m，于是每次测量结果都对应一条可证明的约束：
+
+        direction ：收得到 ⇒ d ≤ R_rec ≤ 1500 ⇒ 源落在以测量点为心、半径 1500 m 的圆盘**内**；
+        near      ：d ≤ 5 m（近距阈值）      ⇒ 源落在以测量点为心、半径 5 m 的圆盘**内**；
+        no_signal ：收不到 ⇒ d > R_rec ≥ 1000 ⇒ 源落在以测量点为心、半径 1000 m 的圆盘**外**。
+
+    三者都不是启发式。no_signal 尤其宝贵：它把"什么都没听到"变成一条实质的排除约束 —— 单条
+    射线原本只给出"一条贯穿圆域的长带"，叠加"环带 1000~1500 m"与各站的 no_signal 禁区后，
+    常常直接压到可清除量级。这正是"起始先做一次全频道扫描"的额外收益来源。
+
+    保守性（真源永远留在区域内）。圆盘用正多边形近似，两个方向必须各自偏保守：
+        "源在圆盘内"的**交集**用外接多边形（半径 r / cos(π/n) ⊇ 真圆盘）；
+        "源在圆盘外"的**差集**用内接多边形（半径 r ⊆ 真圆盘）。
+    所交集合偏大、所减集合偏小，故真源不会被切掉。
+
+    非凸与多块。减去若干圆盘后区域可能不再凸、甚至裂成多块，本类按"整个几何"处理：vertices
+    收集各分块的外环顶点，故直径与最小覆盖圆都覆盖全部可能位置（最远点对必在顶点上），判据只
+    会更保守 —— 安全。但"直径 < 40 m ⇒ 最小覆盖圆半径 < 20 m"依赖凸性、非凸时不再成立，故
+    T3.py 的清除判据一律直接用最小覆盖圆半径（见 RobotDog._precise），不用直径。
+    """
+
+    def __init__(self, err: float = 1.0, radius: Optional[float] = None,
+                 sides: Optional[int] = None) -> None:
+        super().__init__(err, radius, sides)
+        self._inside: List[Tuple[float, float, float]] = []      # 源在此圆盘内
+        self._outside: List[Tuple[float, float, float]] = []     # 源在此圆盘外
+        self._applied_in = 0
+        self._applied_out = 0
+        self._cache: Dict[str, Any] = {}
+
+    # ---- 硬约束 ----
+    def add_inside(self, x: float, y: float, r: float) -> "ProbRegion":
+        """叠加"源在以 (x, y) 为心、r 为半径的圆盘内"。"""
+        self._inside.append((float(x), float(y), float(r)))
+        return self
+
+    def add_outside(self, x: float, y: float, r: float) -> "ProbRegion":
+        """叠加"源在以 (x, y) 为心、r 为半径的圆盘外"。"""
+        self._outside.append((float(x), float(y), float(r)))
+        return self
+
+    def disc(self, x: float, y: float, r: float, inscribed: bool) -> Polygon:
+        """圆盘的正多边形近似：inscribed=True 内接（⊆ 真圆盘），False 外接（⊇ 真圆盘）。"""
+        rr = float(r) if inscribed else float(r) / math.cos(math.pi / (4.0 * EXCL_QUAD))
+        return Point(float(x), float(y)).buffer(rr, quad_segs=EXCL_QUAD)
+
+    # ---- 几何：楔形交（父类增量）之上再叠加圆盘约束（同样增量、惰性）----
+    @property
+    def region(self):
+        geom = super().region
+        if self._applied_in < len(self._inside) or self._applied_out < len(self._outside):
+            for x, y, r in self._inside[self._applied_in:]:
+                geom = geom.intersection(self.disc(x, y, r, False))
+            self._applied_in = len(self._inside)
+            for x, y, r in self._outside[self._applied_out:]:
+                geom = geom.difference(self.disc(x, y, r, True))
+            self._applied_out = len(self._outside)
+            self._region = geom                 # 覆盖父类缓存，后续增量楔形交由此继续
+            self._cache.clear()
+        return self._region
+
+    def _sig(self) -> tuple:
+        return (len(self._nodes), self._done, self._applied_in, self._applied_out)
+
+    def _memo(self, key: str, compute):
+        self.region                             # 先让几何追平，再取签名
+        sig = self._sig()
+        if self._cache.get("sig") != sig:
+            self._cache = {"sig": sig}
+        if key not in self._cache:
+            self._cache[key] = compute()
+        return self._cache[key]
+
+    @property
+    def vertices(self):
+        """区域顶点：单块取外环，多块（被禁区切开）时收集各块外环顶点。"""
+        geom = self.region
+        if geom.is_empty:
+            return []
+        if geom.geom_type == "Polygon":
+            parts = [geom]
+        elif geom.geom_type == "MultiPolygon":
+            parts = list(geom.geoms)
+        else:
+            return []
+        pts: List[Tuple[float, float]] = []
+        for poly in parts:
+            pts.extend((x, y) for x, y, *_ in poly.exterior.coords[:-1])
+        if len(parts) == 1:
+            return pts if parts[0].exterior.is_ccw else pts[::-1]
+        return pts
+
+    @property
+    def diameter(self):
+        return self._memo("diameter", lambda: TriangulationRegion.diameter.fget(self))
+
+    @property
+    def enclosing_circle(self):
+        def compute():
+            if not self.vertices:
+                return None
+            center = shapely.minimum_bounding_circle(self.region).centroid
+            return (center.x, center.y, float(shapely.minimum_bounding_radius(self.region)))
+        return self._memo("mec", compute)
+
+    def min_distance_to(self, p: Sequence[float]) -> float:
+        """区域（可能源集合）到点 p 的最小距离 / m；区域为空时返回 0。"""
+        geom = self.region
+        if geom.is_empty:
+            return 0.0
+        return float(geom.distance(Point(float(p[0]), float(p[1]))))
+
+
 def fisher_sigma(p: Sequence[float], bearings: Sequence[Sequence[float]]) -> float:
     """在假设源位置 p 处、由一组 (检测点x, 检测点y, 示向度) 预测的位置 1σ / m。
 
@@ -692,27 +844,29 @@ def hypothesis_points(region, obs_list: Sequence[Obs],
                       start: Sequence[float] = (0.0, 0.0)) -> List[Tuple[float, float]]:
     """补测选点用的"假设源位置"集合。
 
-    源必落在定位区域内，故用区域内散布的点做最坏情形假设（对全部假设都好的补测点才选）：
-    * 多条射线：取最小覆盖圆圆心 + 区域内最远点采样出的若干顶点；
-    * 单条射线：区域是一条带状楔形，沿射线按若干可能距离取点（源距离未知，只能枚举）。
+    区域已知时统一取"最小覆盖圆圆心 + 最远点采样出的若干顶点"（单条射线也适用：叠加 no_signal
+    禁区与接收半径环带后，区域不再是无限长的一条带，而是有限的一段）；区域退化时（尚无禁区
+    约束）才退回"沿那条射线按可能距离枚举"。
     """
     pts: List[Tuple[float, float]] = []
-    if len(obs_list) < 2:
+    mec = region.enclosing_circle
+    verts = list(region.vertices)
+    if verts:
+        # 区域已知（含 no_signal 禁区与接收半径环带）：最小覆盖圆心 + 最远点采样若干顶点
+        if mec is not None:
+            pts.append((mec[0], mec[1]))
+        while len(pts) < HYP_MAX and verts:
+            far = max(verts, key=lambda v: min(dist(v, q) for q in pts))
+            verts.remove(far)
+            pts.append(far)
+    elif len(obs_list) == 1:
+        # 区域退化（尚无禁区约束）：只能沿那条射线按可能距离枚举
         o = obs_list[0]
         for s in SINGLE_HYP:
             hx = o.x + s * math.cos(math.radians(o.theta))
             hy = o.y + s * math.sin(math.radians(o.theta))
             if math.hypot(hx, hy) <= REGION_RADIUS:
                 pts.append((hx, hy))
-    else:
-        mec = region.enclosing_circle
-        if mec is not None:
-            pts.append((mec[0], mec[1]))
-        verts = list(region.vertices)
-        while len(pts) < HYP_MAX and verts:      # 最远点采样：始终补"离已选点最远"的顶点
-            far = max(verts, key=lambda v: min(dist(v, q) for q in pts))
-            verts.remove(far)
-            pts.append(far)
     # 与已有检测点太近的假设点无法估计距离（r → 0），剔除；并去重
     keep: List[Tuple[float, float]] = []
     for h in pts:
@@ -825,14 +979,22 @@ class RobotDog:
 
     def __init__(self, sim, verbose: bool = True, logfile: Optional[str] = None,
                  episode: int = 0, clear: bool = True,
-                 k_clear_max: int = K_CLEAR_MAX) -> None:
+                 k_clear_max: int = K_CLEAR_MAX,
+                 inline_try_radius: float = INLINE_TRY_RADIUS,
+                 inline_detour: float = INLINE_DETOUR) -> None:
         self.sim = sim
         self.verbose = verbose
         self.clear_enabled = clear
         self.k_clear_max = int(k_clear_max)
+        self.inline_try_radius = float(inline_try_radius)    # 顺路试清允许的覆盖圆半径上限 / m
+        self.inline_detour = float(inline_detour)            # 顺路试清允许的绕行里程上限 / m
         self._logfile = open(logfile, "a", encoding="utf-8") if logfile else None
         self.obs: Dict[int, List[Obs]] = defaultdict(list)
-        self.regions: Dict[int, TriangulationRegion] = {}
+        self.meas: Dict[int, List[Meas]] = defaultdict(list)   # 全部测量（含 no_signal）
+        self.n_skip = 0                                        # 判定必无信号而跳过的测量次数
+        self.n_inline_fail = 0                                 # 巡视途中顺路试清白跑的次数
+        self.initial_scan: Dict[str, Any] = {}                 # 起始全频道扫描的统计
+        self.regions: Dict[int, ProbRegion] = {}
         self.tracks: Dict[int, Dict[str, Any]] = {}      # 逐频道的定位/清除档案
         self.cleared: set = set()
         self.pos = np.zeros(2)
@@ -868,11 +1030,26 @@ class RobotDog:
         self.travel_m += dist(self.pos, (x, y))
         self.pos, self.vt = np.array([x, y]), float(r["virtual_time_s"])
         self.n_measure += 1
-        if r.get("measure_result") == "direction":
-            o = Obs(channel, x, y, float(r["svd_deg"]), self.stage)
-            self.obs[channel].append(o)
-            self.region(channel).add_node(o.x, o.y, o.theta)     # 增量并入楔形
+        outcome = r.get("measure_result", "no_signal")
+        reg = self.region(channel)          # 首次创建会重放此前测量，故必须先取再追加
+        m = Meas(channel, x, y, outcome,
+                 float(r["svd_deg"]) if outcome == "direction" else None, self.stage)
+        self.meas[channel].append(m)
+        self._apply_meas(reg, m)
+        if outcome == "direction":
+            self.obs[channel].append(Obs(channel, x, y, m.theta, self.stage))
         return r
+
+    def _provable_no_signal(self, channel: int, at: Sequence[float]) -> bool:
+        """能否证明"在 at 处测 channel 必然无信号"，从而省掉这次测量。
+
+        可能源集合是真实源位置的超集，故"区域到 at 的最小距离 > 1500 m"⇒ 真源到 at 的距离也
+        > 1500 m ≥ 有效接收半径 ⇒ 必然收不到信号。此时这次测量不会带来任何新信息，直接跳过。
+        """
+        reg = self.regions.get(channel)
+        if reg is None or reg.region.is_empty:
+            return False
+        return reg.min_distance_to(at) > RECEIVE_MAX + 1.0
 
     def clear(self, x: float, y: float, channel: int) -> bool:
         """清除；返回是否成功。"""
@@ -892,43 +1069,71 @@ class RobotDog:
     def _out_of_time(self) -> bool:
         return time.monotonic() > self.deadline
 
-    def region(self, channel: int) -> TriangulationRegion:
-        """取该频道的定位区域对象。
+    def region(self, channel: int) -> ProbRegion:
+        """取该频道的"可能源集合"（ProbRegion）。
 
-        惰性创建并把已有观测补进去；之后每次 measure() 用 add_node 增量并入一个新楔形，
-        TriangulationRegion 内部按 _done 缓存已并入个数，故逐条读 diameter 只补一刀。
+        惰性创建：首次访问时把该频道此前的全部测量（含 no_signal）作为硬约束补进去；之后每次
+        measure() 直接叠加新约束。ProbRegion 对楔形交与圆盘约束都做增量缓存，故反复读直径或
+        最小覆盖圆只会补上新增的那几条。
         """
         if channel not in self.regions:
-            self.regions[channel] = TriangulationRegion(
-                err=BEARING_ERROR_DEG, radius=REGION_RADIUS, sides=CLIP_SIDES)
-            for o in self.obs.get(channel, ()):
-                self.regions[channel].add_node(o.x, o.y, o.theta)
+            reg = ProbRegion(err=BEARING_ERROR_DEG, radius=REGION_RADIUS, sides=CLIP_SIDES)
+            for m in self.meas.get(channel, ()):
+                self._apply_meas(reg, m)
+            self.regions[channel] = reg
         return self.regions[channel]
+
+    @staticmethod
+    def _apply_meas(reg: ProbRegion, m: Meas) -> None:
+        """把一次测量的结果转成硬约束叠加到可能源集合上（依据见 ProbRegion 的类文档）。"""
+        if m.outcome == "direction":
+            reg.add_node(m.x, m.y, float(m.theta))
+            reg.add_inside(m.x, m.y, RECEIVE_MAX)      # 收得到 ⇒ 源在接收半径上限之内
+        elif m.outcome == "near":
+            reg.add_inside(m.x, m.y, NEAR_RADIUS)      # 5 m 内 ⇒ 位置几乎确定
+        elif m.outcome == "no_signal":
+            reg.add_outside(m.x, m.y, COVER_RADIUS)    # 收不到 ⇒ 源在接收半径下界之外
 
     def diameter(self, channel: int) -> float:
         """该频道当前定位区域的直径 / m（0 表示区域为空/退化）。"""
         return float(self.region(channel).diameter)
 
     def _precise(self, channel: int) -> bool:
-        """判据：定位区域直径（含裁剪误差）< 40 m ⇔ 最小覆盖圆半径 < 20 m。
+        """判据：可能源集合的最小覆盖圆半径 + 裁剪误差 < 20 m（= 清除半径）。
 
-        注意它**不是清除门槛**：它只回答"估计是否已经够准、可以不再补测"。清除一律由
-        "走到估计点先试一次 /clear"决定（见 _nearby_try_clear 的说明）。
+        注意它**不是清除门槛**：只回答"估计是否已经够准、可以停止补测"；清除一律由"走到估计点
+        先试一次 /clear"决定（见 _nearby_try_clear）。
+
+        这里用最小覆盖圆半径而不是"直径 < 40 m"：直径判据的依据是"凸区域的最小覆盖圆半径 ≤
+        直径/2"，而叠加 no_signal 禁区后区域可能非凸、甚至裂成多块，凸性不再成立；直接看覆盖圆
+        半径对任何集合都成立 —— 真源必在区域内 ⊆ 覆盖圆内，故走到圆心必在 20 m 以内。
         """
-        return self.diameter(channel) + 2.0 * CLIP_ERR < DIAM_PRECISE
+        mec = self.region(channel).enclosing_circle
+        return mec is not None and mec[2] + CLIP_ERR < CLEAR_RADIUS
 
     # ---- 阶段 1：巡视扫描 ----
     def _active_channels(self) -> List[int]:
-        """仍需测向的频道：未清除、且示向度条数未达上限。"""
+        """仍需测向的频道：未清除、示向度条数未达上限、且**定位还不够准**。
+
+        第三条是关键：叠加 no_signal 禁区与接收半径环带后，很多频道两条射线就已把可能源集合压到
+        覆盖圆半径 < 20 m，此时再测纯属浪费（每站 5 s 测向 + 可能的 1 s 切换）—— 实测前 3 站
+        每站都要把 20 个频道全测一遍，而每站只有 4~6 次能测出方向。
+        """
         return [c for c in CHANNELS
-                if c not in self.cleared and len(self.obs.get(c, ())) < OBS_CAP]
+                if c not in self.cleared
+                and len(self.obs.get(c, ())) < OBS_CAP
+                and not self._precise(c)]
 
     def _sweep(self, channels: Sequence[int], at: Sequence[float]) -> Dict[str, int]:
         """在 at 处按频道号升序逐频道测向（升序可省频道切换时间）；near 就地清除。"""
-        counts = {"direction": 0, "near": 0, "no_signal": 0}
+        counts = {"direction": 0, "near": 0, "no_signal": 0, "skip": 0}
         for ch in sorted(channels):
             if self._out_of_time():
                 break
+            if self._provable_no_signal(ch, at):
+                counts["skip"] += 1          # 区域整体在 1500 m 之外：必然无信号，不必测
+                self.n_skip += 1
+                continue
             res = self.measure(at[0], at[1], ch).get("measure_result", "no_signal")
             counts[res] = counts.get(res, 0) + 1
             if res == "near":
@@ -937,7 +1142,14 @@ class RobotDog:
         return counts
 
     def survey(self, waypoints: np.ndarray, order: Sequence[int]) -> None:
-        """依次移动到各圆心并扫描：阶段一的主体。"""
+        """依次移动到各圆心并扫描：阶段一的主体。
+
+        第 1 站（原点）就是"起始全频道扫描"：一次把 20 个频道全测一遍，成本 20 次测向
+        （≈ 20×5 s + 19×1 s 切换 ≈ 119 s），换来的是"哪些频道在 1000 m 内"这一批最便宜的信息
+        —— 实测平均能直接锚定 6 个源的方向，同时把其余频道标记为"源在 1000 m 之外"（这条对后续
+        跳过测量与区域收缩都有用）。扫描结束后立刻用这批方位调整后续路径的绕向与落脚点。
+        """
+        order = list(order)
         self.log(f"阶段1 巡视扫描：依次访问 {len(order)} 个圆心"
                  f"（顺序 {' → '.join(str(i) for i in order)}）")
         for step_i, idx in enumerate(order, 1):
@@ -959,8 +1171,96 @@ class RobotDog:
                 "virtual_time_s": round(self.vt, 3), "travel_m": round(self.travel_m, 2),
             })
             self.log(f"    有示向度 {counts['direction']}、无信号 {counts['no_signal']}、"
-                     f"近距清除 {counts['near']}，累计里程 {self.travel_m:.0f} m，"
-                     f"虚拟时刻 {self.vt:.0f} s")
+                     f"近距清除 {counts['near']}、判定必无信号而跳过 {counts['skip']}，"
+                     f"累计里程 {self.travel_m:.0f} m，虚拟时刻 {self.vt:.0f} s")
+            if step_i == 1:
+                self.initial_scan = dict(counts, n_channels=len(active))
+                self.log(f"    [起始全频道扫描] 一次扫完 20 个频道：锚定 {counts['direction']} "
+                         f"个源的方向，其余 {counts['no_signal']} 个判定为源在 "
+                         f"{COVER_RADIUS:.0f} m 之外")
+                self._orient_route(waypoints, order, wp)
+            if step_i < len(order):
+                self._inline_clear(wp, waypoints[order[step_i]])
+        self.log(f"阶段1 完成：里程 {self.travel_m:.0f} m，虚拟时刻 {self.vt:.0f} s，"
+                 f"累计示向度 {sum(len(v) for v in self.obs.values())} 条，"
+                 f"途中顺路清除 {len(self.cleared)} 个")
+
+    def _orient_route(self, waypoints: np.ndarray, order: List[int],
+                      origin: Sequence[float]) -> None:
+        """起始扫描之后，用听到的源方位调整巡视路径的绕向与落脚点（零成本）。
+
+        7 个圆心的访问长度恒为 6d（原点 → 一个环顶点 = d，再沿正六边形走 5 条边 = 5d），因此
+        "从哪个环顶点开始、顺时针还是逆时针"共 12 条路径**长度完全相同**。选择依据：让巡视的
+        最后落脚点靠近"起始扫描已经听到的源"（这些是最先能清的源），清除阶段就能直接从它们开始，
+        不必为它们单独折返。
+        """
+        ring = [i for i in order if i != 0]
+        if len(ring) < 3 or not self.obs:
+            return
+        # 起始扫描听到的源：方位已知、距离未知，取接收半径区间中点作估计
+        est = []
+        for ml in self.meas.values():
+            for m in ml:
+                if m.theta is None or dist((m.x, m.y), origin) > 1e-6:
+                    continue
+                est.append(np.array([origin[0] + RECEIVE_MID * math.cos(math.radians(m.theta)),
+                                     origin[1] + RECEIVE_MID * math.sin(math.radians(m.theta))]))
+        if not est:
+            return
+        best, best_score = None, None
+        for s in range(len(ring)):
+            for direction in (1, -1):
+                path = [ring[(s + direction * k) % len(ring)] for k in range(len(ring))]
+                end = np.asarray(waypoints[path[-1]], dtype=float)
+                score = float(np.mean([np.linalg.norm(end - p) for p in est]))
+                if best_score is None or score < best_score - 1e-9:
+                    best, best_score = path, score
+        if best is None:
+            return
+        new_order = [order[0]] + best
+        if new_order != list(order):
+            old_end = np.asarray(waypoints[order[-1]], dtype=float)
+            self.log(f"    [线路] 起始扫描已锚定 {len(est)} 个源的方向，据此把巡视绕向与落脚点从 "
+                     f"圆心{order[-1]} 调整到圆心{new_order[-1]}"
+                     f"（路径长度不变，终点到已听源的估计距离 "
+                     f"{np.mean([np.linalg.norm(old_end - p) for p in est]):.0f} → "
+                     f"{best_score:.0f} m）")
+        order[:] = new_order
+
+    def _inline_clear(self, at: Sequence[float], next_wp: Sequence[float]) -> int:
+        """巡视途中顺路清除：估计点就在路线上（绕行代价小）的频道，当场清掉。
+
+        巡视本来就要路过这些位置，绕一下的额外里程 ≤ INLINE_DETOUR；而留到阶段二再清，至少要从
+        别处专程跑一趟（几百米）。清掉后该频道后续各站都不再测量，双向省时间。
+        """
+        if not self.clear_enabled:
+            return 0
+        n = 0
+        for ch in sorted(self.obs):
+            if ch in self.cleared or self._out_of_time():
+                continue
+            mec = self.region(ch).enclosing_circle
+            if mec is None or mec[2] + CLIP_ERR >= self.inline_try_radius:
+                continue                                  # 估计太离谱就不值得绕
+            est = (mec[0], mec[1])
+            extra = (dist(at, est) + dist(est, next_wp) - dist(at, next_wp))
+            if extra > self.inline_detour:
+                continue
+            self.stage = "survey-clear"
+            if self.clear(est[0], est[1], ch):
+                self.tracks.setdefault(ch, {}).update({"method": "survey-inline",
+                                                       "clear_point": [est[0], est[1]]})
+                n += 1
+                self.log(f"    [顺路清除] 频道{ch} @ ({est[0]:.1f}, {est[1]:.1f}) 命中"
+                         f"（绕行 {extra:.0f} m，估计误差 "
+                         f"{dist(est, (mec[0], mec[1])):.0f} m，省下专程往返）")
+            else:
+                self.n_inline_fail += 1
+                self.log(f"    [顺路清除] 频道{ch} @ ({est[0]:.1f}, {est[1]:.1f}) 未命中"
+                         f"（绕行 {extra:.0f} m、覆盖圆半径 {mec[2]:.0f} m，留到阶段二处理）")
+        if n:
+            self.log(f"    本段顺路清除 {n} 个，累计已清 {len(self.cleared)} 个")
+        return n
 
     # ---- 阶段 2a：巡视后的定位诊断（只记录，不改变处理流程）----
     def diagnose(self) -> Dict[str, int]:
@@ -973,17 +1273,22 @@ class RobotDog:
             if ch in self.cleared:
                 continue
             d = self.diameter(ch)
+            mec = self.region(ch).enclosing_circle
             self.tracks.setdefault(ch, {}).update({
                 "n_obs_survey": len(self.obs[ch]),
+                "n_no_signal_survey": sum(1 for m in self.meas.get(ch, ())
+                                          if m.stage == "survey" and m.outcome == "no_signal"),
                 "diameter_survey_m": round(d, 3),
+                "mec_radius_survey_m": round(mec[2], 3) if mec else None,
                 "bounded_survey": bool(self.region(ch).bounded),
                 "n_probe": 0,
             })
             precise += self._precise(ch)
         self.log(f"阶段2 定位与清除：{len(self.obs)} 个频道，其中巡视后估计已够准"
-                 f"（直径 < {DIAM_PRECISE:.0f} m，诊断值）{precise} 个；"
+                 f"（最小覆盖圆半径 < {CLEAR_RADIUS:.0f} m，诊断值）{precise} 个；"
                  f"全部频道都走同一流程：就近试清 → 未命中则补测缩小再清")
-        return {"n_channels": len(self.obs), "n_precise": precise}
+        return {"n_channels": len(self.obs), "n_precise": precise,
+                "n_skip": self.n_skip}
 
     def _nearest_order(self, channels: Sequence[int]) -> List[int]:
         """确定性的访问顺序：最近邻给出初值，再用 2-opt 精修（固定起点、只接受严格下降）。
@@ -1291,7 +1596,9 @@ class RobotDog:
             self.survey(plan.waypoints, order)
             if self.clear_enabled:
                 self.diagnose()
-                # 单一顺序：按各频道估计点到当前位置的距离做最近邻 + 2-opt 精修（省里程）
+                # 阶段二的访问顺序：按各频道估计点到当前位置的距离做最近邻 + 2-opt（省里程）。
+                # 实测"每处理一个就重排"与"一次定序"结果完全相同（补测位移不足以改变最近邻
+                # 首元素），故保留更简单的一次定序。
                 for ch in self._nearest_order([c for c in sorted(self.obs)
                                                if c not in self.cleared]):
                     if self._out_of_time():
@@ -1315,8 +1622,13 @@ class RobotDog:
             "cleared": n,
             "avg_time_s": self.vt / n if n else float("inf"),
             "n_precise_at_survey": sum(1 for r in self.tracks.values()
-                                      if r.get("diameter_survey_m", float("inf"))
-                                      + 2 * CLIP_ERR < DIAM_PRECISE),
+                                      if r.get("mec_radius_survey_m") is not None
+                                      and r["mec_radius_survey_m"] + CLIP_ERR < CLEAR_RADIUS),
+            "n_skip_measure": self.n_skip,
+            "initial_scan": self.initial_scan,
+            "n_inline_cleared": sum(1 for r in self.tracks.values()
+                                    if r.get("method") == "survey-inline"),
+            "n_inline_fail": self.n_inline_fail,
             "n_refined": sum(1 for r in self.tracks.values() if r.get("n_probe")),
             "n_probe": sum(int(r.get("n_probe", 0)) for r in self.tracks.values()),
             "tracks": self.tracks,
@@ -1544,6 +1856,9 @@ def summarize(rows: Sequence[dict]) -> Dict[str, Any]:
         "n_measure_mean": round(float(np.mean([r["n_measure"] for r in rows])), 1),
         "n_probe_mean": round(float(np.mean([r["n_probe"] for r in rows])), 2),
         "n_precise_at_survey": sum(r.get("n_precise_at_survey", 0) for r in rows),
+        "n_skip_measure": sum(r.get("n_skip_measure", 0) for r in rows),
+        "n_inline_cleared": sum(r.get("n_inline_cleared", 0) for r in rows),
+        "n_inline_fail": sum(r.get("n_inline_fail", 0) for r in rows),
         "n_refined": sum(r.get("n_refined", 0) for r in rows),
         "localize_err_mean_m": round(float(np.mean(errs)), 3) if errs else None,
         "localize_err_max_m": round(float(np.max(errs)), 3) if errs else None,
@@ -1561,18 +1876,19 @@ def save_survey(save_dir: Path, rows: List[dict], observations: List[dict],
         "stage": "覆盖圆求解 + 依次到圆心巡视扫描 + 就近试清（未命中按文献准则补测缩小后再清）",
         "cover_plan": plan_json,
         "clear_radius_m": CLEAR_RADIUS,
-        "diam_precise_m": DIAM_PRECISE,
+        "receive_radius_m": [COVER_RADIUS, RECEIVE_MAX],
         "summary": summarize(rows),
         "episodes": rows,
     }, ensure_ascii=False, indent=2), encoding="utf-8")
     csv_path = save_dir / OBS_CSV
     with csv_path.open("w", newline="", encoding="utf-8") as f:
         w = csv.writer(f)
-        w.writerow(["episode", "channel", "stage", "x_m", "y_m", "svd_deg",
+        w.writerow(["episode", "channel", "stage", "x_m", "y_m", "outcome", "svd_deg",
                     "nearest_center_m"])
         for o in observations:
             w.writerow([o["episode"], o["channel"], o["stage"], f"{o['x']:.2f}",
-                        f"{o['y']:.2f}", f"{o['theta']:.2f}",
+                        f"{o['y']:.2f}", o["outcome"],
+                        "" if o["theta"] is None else f"{o['theta']:.2f}",
                         f"{o['nearest_center_m']:.2f}"])
     return [json_path, csv_path]
 
@@ -1601,14 +1917,15 @@ def episode_row(ep: int, seed: int, truth: Optional[Sequence[dict]], dog: RobotD
 # ----------------------------------------------------------------------------
 # 两种运行模式
 # ----------------------------------------------------------------------------
-def _observations(ep: int, plan: CoverPlan, obs: Dict[int, List[Obs]]) -> List[dict]:
-    """把本局观测整理成 CSV 行（附"观测点到最近圆心的距离"，便于核对覆盖保证）。"""
+def _observations(ep: int, plan: CoverPlan, meas: Dict[int, List[Meas]]) -> List[dict]:
+    """把本局全部测量整理成 CSV 行（含 no_signal，并附"测量点到最近圆心的距离"）。"""
     rows = []
-    for ch, ol in sorted(obs.items()):
-        for o in ol:
-            d = float(np.linalg.norm(plan.waypoints - np.array([o.x, o.y]), axis=1).min())
-            rows.append({"episode": ep, "channel": ch, "x": o.x, "y": o.y,
-                         "theta": o.theta, "stage": o.stage, "nearest_center_m": d})
+    for ch, ml in sorted(meas.items()):
+        for m in ml:
+            d = float(np.linalg.norm(plan.waypoints - np.array([m.x, m.y]), axis=1).min())
+            rows.append({"episode": ep, "channel": ch, "x": m.x, "y": m.y,
+                         "outcome": m.outcome, "theta": m.theta, "stage": m.stage,
+                         "nearest_center_m": d})
     return rows
 
 
@@ -1622,8 +1939,10 @@ def _episode_printer(clear: bool):
         if clear:
             print(f"  阶段2：就近试清命中 {stats['cleared']} 个（其中补测后再清 "
                   f"{stats['n_refined']} 个，共补测 {stats['n_probe']} 次）；"
-                  f"巡视后估计已够准的（直径 < {DIAM_PRECISE:.0f} m，诊断）"
-                  f"{stats['n_precise_at_survey']} 个")
+                  f"巡视后估计已够准的（覆盖圆半径 < {CLEAR_RADIUS:.0f} m，诊断）"
+                  f"{stats['n_precise_at_survey']} 个；判定必无信号跳过测量 "
+                  f"{stats['n_skip_measure']} 次；途中顺路清除 {stats['n_inline_cleared']} 个"
+                  f"（白跑 {stats['n_inline_fail']} 次）")
             print(f"  清除：{stats['cleared']}/{n_sources}（平均 {stats['avg_time_s']:.1f} s/个），"
                   f"定位误差均值 {check['localize_err_mean_m']} m / 最大 "
                   f"{check['localize_err_max_m']} m，清除点在 20 m 内 "
@@ -1654,12 +1973,14 @@ def run_practice(args: argparse.Namespace, res: CoverSolveResult, save_dir: Path
             dog = RobotDog(sim_api.Simulator(robot_id=args.robot_id, base_url=arena.robot_url,
                                              timeout=args.timeout),
                            verbose=not args.quiet, logfile=args.log, episode=ep + 1,
-                           clear=clear, k_clear_max=args.k_clear_max)
+                           clear=clear, k_clear_max=args.k_clear_max,
+                           inline_try_radius=args.inline_try_radius,
+                           inline_detour=args.inline_detour)
             stats = dog.run(res.plan, res.survey_order)
             arena.finish_episode()
             check = truth_check(truth, res.plan, dog.obs, dog.cleared, dog.tracks)
             rows.append(episode_row(ep + 1, seed, truth, dog, stats, check))
-            observations.extend(_observations(ep + 1, res.plan, dog.obs))
+            observations.extend(_observations(ep + 1, res.plan, dog.meas))
             show(stats, check, len(truth))
     print("\n" + "=" * 78)
     if clear:
@@ -1669,7 +1990,8 @@ def run_practice(args: argparse.Namespace, res: CoverSolveResult, save_dir: Path
               f"平均 {np.mean([r['avg_time_s'] for r in rows if r['avg_time_s']]):.1f} s/个，"
               f"平均虚拟时间 {np.mean([r['virtual_time_s'] for r in rows]):.0f} s，"
               f"平均测向 {np.mean([r['n_measure'] for r in rows]):.0f} 次"
-              f"（其中补测 {np.mean([r['n_probe'] for r in rows]):.0f} 次）")
+              f"（其中补测 {np.mean([r['n_probe'] for r in rows]):.0f} 次；"
+              f"判定必无信号而跳过 {np.mean([r['n_skip_measure'] for r in rows]):.0f} 次）")
         print(f"  定位误差：均值 "
               f"{np.mean([r['localize_err_mean_m'] for r in rows if r['localize_err_mean_m']]):.2f}"
               f" m，最差单源 "
@@ -1702,7 +2024,9 @@ def run_official(args: argparse.Namespace, res: CoverSolveResult, save_dir: Path
     sim = sim_api.Simulator(robot_id=args.robot_id, base_url=args.base_url, timeout=args.timeout)
     print(f"连接模拟器 {args.base_url}（robot_id={args.robot_id}）")
     dog = RobotDog(sim, verbose=not args.quiet, logfile=args.log, episode=1,
-                   clear=not args.survey_only, k_clear_max=args.k_clear_max)
+                   clear=not args.survey_only, k_clear_max=args.k_clear_max,
+                   inline_try_radius=args.inline_try_radius,
+                   inline_detour=args.inline_detour)
     stats = dog.run(res.plan, res.survey_order)
     print(f"完成：清除 {stats['cleared']} 个，巡视 {stats['waypoints_visited']} 个圆心，"
           f"里程 {stats['travel_m']:.0f} m，虚拟时间 {stats['virtual_time_s']:.0f} s，"
@@ -1711,7 +2035,7 @@ def run_official(args: argparse.Namespace, res: CoverSolveResult, save_dir: Path
     row = episode_row(1, args.seed, None, dog, stats,
                       truth_check(None, res.plan, dog.obs, dog.cleared, dog.tracks))
     paths = (save_plan(res, save_dir)
-             + save_survey(save_dir, [row], _observations(1, res.plan, dog.obs), res.to_json()))
+             + save_survey(save_dir, [row], _observations(1, res.plan, dog.meas), res.to_json()))
     print("结果已保存：" + "，".join(str(p) for p in paths))
     return 0
 
@@ -1757,6 +2081,11 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--k-clear-max", type=int, default=K_CLEAR_MAX,
                    help=f"试清未中后最多再补清几个点（用 K 个半径 20 m 的圆覆盖定位区域；"
                         f"缺省 {K_CLEAR_MAX}，只在能盖满区域时才用，盖不满则转入补测）")
+    p.add_argument("--inline-try-radius", type=float, default=INLINE_TRY_RADIUS,
+                   help=f"巡视途中顺路试清允许的覆盖圆半径上限 / m（缺省 {INLINE_TRY_RADIUS:.0f}；"
+                        f"设成 {CLEAR_RADIUS:.0f} 表示只清估计已够准的）")
+    p.add_argument("--inline-detour", type=float, default=INLINE_DETOUR,
+                   help=f"巡视途中顺路试清允许的绕行里程上限 / m（缺省 {INLINE_DETOUR:.0f}）")
     p.add_argument("--survey-only", action="store_true",
                    help="只做阶段一（巡视扫描 + 覆盖核对），不做定位与清除")
     p.add_argument("--quiet", action="store_true", help="只输出汇总，不打印过程")

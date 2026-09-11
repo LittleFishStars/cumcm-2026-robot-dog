@@ -1,34 +1,36 @@
 {
   "region_radius_m": 1800.0,
   "cover_radius_m": 1000.0,
-  "ring_radius_m": 1558.846,
+  "ring_radius_m": 1200.0,
+  "ring_radius_chosen": true,
+  "ring_radius_max_margin_m": 1558.846,
   "n_circles": 7,
-  "analytic_worst_m": 900.0,
-  "computed_worst_m": 900.0,
-  "margin_m": 100.0,
+  "analytic_worst_m": 968.9016,
+  "computed_worst_m": 968.9016,
+  "margin_m": 31.0984,
   "worst_point": [
     1558.85,
     -900.0
   ],
   "coverage_ratio": 1.0,
   "multiplicity_points": {
-    "1": 271595,
-    "2": 144096,
-    "3": 11406
+    "1": 186629,
+    "2": 145780,
+    "3": 94688
   },
-  "single_ratio": 0.6359094069965371,
-  "multi_ratio": 0.3640905930034629,
-  "mean_multiplicity": 1.3908,
+  "single_ratio": 0.4369709925379949,
+  "multi_ratio": 0.5630290074620051,
+  "mean_multiplicity": 1.7847,
   "survey_order": [
     0,
-    3,
-    2,
     1,
-    6,
+    2,
+    3,
+    4,
     5,
-    4
+    6
   ],
-  "survey_length_m": 9353.07,
+  "survey_length_m": 7200.0,
   "centers": [
     {
       "id": 0,
@@ -39,38 +41,38 @@
     {
       "id": 1,
       "kind": "环上圆",
-      "x": 1558.846,
+      "x": 1200.0,
       "y": 0.0
     },
     {
       "id": 2,
       "kind": "环上圆",
-      "x": 779.423,
-      "y": 1350.0
+      "x": 600.0,
+      "y": 1039.23
     },
     {
       "id": 3,
       "kind": "环上圆",
-      "x": -779.423,
-      "y": 1350.0
+      "x": -600.0,
+      "y": 1039.23
     },
     {
       "id": 4,
       "kind": "环上圆",
-      "x": -1558.846,
+      "x": -1200.0,
       "y": 0.0
     },
     {
       "id": 5,
       "kind": "环上圆",
-      "x": -779.423,
-      "y": -1350.0
+      "x": -600.0,
+      "y": -1039.23
     },
     {
       "id": 6,
       "kind": "环上圆",
-      "x": 779.423,
-      "y": -1350.0
+      "x": 600.0,
+      "y": -1039.23
     }
   ],
   "feasible_ring_interval_m": [
@@ -85,7 +87,7 @@
       "margin_m": 0.0,
       "survey_length_m": 6737.7,
       "survey_time_s": 1347.5,
-      "mean_multiplicity": 1.8623,
+      "mean_multiplicity": 1.8624,
       "min_multiplicity": 1
     },
     {

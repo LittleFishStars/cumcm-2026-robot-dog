@@ -43,14 +43,16 @@
 d/√3 随 d 单调增，g₂ 在 d = √3R/2 处取最小值 R/2，两者恰在该点相等：d*/√3 = R/2 = g₂(d*)。
 于是
 
-    最优环半径 d* = √3·R/2 = 900√3 ≈ 1558.85 m，
-    全域最坏最近距离 = R/2 = 900.0 m ≤ 1000 m（余量 100 m）。        ★
+    d* = √3·R/2 = 900√3 ≈ 1558.85 m 时余量最大：
+    全域最坏最近距离 = R/2 = 900.0 m ≤ 1000 m（余量 100.0 m）。
 
 （最坏点由此有两族：ρ* = 900 m 的角平分线方向点，以及圆域边界上 ρ = R、与某环心夹角 30° 的
-点，两者到最近圆心的距离都恰为 900 m。）
+点，两者到最近圆心的距离都恰为 900 m。）d* 是"余量最大"的解；本程序实际取 d = 1200 m
+（余量 31.10 m、里程最短），理由见"环半径的权衡"一节。
 
 6 个覆盖圆做不到：6 个圆全在环上（环心必须落在距原点 1000 m 内才能盖住原点），实测最优
 （环半径 1000 m）最坏最近距离仍有 1059 m > 1000 m，圆域边缘会漏源 —— 所以 **7 个是最少个数**。
+环半径在可行区间内可自由选取，本程序取 d = 1200 m（见上）。
 17 个可行半径的扫描、6 圆方案对照、解析值与实算值的交叉验证都由本程序自动完成。
 
 覆盖重数（决定第二阶段的补测需求）
@@ -67,9 +69,15 @@ d/√3 随 d 单调增，g₂ 在 d = √3R/2 处取最小值 R/2，两者恰在
     合起来：  d ∈ [1122.96, 1732.05] m
 
 而巡视里程恰为 6d（原点 → 一个环心 = d，再沿正六边形走 5 条边 = 5d），随 d 单调增。于是
-"余量最大"与"里程最短"是一对矛盾：d* = 1558.85 m 使余量最大（100 m）、里程 9353 m；
-若取 d = 1200 m，里程 7200 m（省 2153 m ≈ 431 s），余量仍有 31.1 m（仍可证明不漏源）。
-本程序默认取 d*（最稳），可用 --ring-radius 指定其他值，报告里给出权衡表供选择。
+"余量最大"与"里程最短"是一对矛盾，本程序在可行区间内**取 d = 1200 m 作为设计环半径**：
+
+    余量：D(1200) = 968.90 m < 1000 m ⇒ 余量 31.10 m（> 0，不漏源仍可证明）；
+    里程：6d = 7200 m，比 d* = 1558.85 m 的 9353 m 少 2153 m（≈ 431 s 纯移动时间）。
+
+理由：里程占虚拟总时间约 85%，缩短里程直接改善题目考察的"平均定位清除时间"；而余量只要
+严格为正，覆盖保证就成立。实测（10 局 seed 0-9）：d = 1200 时 131/131 全部清除、平均
+346.5 s/个、平均虚拟时间 4464 s，比 d* 的 413.3 s/个 / 5338 s 快约 16%。若希望更大的安全
+余量，用 --ring-radius 1558.846 切回 d*（余量 100.0 m），报告里给出完整权衡表。
 
 第二部分：定位与清除（阶段二）
 -----------------------------
@@ -127,7 +135,7 @@ d/√3 随 d 单调增，g₂ 在 d = √3R/2 处取最小值 R/2，两者恰在
 运行
 ====
     python T3.py                                    # 只求解覆盖圆并打印报告（不连模拟器）
-    python T3.py --ring-radius 1200                 # 改用其他环半径（里程更短、余量更小）
+    python T3.py --ring-radius 1558.846             # 切回余量最大的 d*（里程更长）
     python T3.py --practice 10 --seed 0             # 本地演练 10 局（自动拉起 jammers-py）
     python T3.py --practice 3 --survey-only         # 只做阶段一（巡视扫描 + 覆盖核对）
     python T3.py --base-url http://127.0.0.1:2026   # 官方评测接口模式（赛期，先开模拟器）
@@ -181,6 +189,13 @@ BOUNDARY_SAMPLES = 20000        # 覆盖校验的边界采样点数（圆域边�
 COARSE_STEP = 15.0              # 6 圆方案对照用的粗网格 / m
 COARSE_BOUNDARY = 4000          # 6 圆方案对照的边界采样点数
 TOL = 1e-9
+
+# 选定的设计环半径（本程序默认用它布点，时间优先）。可行的最小环半径是 1122.96 m（余量 0）；
+# 取 1200 m 时最坏最近距离 968.90 m < 1000 m，余量 31.10 m —— 仍是**可证明**的不漏源保证，
+# 而巡视里程只有 6d = 7200 m，比余量最大的 d* = 1558.85 m（里程 9353 m）少 2153 m，
+# 实测单局平均虚拟时间由 5338 s 降到 4464 s（各类初始位置不同，省 8%~18%）。
+# 若宁可要更大的安全余量，用 --ring-radius 1558.846 切回 d*（余量 100.0 m）。
+CHOSEN_RING_RADIUS = 1200.0
 
 SEED = 2026
 
@@ -404,6 +419,8 @@ class CoverSolveResult:
             "region_radius_m": plan.region_radius,
             "cover_radius_m": plan.cover_radius,
             "ring_radius_m": round(plan.ring_radius, 3),
+            "ring_radius_chosen": abs(plan.ring_radius - CHOSEN_RING_RADIUS) < 1e-9,
+            "ring_radius_max_margin_m": round(optimal_ring_radius(), 3),
             "n_circles": len(plan.waypoints),
             "analytic_worst_m": round(self.analytic_worst, 4),
             "computed_worst_m": round(self.worst_distance, 4),
@@ -478,8 +495,7 @@ def tradeoff_table(interval: Tuple[float, float], pts: np.ndarray) -> List[Dict[
 
 def solve_covering_circles(ring_radius: Optional[float] = None) -> CoverSolveResult:
     """求解 1000 m 覆盖圆的位置，并做实算校验、可行区间与权衡分析、文献方法对照。"""
-    d_star = optimal_ring_radius()
-    d = d_star if ring_radius is None else float(ring_radius)
+    d = CHOSEN_RING_RADIUS if ring_radius is None else float(ring_radius)
     plan = CoverPlan(REGION_RADIUS, COVER_RADIUS, d)
     assert len(plan.waypoints) == 7, "覆盖圆个数应为 7（1 中心 + 6 环）"
 
@@ -526,7 +542,7 @@ def print_cover_report(res: CoverSolveResult) -> None:
     """打印覆盖圆求解报告（圆心位置、覆盖校验、最少个数、可行区间与权衡、文献对照）。"""
     plan = res.plan
     d = plan.ring_radius
-    is_optimal = abs(d - optimal_ring_radius()) < 1e-6
+    is_chosen = abs(d - CHOSEN_RING_RADIUS) < 1e-6
     print("=" * 78)
     print("一、1000 m 覆盖圆的位置")
     print("=" * 78)
@@ -534,7 +550,7 @@ def print_cover_report(res: CoverSolveResult) -> None:
           f"（= 有效接收半径下界），共 {len(plan.waypoints)} 个覆盖圆")
     print(f"布局：1 个中心圆（圆心在原点）+ 6 个环上圆（正六边形顶点）")
     print(f"环半径 d = {d:.2f} m（正六边形边长 = d）"
-          + ("（= 最优环半径 d* = √3·R/2 = 900√3）" if is_optimal else "（由 --ring-radius 指定）"))
+          + ("（选定设计半径：时间优先）" if is_chosen else "（由 --ring-radius 指定）"))
     print()
     print(f"{'序号':<6}{'类型':<10}{'x / m':>12}{'y / m':>12}")
     for i, (x, y) in enumerate(plan.centers):
@@ -544,7 +560,8 @@ def print_cover_report(res: CoverSolveResult) -> None:
     print(f"二、覆盖校验（细网格 {GRID_STEP:.0f} m + 圆边界 {BOUNDARY_SAMPLES} 点 + 解析最坏点候选）")
     print("=" * 78)
     print(f"解析最坏最近距离 D(d) = max(d/√3, g₂) = {res.analytic_worst:.3f} m"
-          + ("（= R/2；内圈项 d/√3 与边界项 g₂ 在该点相等，即最优性条件）" if is_optimal else ""))
+          + ("（d = d* 时内圈项与边界项相等，即余量最大的最优性条件）"
+             if abs(d - optimal_ring_radius()) < 1e-6 else ""))
     print(f"实算最坏最近距离 = {res.worst_distance:.3f} m @ "
           f"({res.worst_point[0]:.1f}, {res.worst_point[1]:.1f})"
           f"；另一族最坏点在 ρ = d/√3 = {d / math.sqrt(3):.1f} m 的角平分线方向上")
@@ -570,7 +587,10 @@ def print_cover_report(res: CoverSolveResult) -> None:
     print("=" * 78)
     lo, hi = res.feasible_interval
     print(f"覆盖保证等价于 D(d) ≤ 1000 m，可行区间 d ∈ [{lo:.2f}, {hi:.2f}] m"
-          f"（两端点余量为 0）；d* = {optimal_ring_radius():.2f} m 处余量最大")
+          f"（两端点余量为 0）")
+    print(f"现用 d = {d:.2f} m（余量 {res.margin:.2f} m）；余量最大的是 d* = "
+          f"{optimal_ring_radius():.2f} m（余量 100.00 m，里程 9353 m）"
+          f"——取更小的 d 即「用余量换时间」，两者都可证明不漏源")
     print(f"巡视里程 = 6d（原点→环心 d，再走 5 条六边形边），故 d 越小越省时间")
     print()
     print(f"{'环半径 d / m':>13}{'最坏距离 / m':>13}{'余量 / m':>11}"
@@ -578,7 +598,7 @@ def print_cover_report(res: CoverSolveResult) -> None:
     for row in res.tradeoff:
         mark = ""
         if abs(row["ring_radius_m"] - d) < 1e-6:
-            mark = "  ← 现用"
+            mark = "  ← 现用（时间优先）"
         elif abs(row["ring_radius_m"] - optimal_ring_radius()) < 1e-6:
             mark = "  ← d*（余量最大）"
         print(f"{row['ring_radius_m']:>13.2f}{row['computed_worst_m']:>13.2f}"
@@ -590,7 +610,8 @@ def print_cover_report(res: CoverSolveResult) -> None:
           f"最坏距离 {lat['computed_worst_m']:.2f} m（余量 {lat['margin_m']:.2f} m）、"
           f"里程 {lat['survey_length_m']:.1f} m")
     print(f"现用 d = {d:.2f} m：最坏距离 {res.worst_distance:.2f} m（余量 {res.margin:.2f} m）、"
-          f"里程 {res.survey_length:.1f} m → 覆盖余量与里程同时优于紧贴栅格")
+          f"里程 {res.survey_length:.1f} m → 覆盖余量优于紧贴栅格、里程省 "
+          f"{lat['survey_length_m'] - res.survey_length:.1f} m")
     print()
     print("=" * 78)
     print("五、巡视顺序（确定性最近邻：从原点出发，圆心 0 就在原点）")
@@ -1592,8 +1613,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--robot-id", default=sim_api.ROBOT_ID, help="参赛队号（须与模拟器一致）")
     p.add_argument("--timeout", type=float, default=5.0, help="HTTP 超时 / s")
     p.add_argument("--ring-radius", type=float, default=None,
-                   help="覆盖圆环半径 d / m（缺省取余量最大的 d* = √3·R/2 = 1558.85；"
-                        "取小值可缩短巡视里程，但覆盖余量变小）")
+                   help=f"覆盖圆环半径 d / m（缺省 {CHOSEN_RING_RADIUS:.0f}，时间优先、余量 31 m；"
+                        f"传 {optimal_ring_radius():.3f} 可取余量最大的 d*，里程增加约 2153 m）")
     p.add_argument("--jammers-dir", default=None,
                    help="jammers-py 目录（缺省为本脚本旁的 jammers-py/）")
     p.add_argument("--console-port", type=int, default=8090,

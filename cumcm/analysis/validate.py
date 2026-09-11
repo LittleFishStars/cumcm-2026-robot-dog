@@ -71,9 +71,11 @@ class _CorridorProbe:
     _polar_deg = staticmethod(T3_strategy.RobotDog._polar_deg)
     _at_origin = staticmethod(T3_strategy.RobotDog._at_origin)
 
-    def __init__(self, sector_deg: float = 2.0, exclude_r: float = 0.0) -> None:
+    def __init__(self, sector_deg: float = 2.0, exclude_r: float = 0.0,
+                 radius_max: Optional[float] = None) -> None:
         self.inline_sector_deg = float(sector_deg)
         self.inline_exclude_r = float(exclude_r)
+        self.inline_radius_max = (None if radius_max is None else float(radius_max))
 
 
 class _T3GA:

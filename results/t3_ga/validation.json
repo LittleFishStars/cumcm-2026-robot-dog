@@ -572,10 +572,10 @@
       "episodes.csv": true
     },
     "f_figures_pdf": 10,
-    "elapsed_s": 116.1
+    "elapsed_s": 120.2
   },
   "failed": 0,
   "skipped": 5,
-  "elapsed_s": 116.1,
-  "generated_at": "2026-09-12 00:54:40"
+  "elapsed_s": 120.2,
+  "generated_at": "2026-09-12 01:43:25"
 }

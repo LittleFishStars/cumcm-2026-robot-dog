@@ -51,9 +51,9 @@ class RobotDog:
     阶段一（巡视扫描）：按覆盖圆方案依次走到 7 个圆心，在每个圆心对未采够的频道测向，把
     每个源的示向度采集齐全（同一地点误差固定，故每频道最多采 OBS_CAP 条）。起始点（原点）
     的那一站是"全频道扫描"，扫完立刻用这批示向度做两件零成本的事：把覆盖圆布局**旋转**到
-    最密集扇区方向，并据此选择巡视的落脚点（`_orient_route`）。旋转与换终点都不改变覆盖保证
-    （覆盖只依赖点间距离与点到原点的距离），只改变"巡视最后停在哪里"，从而让阶段二从源密集区
-    开始、省掉折返。
+    最密集扇区方向（角度频率最高的 60° 区间中点），并据此把布局旋转到"第一个巡视点正对源
+    最密集方向顺时针旋转 90° 处"（`_orient_route`）。旋转不改变覆盖保证（覆盖只依赖点间距离与
+    点到原点的距离），也不改变巡回路径长度（只依赖点间距离），是纯零成本自由度。
 
     阶段二（定位与清除）：对每个频道走同一条流程，**没有"够不够准"的清除门槛** ——
       1. 用问题 1 的交会定位区域（各 ±1° 楔形之交 ∩ 圆域）得到位置估计（区域最小覆盖圆圆心）；
@@ -420,19 +420,14 @@ class RobotDog:
         **自由度**：把整个 7 点布局绕原点整体旋转不改变覆盖条件（只取决于点间距离与点到原点的
         距离），也不改变巡回路径长度（只取决于点间距离）。所以"7 个站分别朝向哪"是纯自由的。
 
-        **决策**：巡视结束后紧接着就是阶段二（逐个清除），所以希望**巡视终点离源密集区近**。
-        对每个候选终点站 j，代价 = 巡视额外里程 + 终点到源密集估计的距离：
-          * 巡视额外里程 = L_j − L_min，其中 L_j 是"以 j 为终点的最短开放路径"长度（精确解）；
-          * 终点到源密集估计的距离 ≈ |ρ_est − |c_j||（旋转后站点 j 正落在 θ* 方向上）。
-        取 argmin（并列取编号小者）。随后把布局旋转到"站点 j 正对 θ*"，于是终点恰好落在源最多
-        的方向上、距离也最接近源的实际径向距离。
+        **决策（用户指定）**：
+          1. 最密集方向 θ* = "角度频率最高的 60° 区间中点"（dense_sector_rotation，众数赢）；
+          2. 布局旋转使**第一个巡视点**（path[0]）正对"θ* 顺时针旋转 90°"的方向
+             （atan2 坐标系下顺时针即角度 −90°，故目标方位 = θ* − 90°）；
+          3. 巡视顺序仍由"Held-Karp 最短开放路径 + 终点靠源密集区径向"选取（此轮不变）。
 
-        **为什么最后落脚点重要**：实测（10 局）阶段二里程约 8.1 km，其中专程往返占了绝大部分；
-        巡视终点若已在源密集区，这批源可以顺手清掉，省下整段折返。
-
-        **与旧实现的区别**：旧版先按"1 号环心对准最密集 60° 扇区"旋转，再只在"正六边形族的
-        12 条等长环行路线"里挑终点 —— 那只在六边形布局下成立（利用 6 重旋转对称）。现在站点
-        布局是一般 7 点，故改为直接对"终点站"做精确枚举 + 旋转对准，两种布局都正确。
+        **为什么这样摆**：旋转是零成本自由度；把起点对准密集方向旁 90°、而非正对，是用户对
+        "第一阶段先扫外围、把密簇留给之后处理"的排布偏好（覆盖与路径长度均不受旋转影响）。
 
         `--no-rotate` 时不做旋转，仅在原朝向下选终点。
         """
@@ -463,28 +458,25 @@ class RobotDog:
         _, end, length, path = best
 
         if self.rotate:
-            # 把站点 end 转到 θ* 方向上：旋转角 = θ* − 该站原方位角
-            cur = math.atan2(float(wps[end][1]), float(wps[end][0]))
-            self.plan = self.plan.rotated(dense - cur)
+            # 把"第一个巡视点"转到（θ* 顺时针旋转 90°）的方向上。
+            # atan2 坐标系（x 右、y 上，逆时针为正）：顺时针 90° = 角度 −90°，目标方位 = θ* − π/2。
+            first = int(path[0])
+            cur = math.atan2(float(wps[first][1]), float(wps[first][0]))
+            target = (dense - math.pi / 2.0) % (2.0 * math.pi)
+            self.plan = self.plan.rotated(target - cur)
             wps = self.plan.waypoints
-            self.rotation_deg = math.degrees((dense - cur) % (2.0 * math.pi))
+            self.rotation_deg = math.degrees((target - cur) % (2.0 * math.pi))
         else:
             rho_j = float(np.hypot(*wps[end]))
             self.log(f"    [朝向] --no-rotate：不做布局旋转，仅在现有朝向下选终点")
 
-        old_end = order[-1]
-        if list(path) != list(order):
-            old_gap = float(np.linalg.norm(wps[old_end]
-                                           - np.array([RECEIVE_MID * math.cos(dense),
-                                                       RECEIVE_MID * math.sin(dense)])))
-            new_gap = float(np.linalg.norm(wps[end]
-                                           - np.array([RECEIVE_MID * math.cos(dense),
-                                                       RECEIVE_MID * math.sin(dense)])))
-            self.log(f"    [朝向] 起始扫描听到 {len(bearings)} 个源，最密集方向 "
-                     f"{self.rotation_deg:.1f}°；布局{'旋转 ' + format(math.degrees((dense - cur) % (2.0 * math.pi)), '.1f') + '° 使' if self.rotate else ''}"
-                     f"站点{end} 正对该方向。巡视终点从站点{old_end} 调整到站点{end}"
-                     f"（里程 {length:.0f} m，比最短路径多 {length - L_min:.0f} m；"
-                     f"终点到源密集方向的距离 {old_gap:.0f} → {new_gap:.0f} m）")
+        first = int(path[0])
+        self.log(f"    [朝向] 起始扫描听到 {len(bearings)} 个源，最密集方向 "
+                 f"{math.degrees(dense % (2.0 * math.pi)):.1f}°，其顺时针 90° 处 = "
+                 f"{math.degrees((dense - math.pi / 2.0) % (2.0 * math.pi)):.1f}°；"
+                 f"{'布局旋转 ' + format(self.rotation_deg, '.1f') + '° 使' if self.rotate else '未旋转（--no-rotate），'}"
+                 f"第一个巡视点站点{first} 正对该方位。巡视终点为站点{end}"
+                 f"（终点路径长 {length:.0f} m，比最短路径多 {length - L_min:.0f} m）")
         order[:] = list(path)
         self.survey_order_planned = list(path)
         self._survey_path_len = length

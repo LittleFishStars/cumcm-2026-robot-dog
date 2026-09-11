@@ -61,14 +61,18 @@ TMP_VERIFY_DIR = ".tmp_verify"  # F 组两次演练的暂存目录（跑完即�
 
 
 class _CorridorProbe:
-    """只带走廊相关属性的最小替身。
+    """只带顺路清除相关属性的最小替身。
 
-    `_leg_corridor` 与 `_inline_excluded` 都只读 `inline_corridor` / `inline_exclude_r` 两个
-    属性、不碰仿真，故无需真造一台机器狗就能单测这两个纯几何判据。
+    `_in_azimuth_arc` 内部经 self 调用 `_polar_deg`，`_inline_clear` 内部经 self 调用
+    `_at_origin`；`_in_sector` 只读 `inline_sector_deg`、`_inline_excluded` 只读
+    `inline_exclude_r`。装上这四样即可单测各判据，无需真造一台机器狗。
     """
 
-    def __init__(self, half: float, exclude_r: float = 0.0) -> None:
-        self.inline_corridor = float(half)
+    _polar_deg = staticmethod(T3_strategy.RobotDog._polar_deg)
+    _at_origin = staticmethod(T3_strategy.RobotDog._at_origin)
+
+    def __init__(self, sector_deg: float = 2.0, exclude_r: float = 0.0) -> None:
+        self.inline_sector_deg = float(sector_deg)
         self.inline_exclude_r = float(exclude_r)
 
 
@@ -411,89 +415,90 @@ def group_c(rep: Report, rng: np.random.Generator) -> None:
         ok &= after <= before + 1e-9
     rep.check("C", "2-opt 精修从不使路程变长（20 例）", ok)
 
-    # ---- C4~C7：T3 主线"顺路清除"的走廊判据（本站 → 下一站，按角度算）----
-    # 这套判据的直接后果是**总里程不变**（顺路清除只花清除/试探时间，不额外走路），所以
-    # "点到底算不算在走廊内"必须卡准：放宽会多走冤枉路，收窄会白丢本该顺路清掉的目标。
-    probe = _CorridorProbe(T3_cfg.INLINE_CORRIDOR_M)
-    w = T3_cfg.INLINE_CORRIDOR_M
-    corridor = T3_strategy.RobotDog._leg_corridor
-    A, B = (0.0, 0.0), (1000.0, 0.0)
+    # ---- C4~C8：T3 主线"顺路清除"的判据 ----
+    # 判据以**区域圆心（原点）**为参照（见 cumcm/t3/strategy.py 的 _in_azimuth_arc）：估计点与
+    # 圆心的连线方向，落在「本站→圆心」与「下一站→圆心」两条连线夹出的方位扇区内即清，半径
+    # 不限。它决定了"沿途到底清哪些点"，必须卡准：放错方向会绕远、收窄会白丢顺路可清的目标。
+    probe = _CorridorProbe()
+    arc = T3_strategy.RobotDog._in_azimuth_arc
+    at, nxt = (900.0, 0.0), (450.0, 779.4)          # 方位 0° 与 60°
 
-    cases = [((500.0, 0.0), True, "线上正中"),
-             ((500.0, w - 0.1), True, "横向偏离略小于半宽"),
-             ((500.0, w + 0.1), False, "横向偏离略大于半宽"),
-             ((1500.0, 0.0), False, "越过下一站 500 m"),
-             ((-500.0, 0.0), False, "在本站之前 500 m")]
-    wrong = [d for est, want, d in cases if (corridor(probe, A, B, est) is not None) != want]
-    rep.check("C", "巡视走廊：段内放行、越界与段外拒绝（5 例）", not wrong,
-              "全部符合" if not wrong else f"不符：{wrong}")
+    # C4 定点：方位在两条连线之间则放行，反之拒绝；半径不限。
+    acases = [((800.0, 240.0), True, "方位 16.7° 在扇区内（半径 835 m ≤ 两站半径 900 m）"),
+              ((500.0, 0.0), True, "方位 0° = 本站连线方向（含端点）"),
+              ((225.0, 389.7), True, "方位 60° = 下一站连线方向（含端点）"),
+              ((300.0, 750.0), False, "方位 68.2° 出扇区（半径 808 m 在界内，是被方位排除）"),
+              ((850.0, 1000.0), False, "方位 49.6° 在方位内但半径 1312 m 超两站半径"),
+              ((-500.0, 0.0), False, "方位 180°（反侧）")]
+    wrong = [d for est, want, d in acases if (arc(probe, at, nxt, est) is not None) != want]
+    rep.check("C", "顺路清除方位扇区：两连线之间放行、之外拒绝（5 例）",
+              not wrong, "全部符合" if not wrong else f"不符：{wrong}")
 
-    # C5 与"线段投影"精确判据对拍。数学上两者等价（沿线距离 t ∈ [0, L] 且横向偏离 ≤ 半宽），
-    # 这里实测确认角度口径没写偏。端点附近（距端点 ≤ 半宽）两种口径本就会有微小差别，
-    # 因为角度阈值在距离小于半宽时按定义放行，故这部分单独计、不计入不一致。
+    # C5 与"方位角三角不等式"参考公式随机对拍：th_est 在 th_at~th_next 间 ⟺
+    # ang_diff(th_est,th_at)+ang_diff(th_est,th_next) == ang_diff(th_at,th_next)（短弧取等）。
     hard = 0
     for _ in range(4000):
-        a = rng.uniform(-1800, 1800, size=2)
-        b = a + rng.uniform(-2000, 2000, size=2)
-        L = float(np.linalg.norm(b - a))
-        if L < 1e-6:
-            continue
-        if rng.random() < 0.5:                      # 一半样本贴直线生成，专门压边界
-            u = (b - a) / L
-            t = rng.uniform(-0.3 * L, 1.3 * L)
-            h = rng.uniform(-1.5 * w, 1.5 * w)
-            q = a + t * u + h * np.array([-u[1], u[0]])
-        else:
-            q = rng.uniform(-1800, 1800, size=2)
-        u = (b - a) / L
-        v = q - a
-        t = float(v[0] * u[0] + v[1] * u[1])
-        h = abs(float(v[0] * (-u[1]) + v[1] * u[0]))
-        want = (0.0 <= t <= L) and (h <= w)
-        got = corridor(probe, a, b, q) is not None
-        if want != got and min(float(np.linalg.norm(q - a)),
-                               float(np.linalg.norm(q - b))) > w:
+        a = rng.uniform(-1500, 1500, size=2)
+        b = rng.uniform(-1500, 1500, size=2)
+        if min(float(np.linalg.norm(a)), float(np.linalg.norm(b))) < 100.0:
+            continue                                 # 两端点须远离原点（方位有意义）
+        q = rng.uniform(-1800, 1800, size=2)
+        th = lambda p: float(np.degrees(np.arctan2(p[1], p[0])) % 360.0)
+        d_ab = T_geometry.ang_diff(th(a), th(b))
+        r_ok = float(np.linalg.norm(q)) <= max(float(np.linalg.norm(a)),
+                                               float(np.linalg.norm(b))) + 1e-6
+        want = r_ok and (T_geometry.ang_diff(th(q), th(a))
+                         + T_geometry.ang_diff(th(q), th(b)) <= d_ab + 1e-9)
+        got = arc(probe, a, b, q) is not None
+        if want != got:
             hard += 1
-    rep.check("C", "巡视走廊：与线段投影判据等价（4000 组随机，非端点处）", hard == 0,
-              f"实质不一致 {hard} 处")
-    rep.metric("c_corridor_mismatch", hard)
+    rep.check("C", "顺路清除方位扇区：与三角不等式参考公式等价（4000 组随机）",
+              hard == 0, f"实质不一致 {hard} 处")
+    rep.metric("c_azimuth_mismatch", hard)
 
-    # C6 必须用**角度**比较而不能用 |sin|：sin 分不出 0° 与 180°，越站点的 |sin Δ₂| 也是 0，
-    # 会被误判成"在线上"。这个定点用例正是为了把该陷阱钉死在验证里。
-    beyond = (1500.0, 0.0)                          # 正落在直线上，但在下一站之外 500 m
-    h_line = abs((beyond[1] - A[1]) * 0.0 + 0.0)    # 到无限长直线的垂距（此处恰为 0）
-    a2 = T_geometry.ang_diff(T_geometry.bearing(B, beyond), T_geometry.bearing(B, A))
-    rep.check("C", "巡视走廊：越站点被排除（|sin| 判据会误判为在线上）",
-              corridor(probe, A, B, beyond) is None and h_line <= w and a2 > 90.0,
-              f"垂距 {h_line:.0f} m ≤ 半宽、回望角 {a2:.0f}° ⇒ 角度判据正确排除")
+    # C6 必须用**角度**比较而不能用 |sin|：|sin 180°| = 0，反侧的点（方位 180° 对 0°）会被
+    # 误判成"与本站同向"。这里 est 在 at 的**正反方向**，|sin|=0 恰是陷阱例子。
+    refl = (-500.0, 0.0)                             # 方位 180°，在 at(0°) 与 nxt(60°) 之外
+    sin_trap = abs(math.sin(math.radians(T_geometry.ang_diff(
+        T_geometry.bearing((0.0, 0.0), refl), T_geometry.bearing((0.0, 0.0), at))))) < 1e-9
+    a_refl = T_geometry.ang_diff(T3_strategy.RobotDog._polar_deg(refl),
+                                 T3_strategy.RobotDog._polar_deg(at))
+    rep.check("C", "顺路清除：反侧点被排除（|sin| 判据会误判为同向）",
+              arc(probe, at, nxt, refl) is None and sin_trap and a_refl > 60.0,
+              f"|sin 方位差|≈0 会误判、ang_diff 给出 {a_refl:.0f}° ⇒ 正确排除")
 
-    # C7 区域圆心排除规则：单独抽出 _inline_excluded 就是为了能这样直接验它。
-    ex_probe = _CorridorProbe(w, exclude_r=T3_cfg.INLINE_EXCLUDE_R_M)
-    excluded_now = T3_strategy.RobotDog._inline_excluded(ex_probe, (400.0, 0.0))
-    kept_now = T3_strategy.RobotDog._inline_excluded(ex_probe, (700.0, 0.0))
-    no_excl = _CorridorProbe(w, exclude_r=0.0)
+    # C7 区域圆心排除规则：极角扇区半径不限、延伸到圆域各处，所以 600 m 排除**确实会触发**。
+    ex_probe = _CorridorProbe(exclude_r=T3_cfg.INLINE_EXCLUDE_R_M)
+    near = (400.0, 230.0)                            # 方位 29.9° 在扇区内，距原点 461 m
+    far = (800.0, 300.0)                             # 方位 20.6° 在扇区内，距原点 854 m
+    in_near = arc(ex_probe, at, nxt, near) is not None
+    in_far = arc(ex_probe, at, nxt, far) is not None
+    excl = T3_strategy.RobotDog._inline_excluded
+    no_excl = _CorridorProbe(exclude_r=0.0)
     rep.check("C", f"顺路清除排除距区域圆心 {T3_cfg.INLINE_EXCLUDE_R_M:.0f} m 内的估计点",
-              excluded_now and not kept_now
-              and not T3_strategy.RobotDog._inline_excluded(no_excl, (400.0, 0.0)),
-              "400 m 处排除、700 m 处保留；门槛置 0 时不再排除")
+              in_near and in_far and excl(ex_probe, near) and not excl(ex_probe, far)
+              and not excl(no_excl, near),
+              "近心点在扇区内但被排除、远心点保留、门槛置 0 不再排除")
 
-    # C8 该排除规则在当前巡视几何下**结构性不触发**（并非"偶然没用上"）：巡视只发生在环上相邻
-    # 两站之间，而 7 个圆心都在距原点约 1 km 处，故每条弦到原点的最近距离都远大于 600 m。
-    # 记录成指标而非检查：换布局时若它降到 600 m 以下，这里应当引起注意。
-    _res = T3_cover.solve_covering_circles()
-    wps = _res.plan.waypoints
-    order = [int(i) for i in _res.survey_order]
-    chord_min = float("inf")
-    for i in range(1, len(order) - 1):              # 首段是"起点(原点)→第一站"，不参与顺路清除
-        a, b = np.asarray(wps[order[i]], dtype=float), np.asarray(wps[order[i + 1]], dtype=float)
-        u = b - a
-        t = float(np.clip(-float(a @ u) / float(u @ u), 0.0, 1.0))
-        chord_min = min(chord_min, float(np.linalg.norm(a + t * u)))
-    rep.metric("c_inline_chord_min_r_m", chord_min)
-    print(f"    巡视弦到区域圆心的最近距离 {chord_min:.0f} m"
-          f"（排除门槛 {T3_cfg.INLINE_EXCLUDE_R_M:.0f} m ⇒ "
-          f"{'结构性不触发' if chord_min > T3_cfg.INLINE_EXCLUDE_R_M else '会触发'}）")
-
+    # C8 起点(原点)→第一站：起点与圆心的连线是零向量，没有方位，退化为"朝向第一站 ± 半张角"
+    # 的本地扇形兜底（_in_sector）—— 一并纳入回归，防止该特判以后被误删。
+    sector = T3_strategy.RobotDog._in_sector
+    s_probe = _CorridorProbe(sector_deg=T3_cfg.INLINE_SECTOR_DEG)
+    origin, first = (0.0, 0.0), (900.0, 1000.0)      # 第一站方位 48°
+    scases = [((620.0, 700.0), True, "朝第一站方向偏差 0.5°，距离在段内"),
+              ((-620.0, -700.0), False, "反方向（180°）"),
+              ((2000.0, 2200.0), False, "方向对但超过段长")]
+    wrong = [d for est, want, d in scases
+             if (sector(s_probe, origin, first, est) is not None) != want]
+    rep.check("C", "起点→第一站兜底扇形：朝第一站方向放行、反侧/超程拒绝（3 例）",
+              not wrong, "全部符合" if not wrong else f"不符：{wrong}")
+    # 起点段与 600 m 排除的组合：兜底扇形内仍有近心点被排除（如方位 48°、距原点 400 m 的点）。
+    near_origin = (260.0, 300.0)                     # 方位 ≈49°，距原点 397 m < 600 m
+    rep.check("C", "起点段同样遵守 600 m 排除",
+              sector(s_probe, origin, first, near_origin) is not None
+              and excl(_CorridorProbe(sector_deg=2.0, exclude_r=T3_cfg.INLINE_EXCLUDE_R_M),
+                       near_origin),
+              "在兜底扇形内但距圆心 397 m ⇒ 被排除")
 
 # ---------------------------------------------------------------------------
 # D 参数敏感性

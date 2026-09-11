@@ -31,7 +31,7 @@ from cumcm.common.routing import (dist_matrix, exact_open_by_end, exact_open_ord
 from cumcm.common.sim_client import RecordedSim
 from cumcm.t3.config import (BEARING_ERROR_DEG, CHANNELS, CLEAR_RADIUS, CLIP_ERR, CLIP_SIDES,
                              COVER_RADIUS, HOMING_CAP, HOMING_MAX, HOMING_STEP,
-                             INLINE_CORRIDOR_M, INLINE_EXCLUDE_R_M, K_CLEAR_MAX,
+                             INLINE_EXCLUDE_R_M, INLINE_SECTOR_DEG, K_CLEAR_MAX,
                              K_COVER_SAMPLES,
                              K_COVER_STEP_MIN, NEAR_RADIUS, OBS_CAP, RECEIVE_MAX, RECEIVE_MID,
                              REFINE_MAX, REGION_MARGIN, REGION_RADIUS, SAFETY_MARGIN, TOL,
@@ -69,7 +69,7 @@ class RobotDog:
     def __init__(self, sim, verbose: bool = True, logfile: Optional[str] = None,
                  episode: int = 0, clear: bool = True,
                  k_clear_max: int = K_CLEAR_MAX,
-                 inline_corridor: float = INLINE_CORRIDOR_M,
+                 inline_sector_deg: float = INLINE_SECTOR_DEG,
                  inline_exclude_r: float = INLINE_EXCLUDE_R_M,
                  rotate: bool = True,
                  api_log=None) -> None:
@@ -79,7 +79,7 @@ class RobotDog:
         self.verbose = verbose
         self.clear_enabled = clear
         self.k_clear_max = int(k_clear_max)
-        self.inline_corridor = float(inline_corridor)        # 顺路清除直线走廊的半宽 / m
+        self.inline_sector_deg = float(inline_sector_deg)    # 顺路清除扇形（本站为顶点）半张角 / 度
         self.inline_exclude_r = float(inline_exclude_r)      # 顺路清除排除的区域圆心半径 / m
         self.rotate = bool(rotate)                           # 起始扫描后是否旋转覆盖圆布局
         # 过程日志用 "w"：每局开头重写，于是整份日志只描述**最新一局**。
@@ -350,6 +350,13 @@ class RobotDog:
 
         self.log(f"阶段1 巡视扫描：依次访问 {len(order)} 个圆心"
                  f"（顺序 {' → '.join(str(i) for i in order)}）")
+        # 从起点（原点）出发前往第一个巡视点之前，先把这段走廊里的估计点顺路清掉。
+        # 此前只做了"巡视站之间"（见下方循环内 step_i < len(order) 处），而"从原点出发去
+        # 第一站"同样是"去下一个巡视点"，却被漏掉了 —— 补齐后才是"每次去下一个巡视点之前
+        # 先清之间的点"的完整语义。也正是这段，让"排除距原点 600 m 以内"的规则真正可能触发
+        # （走廊从原点延伸到约 1 km，600 m 以内的估计点被排除，其余顺路清掉）。
+        if order and not self._out_of_time():
+            self._inline_clear(origin, waypoints[order[0]])
         for step_i, idx in enumerate(order, 1):
             wp = waypoints[idx]
             active = self._active_channels()
@@ -472,35 +479,72 @@ class RobotDog:
         self.survey_order_planned = list(path)
         self._survey_path_len = length
 
-    def _leg_corridor(self, at: Sequence[float], next_wp: Sequence[float],
-                      est: Sequence[float]) -> Optional[Tuple[float, float, float, float]]:
-        """估计点 est 是否落在"at → next_wp"这段直线的走廊内；返回 (沿线距离, 横向偏离, Δ₁, Δ₂)。
+    @staticmethod
+    def _at_origin(p: Sequence[float]) -> bool:
+        """是否（近似）位于区域圆心（原点）—— 起点(0,0) 特判用。"""
+        return math.hypot(p[0], p[1]) <= 1.0
 
-        判据按**角度**算，并且**两头都判** —— 后者同时实现了"只算夹在本站与下一站之间的点"：
-            Δ₁ = 从 at 看 est 的方位 与 at → next_wp 的方位 之间的夹角；
-            Δ₂ = 从 next_wp 看 est 的方位 与 next_wp → at 的方位 之间的夹角。
-        两者都不超过"走廊半宽在该距离处张开的角" asin(半宽 / d) 才算在走廊内。点若落在
-        next_wp 之外，从 next_wp 望过去的方向与回望 at 的方向几乎相反（差近 180°），Δ₂ 必然
-        超限而被排除 —— 这正是"只算两站之间"的要求。
+    @staticmethod
+    def _polar_deg(p: Sequence[float]) -> float:
+        """点 p 相对区域圆心（原点）的方位角 / 度，[0, 360)。起点(0,0) 的方位未定义，
+        调用方须先用 _at_origin 排除。"""
+        return math.degrees(math.atan2(p[1], p[0])) % 360.0
 
-        必须用**角度**比较而不能用 sin 比较：sin 分不出 0° 与 180°，站外的点会被误判成在线上。
+    def _in_azimuth_arc(self, at: Sequence[float], next_wp: Sequence[float],
+                        est: Sequence[float]) -> Optional[Tuple[float, float, float]]:
+        """估计点 est 是否落在「本站→圆心」与「下一站→圆心」两条连线之间的扇区内。
 
-        数学上与本仓库惯用的线段判据等价（沿线距离 t ∈ [0, L] 且横向偏离 h ≤ 半宽），写成角度
-        口径是为了与"按角度算"的要求一致，也让日志能直接报出角度偏差。距离不超过半宽时该点
-        本身就在端点的走廊内（此时角度阈值无意义），直接放行。
+        判据（以区域圆心为参照的极角扇区，**半径以两站为限**）：
+          · 方位：est 与圆心的连线方向 th_est 位于 th_at 与 th_next 夹出的**较短弧**上，即
+                ang_diff(th_est, th_at) + ang_diff(th_est, th_next) == ang_diff(th_at, th_next)
+            （三角不等式取等；ang_diff 取值 [0,180]，故"较短弧"是唯一候选）；
+          · 半径：r_est ≤ max(r_at, r_next) —— 两条"到圆心连线"的端点就是本站与下一站本身，
+            "点与圆心连线在两条连线之间"便自然止于两站所在的半径，不延伸到圆域深处。
+
+        反侧点（th_est 与 th_at 差 180°）会被三角不等式排除；必须用**角度**比较而不能用
+        sin：|sin 180°| = 0，反侧点会被误判成同向。
+
+        返回 (在短弧上的进度 0~1, 距圆心半径, 与 th_at 的角度差)；并列时按频道号定序。
         """
-        if dist(at, next_wp) <= 1e-9:
+        r_at = math.hypot(at[0], at[1])
+        r_next = math.hypot(next_wp[0], next_wp[1])
+        r_est = math.hypot(est[0], est[1])
+        if r_est > max(r_at, r_next) + 1e-6:
+            return None                              # 超出两站半径，不算"两点之间"
+        th_at = self._polar_deg(at)
+        th_next = self._polar_deg(next_wp)
+        th_est = self._polar_deg(est)
+        d = ang_diff(th_at, th_next)
+        a1 = ang_diff(th_est, th_at)
+        if d <= 1e-9:                                # 两端点同方位：退化为单方向
+            if a1 > 1e-9:
+                return None
+            return (0.0, r_est, 0.0)
+        if a1 + ang_diff(th_est, th_next) > d + 1e-9:
             return None
-        half = self.inline_corridor
-        b_leg, b_back = bearing(at, next_wp), bearing(next_wp, at)
-        d1, d2 = dist(at, est), dist(next_wp, est)
-        a1 = 0.0 if d1 <= 1e-9 else ang_diff(bearing(at, est), b_leg)
-        a2 = 0.0 if d2 <= 1e-9 else ang_diff(bearing(next_wp, est), b_back)
-        lim1 = 180.0 if d1 <= half else math.degrees(math.asin(min(1.0, half / d1)))
-        lim2 = 180.0 if d2 <= half else math.degrees(math.asin(min(1.0, half / d2)))
-        if a1 > lim1 or a2 > lim2:
+        return (a1 / d, r_est, a1)
+
+    def _in_sector(self, at: Sequence[float], next_wp: Sequence[float],
+                   est: Sequence[float]) -> Optional[Tuple[float, float, float]]:
+        """起点段的兜底判据：从原点出发去下一站，以"朝向下一站"的方向为中心展开的本地扇形。
+
+        仅当本站就是起点（_at_origin）时使用：起点在区域圆心，"起点与圆心的连线"是零向量、
+        没有方位，"极角扇区"无从谈起。此时退化为最贴近意图的形态 —— 机器狗从原点朝第一站
+        走去，把"朝向第一站 ± inline_sector_deg"这个本地扇形内的点顺路清掉。
+        返回 (沿线距离, 横向偏离, 角度偏差)；并列时按频道号定序。
+        """
+        L = dist(at, next_wp)
+        if L <= 1e-9:
             return None
-        return (d1 * math.cos(math.radians(a1)), d1 * math.sin(math.radians(a1)), a1, a2)
+        d = dist(at, est)
+        if d > L + 1e-6:
+            return None                              # 不在两个点之间
+        alpha = 0.0 if d <= 1e-9 else ang_diff(bearing(at, est), bearing(at, next_wp))
+        if alpha > self.inline_sector_deg:
+            return None
+        t = d * math.cos(math.radians(alpha))
+        h = d * math.sin(math.radians(alpha))
+        return (t, h, alpha)
 
     def _inline_excluded(self, est: Sequence[float]) -> bool:
         """估计点是否因"距区域圆心（原点）太近"而被排除在顺路清除之外。
@@ -511,22 +555,28 @@ class RobotDog:
         return math.hypot(est[0], est[1]) < self.inline_exclude_r
 
     def _inline_clear(self, at: Sequence[float], next_wp: Sequence[float]) -> int:
-        """巡视途中顺路清除：把"本站 → 下一站"直线走廊内的估计点顺路清掉（判据见 _leg_corridor）。
+        """巡视途中顺路清除：把「本站与圆心的连线 → 下一站与圆心的连线」之间的点顺路清掉。
 
-        为什么这条路是"免费"的：机器狗本来就要沿直线走到下一站，而走廊内的估计点都在这条线上
-        （横向偏离 ≤ 走廊半宽 = 清除半径），走过去再继续前行，**总里程与直奔下一站相同**。
-        于是这些点只需付 5 s（命中）或 3 s（未命中），而留到阶段二处理至少要从别处专程跑一趟
-        （几百米）。命中后该频道在后续各站都不再测量，双向省时间。
+        判据以**区域圆心（原点）**为参照：估计点与圆心的连线方向，落在「本站→圆心」与
+        「下一站→圆心」两条连线夹出的方位扇区内（见 _in_azimuth_arc）即算顺路 —— 这正好是
+        机器狗沿巡视环从本站走到下一站时扫过的方位范围，半径不限。两个特例：
 
-        不设"估计可信度"门槛（原先要求估计点覆盖圆半径 ≤ 150 m 才试）：走廊判据本身已意味着
-        零额外里程，未命中只花 3 s，门槛挡掉的都是可能白捡的命中。
+        - 本站就是**起点（原点）**：起点与圆心的连线是零向量、没有方位，扇区无从谈起，退化为
+          "朝向下一站 ± inline_sector_deg"的本地扇形（见 _in_sector），只清两站之间的近点。
+        - **排除距圆心 600 m 以内的点**（_inline_excluded）：方位扇区延伸到圆域各处，近圆心的
+          点留给阶段二专程处理，不在顺路时顺手清掉。
 
-        排除距区域圆心（原点）INLINE_EXCLUDE_R_M 以内的估计点 —— 作用范围限制，于是顺路清除
-        只发生在外圈走廊上。
+        顺路的成本：极角扇区内半径不限，清点要走到估计点再回来 —— 但只要这些源阶段二反正要
+        清，顺路清掉省的是"从别处专程跑一趟"的里程；清点本身固定花 5 s（命中）或 3 s（未命中），
+        且命中后该频道后续各站都不再测量。
+
+        不设"估计可信度"门槛（原先要求估计点覆盖圆半径 ≤ 150 m 才试）：用户明确"扇区内都要清"，
+        未命中只花 3 s，门槛挡掉的都是可能白捡的命中。
         """
         if not self.clear_enabled:
             return 0
-        picked: List[Tuple[float, int, Tuple[float, float], float, float, float, float]] = []
+        arc = not self._at_origin(at)               # 站点间 → 极角扇区；起点 → 本地扇形兜底
+        picked: List[Tuple[float, int, Tuple[float, float], float, float, float, str]] = []
         n_excluded = 0
         for ch in sorted(self.obs):
             if ch in self.cleared:
@@ -535,27 +585,41 @@ class RobotDog:
             if mec is None:
                 continue                              # 区域为空/退化：连估计点都没有
             est = (float(mec[0]), float(mec[1]))
-            got = self._leg_corridor(at, next_wp, est)
+            got = (self._in_azimuth_arc(at, next_wp, est) if arc
+                   else self._in_sector(at, next_wp, est))
             if got is None:
                 continue
             if self._inline_excluded(est):
                 n_excluded += 1
                 continue                              # 距区域圆心太近：按需求排除
-            picked.append((got[0], ch, est, got[1], got[2], got[3], float(mec[2])))
+            picked.append((got[0], ch, est, got[1], got[2], float(mec[2]),
+                           "arc" if arc else "sector"))
         if not picked:
             return 0
-        picked.sort(key=lambda p: (p[0], p[1]))       # 沿线由近到远，走直线依次清
-        self.log(f"    [顺路清除] 本站 → 下一站 ({next_wp[0]:.0f}, {next_wp[1]:.0f}) 直线走廊内"
-                 f"（半宽 {self.inline_corridor:.0f} m）有 {len(picked)} 个估计点"
-                 f"{f'，另排除距圆心 {self.inline_exclude_r:.0f} m 内的 {n_excluded} 个' if n_excluded else ''}"
-                 f"；本段里程 {dist(at, next_wp):.0f} m 不变")
+        picked.sort(key=lambda p: (p[0], p[1]))       # 沿扇区方位（或沿线）由近到远依次清
+        if arc:
+            th_a = self._polar_deg(at)
+            th_b = self._polar_deg(next_wp)
+            head = (f"    [顺路清除] 本站 ({at[0]:.0f}, {at[1]:.0f}) → 下一站 ({next_wp[0]:.0f},"
+                    f" {next_wp[1]:.0f})：与圆心的连线方向在 {th_a:.0f}° ~ {th_b:.0f}° 之间"
+                    f"（方位扇区 {ang_diff(th_a, th_b):.0f}°）有 {len(picked)} 个估计点")
+        else:
+            head = (f"    [顺路清除] 起点 ({at[0]:.0f}, {at[1]:.0f}) → 第一站"
+                    f" ({next_wp[0]:.0f}, {next_wp[1]:.0f})：朝向第一站 {self.inline_sector_deg:.1f}°"
+                    f" 扇形内（半径 {dist(at, next_wp):.0f} m）有 {len(picked)} 个估计点")
+        self.log(head + (f"；另排除距圆心 {self.inline_exclude_r:.0f} m 内的 {n_excluded} 个"
+                         if n_excluded else ""))
         n = 0
-        for t, ch, est, h, a1, a2, r_mec in picked:
+        for key, ch, est, a, b, r_mec, mode in picked:
             if self._out_of_time():
                 break
             self.stage = "survey-clear"
-            where = (f"沿线 {t:.0f} m、横向偏离 {h:.0f} m、角度偏差 {a1:.2f}°/{a2:.2f}°、"
-                     f"估计覆盖圆半径 {r_mec:.0f} m")
+            if mode == "arc":
+                where = (f"方位距「本站→圆心」{b:.1f}°、距圆心 {a:.0f} m、"
+                         f"估计覆盖圆半径 {r_mec:.0f} m")
+            else:
+                where = (f"沿线 {key:.0f} m、横向偏离 {a:.0f} m、方向偏差 {b:.2f}°、"
+                         f"估计覆盖圆半径 {r_mec:.0f} m")
             if self.clear(est[0], est[1], ch):
                 self.tracks.setdefault(ch, {}).update({"method": "survey-inline",
                                                        "clear_point": [est[0], est[1]]})
@@ -567,6 +631,8 @@ class RobotDog:
                          f"（{where}，留到阶段二处理）")
         if n:
             self.log(f"    本段顺路清除 {n} 个，累计已清 {len(self.cleared)} 个")
+        return n
+
         return n
 
     # ---- 阶段 2a：巡视后的定位诊断（只记录，不改变处理流程）----

@@ -387,6 +387,13 @@ class RobotDog:
                 self.n_face_scanned = len(bearings)
                 self._orient_route(order, wp, bearings)
                 waypoints = self.plan.waypoints
+            # 在去下一站之前：先把「当前点 → 上一站」之间的也清掉，再清「当前点 → 下一站」之间。
+            # 每个扇区因此会被两端各扫一遍（第 k 站前向清 θ_{k}~θ_{k+1}，第 k+1 站后向再清
+            # 同一扇区）——第一遍时对源的估计信息少、可能漏，第二遍站在另一端、估计更新后
+            # 能补漏。首站（step_i=1）没有"上一站"（起点段已由站前的起点兜底扇形覆盖）；
+            # 末站没有"下一站"，只做后向。
+            if step_i > 1:
+                self._inline_clear(wp, waypoints[order[step_i - 2]])
             if step_i < len(order):
                 self._inline_clear(wp, waypoints[order[step_i]])
         self.survey_order_used = list(order)

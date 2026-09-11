@@ -50,7 +50,7 @@ SAFETY_MARGIN = 30.0            # 现实时限预留余量 / s
 
 SEED = 2026
 
-RESULTS_DIR = "results"         # 训练结果输出目录（可用 --save-dir 改）
+RESULTS_DIR = "results/t3_ga"    # 训练结果输出目录（可用 --save-dir 改）
 API_LOG_NAME = "api_calls.jsonl"    # 接口调用日志文件名（落在 --save-dir 下）
 CLEAR_RADIUS = 20.0             # 清除半径 / m（题目给定；GA 版原先在绘图中写作字面量 20.0）
 

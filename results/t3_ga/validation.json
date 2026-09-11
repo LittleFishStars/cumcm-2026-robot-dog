@@ -130,107 +130,107 @@
     ],
     "E": [
       {
-        "check": "[results] 存在可审计的训练结果与接口日志",
+        "check": "[t3_ga] 存在可审计的训练结果与接口日志",
         "pass": true,
         "detail": "20 局 / 3374 次调用"
       },
       {
-        "check": "[results] 所有动作坐标都在半径 1800 m 圆域内",
+        "check": "[t3_ga] 所有动作坐标都在半径 1800 m 圆域内",
         "pass": true,
         "detail": "0 次越界，最远 1799.0 m"
       },
       {
-        "check": "[results] 坐标分量未超协议上限 2e6",
+        "check": "[t3_ga] 坐标分量未超协议上限 2e6",
         "pass": true,
         "detail": "0 次"
       },
       {
-        "check": "[results] 每次成功清除都落在该源 20 m 清除半径内",
+        "check": "[t3_ga] 每次成功清除都落在该源 20 m 清除半径内",
         "pass": true,
         "detail": "越界 0 次"
       },
       {
-        "check": "[results] 成功清除未误伤同名范围内其他源",
+        "check": "[t3_ga] 成功清除未误伤同名范围内其他源",
         "pass": true,
         "detail": "0 次"
       },
       {
-        "check": "[results] 虚拟时钟可独立复算（与模拟器报告值一致到 1e-6 s）",
+        "check": "[t3_ga] 虚拟时钟可独立复算（与模拟器报告值一致到 1e-6 s）",
         "pass": true,
         "detail": "最大差 0.00e+00 s（3334 次）"
       },
       {
-        "check": "[results] 每局恰有一次 /enter 与 /exit",
+        "check": "[t3_ga] 每局恰有一次 /enter 与 /exit",
         "pass": true,
         "detail": "enter=20 exit=20 局数=20"
       },
       {
-        "check": "[results] 测向次数与逐局统计一致",
+        "check": "[t3_ga] 测向次数与逐局统计一致",
         "pass": true,
         "detail": "3077 vs 3077"
       },
       {
-        "check": "[results] 清除动作次数与逐局统计一致",
+        "check": "[t3_ga] 清除动作次数与逐局统计一致",
         "pass": true,
         "detail": "257 vs 257"
       },
       {
-        "check": "[results] 所有接口调用均被接受（无 rejected / 异常）",
+        "check": "[t3_ga] 所有接口调用均被接受（无 rejected / 异常）",
         "pass": true,
         "detail": "0 次被拒"
       },
       {
-        "check": "[results] 全部干扰源被清除",
+        "check": "[t3_ga] 全部干扰源被清除",
         "pass": true,
         "detail": "256/256（100.0%）"
       },
       {
-        "check": "[results] 逐局定位平均误差 < 20 m（清除半径）",
+        "check": "[t3_ga] 逐局定位平均误差 < 20 m（清除半径）",
         "pass": true,
         "detail": "最差局 8.52 m"
       },
       {
-        "check": "[results] 逐局最坏定位误差 < 30 m",
+        "check": "[t3_ga] 逐局最坏定位误差 < 30 m",
         "pass": true,
         "detail": "最坏 19.65 m"
       },
       {
-        "check": "[results] 虚拟总时间在题目 100 h 虚拟限时内",
+        "check": "[t3_ga] 虚拟总时间在题目 100 h 虚拟限时内",
         "pass": true,
         "detail": "最长局 6212.1 s"
       },
       {
-        "check": "[results] 每次定位都有 GA 训练记录且收敛到最后一代",
+        "check": "[t3_ga] 每次定位都有 GA 训练记录且收敛到最后一代",
         "pass": true,
         "detail": "286 次定位（提前收敛 95 次）"
       },
       {
-        "check": "[results] 每次路线规划都有 GA 训练记录（跑满代数）",
+        "check": "[t3_ga] 每次路线规划都有 GA 训练记录（跑满代数）",
         "pass": true,
         "detail": "40 次规划"
       },
       {
-        "check": "[results] 收敛曲线非空",
+        "check": "[t3_ga] 收敛曲线非空",
         "pass": true,
         "detail": "8782 个记录点"
       },
       {
-        "check": "[results] 每局各有一张轨迹图与一份轨迹表",
+        "check": "[t3_ga] 每局各有一张轨迹图与一份轨迹表",
         "pass": true,
-        "detail": "20 张图 / 20 份表 / 20 局 → results/trajectory"
+        "detail": "20 张图 / 20 份表 / 20 局 → results/t3_ga/trajectory"
       },
       {
-        "check": "[results] 轨迹图均为有效且尺寸合理的 PNG",
+        "check": "[t3_ga] 轨迹图均为有效且尺寸合理的 PNG",
         "pass": true,
         "detail": "20 张，尺寸 (912, 1025)~(912, 1025)"
       },
       {
-        "check": "[results] 轨迹与接口日志逐点一致（坐标与动作类型）",
+        "check": "[t3_ga] 轨迹与接口日志逐点一致（坐标与动作类型）",
         "pass": true,
         "detail": "核对 3334 个动作点"
       },
       {
-        "check": "[results] 轨迹点全部在作业圆域内",
+        "check": "[t3_ga] 轨迹点全部在作业圆域内",
         "pass": true,
         "detail": "3334 个点全在域内"
       },
@@ -322,7 +322,7 @@
       {
         "check": "[holdout] 每局各有一张轨迹图与一份轨迹表",
         "pass": true,
-        "detail": "10 张图 / 10 份表 / 10 局 → results/holdout/trajectory"
+        "detail": "10 张图 / 10 份表 / 10 局 → results/t3_ga/holdout/trajectory"
       },
       {
         "check": "[holdout] 轨迹图均为有效且尺寸合理的 PNG",
@@ -447,35 +447,35 @@
     ],
     "e_max_radius_m": 1799.0,
     "e_vt_max_diff_s": 0.0,
-    "e_calls_results": {
+    "e_calls_t3_ga": {
       "enter": 20,
       "measure": 3077,
       "clear": 257,
       "exit": 20
     },
     "e_rejected": 0,
-    "e_cleared_results": {
+    "e_cleared_t3_ga": {
       "cleared": 256,
       "total": 256,
       "ratio": 1.0
     },
-    "e_loc_err_mean_m_results": 6.494540907664863,
-    "e_loc_err_worst_episode_m_results": 8.521074696129954,
-    "e_loc_err_worst_m_results": 19.652916874754176,
-    "e_clear_ratio_results": 1.0,
-    "e_virtual_time_s_results": {
+    "e_loc_err_mean_m_t3_ga": 6.494540907664863,
+    "e_loc_err_worst_episode_m_t3_ga": 8.521074696129954,
+    "e_loc_err_worst_m_t3_ga": 19.652916874754176,
+    "e_clear_ratio_t3_ga": 1.0,
+    "e_virtual_time_s_t3_ga": {
       "min": 4083.124026,
       "max": 6212.097629,
       "mean": 4707.560038500001,
       "median": 4532.105714
     },
-    "e_ga_runs_results": {
+    "e_ga_runs_t3_ga": {
       "localize": 286,
       "route": 40
     },
-    "e_traj_png_results": {
+    "e_traj_png_t3_ga": {
       "files": 20,
-      "dir": "results/trajectory",
+      "dir": "results/t3_ga/trajectory",
       "points_checked": 3334
     },
     "e_calls_holdout": {
@@ -505,7 +505,7 @@
     },
     "e_traj_png_holdout": {
       "files": 10,
-      "dir": "results/holdout/trajectory",
+      "dir": "results/t3_ga/holdout/trajectory",
       "points_checked": 1656
     },
     "f_byte_identical": {
@@ -514,9 +514,9 @@
       "episodes.csv": true
     },
     "f_figures_pdf": 10,
-    "elapsed_s": 94.8
+    "elapsed_s": 77.7
   },
   "failed": 0,
-  "elapsed_s": 94.8,
-  "generated_at": "2026-09-11 10:43:03"
+  "elapsed_s": 77.7,
+  "generated_at": "2026-09-11 15:00:00"
 }

@@ -23,7 +23,8 @@
                                                  # 另起独占演练实例（多会话并行时避免抢端口）
     python T3.py                                 # 官方模式（连 --base-url）
 
-轨迹图默认写到 <save-dir>/trajectory/t3/（--no-plot 关闭，--traj-dir 改目录）。
+结果默认写到 results/t3/（--save-dir 改），轨迹图落在其下的 trajectory/（--no-plot 关闭，
+--traj-dir 改目录）。GA 对照方案的结果树在 results/t3_ga/，两者互相独立。
 """
 
 from __future__ import annotations

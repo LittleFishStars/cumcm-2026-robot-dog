@@ -1,12 +1,12 @@
 """由问题三的运行结果生成论文用数据型图表（PDF 矢量图 + 背后的数据 CSV）。
 
 数据来源全部是已落盘的产物，本脚本不重新求解、不连接模拟器：
-    results/ga_training.json     GA 训练记录 + 逐局统计（含干扰源真值）
-    results/ga_convergence.csv   逐代收敛曲线
-    results/episodes.csv         逐局统计（同上，便于绘图脚本直接读表）
-    results/api_calls.jsonl      逐次接口调用（用于重建机器狗轨迹）
-    results/validation.json      验证结果（σ 标定、参数敏感性等）
-    results/holdout/             独立 seed 批（泛化检验）
+    results/t3_ga/ga_training.json     GA 训练记录 + 逐局统计（含干扰源真值）
+    results/t3_ga/ga_convergence.csv   逐代收敛曲线
+    results/t3_ga/episodes.csv         逐局统计（同上，便于绘图脚本直接读表）
+    results/t3_ga/api_calls.jsonl      逐次接口调用（用于重建机器狗轨迹）
+    results/t3_ga/validation.json      验证结果（σ 标定、参数敏感性等）
+    results/t3_ga/holdout/             独立 seed 批（泛化检验）
 
 用法：
     python T3_figures.py                    # 生成全部图表到 figures/
@@ -30,7 +30,7 @@ import numpy as np
 from cumcm.common.console import relax_console_encoding
 from cumcm.common.plotting import setup_mpl_env
 from cumcm.t3ga.covering import covering_waypoints
-from cumcm.t3ga.config import COVER_RADIUS, REGION_RADIUS
+from cumcm.t3ga.config import COVER_RADIUS, REGION_RADIUS, RESULTS_DIR
 
 # matplotlib 配置目录统一交给公共层（原先是 mkdtemp，每次运行换目录、字体缓存反复重建）
 setup_mpl_env()
@@ -581,8 +581,10 @@ def fig_generalization(main: Dict[str, Any], hold: Dict[str, Any], fig_dir: Path
 # ---------------------------------------------------------------------------
 def main(argv: Sequence[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="生成问题三论文图表（PDF）")
-    ap.add_argument("--results", default="results", help="结果目录")
-    ap.add_argument("--holdout", default="results/holdout", help="独立 seed 批结果目录")
+    ap.add_argument("--results", default=RESULTS_DIR,
+                    help=f"结果目录（缺省 {RESULTS_DIR}）")
+    ap.add_argument("--holdout", default=f"{RESULTS_DIR}/holdout",
+                    help=f"独立 seed 批结果目录（缺省 {RESULTS_DIR}/holdout）")
     ap.add_argument("--figures", default="figures", help="图表输出目录")
     ap.add_argument("--data", default="figures/data", help="图表数据输出目录")
     args = ap.parse_args(argv)

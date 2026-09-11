@@ -18,7 +18,10 @@ cumcm/
              strategy / plotting / training / cli
   analysis/  验证与出图：validate（六组独立验证）、figures（论文图表）
 jammers-py/  本地演练场（复刻模拟器；data/behavior-logs/ 会随每次演练累积日志，可随时清空）
-results/     运行产物（训练结果、接口日志、轨迹、验证结果；official/ 是文档引用的官方模式实测样例）
+results/     运行产物，按两套方案分成两棵子树：
+  t3/        确定性方案（T3.py）：覆盖圆方案、巡视统计、逐条观测、10 局轨迹
+  t3_ga/      GA 对照方案（T3_ga.py）：GA 训练记录、逐局统计、接口日志、验证结果、
+             20 局轨迹，以及 holdout/（泛化批）与 official/（官方模式实测留档）
 figures/     论文用图表 PDF 与背后的数据 CSV
 reports/     方案说明与结果报告
 References/  参考文献（PDF）
@@ -34,10 +37,10 @@ Problem/     赛题材料（已在 .gitignore 中，不入库）
 uv sync                              # 或 pip install -e .
 .venv/bin/python T1.py               # 问题一示例
 .venv/bin/python T3.py               # 只求覆盖圆方案（不连模拟器）
-.venv/bin/python T3.py --practice 3  # 本地演练 3 局（自动拉起 jammers-py）
-.venv/bin/python T3_ga.py --practice 3
-.venv/bin/python T3_validate.py      # 六组独立验证
-.venv/bin/python T3_figures.py       # 生成论文图表
+.venv/bin/python T3.py --practice 3  # 本地演练 3 局（结果落 results/t3/）
+.venv/bin/python T3_ga.py --practice 3        # 结果落 results/t3_ga/
+.venv/bin/python T3_validate.py      # 六组独立验证（默认审计 results/t3_ga/ + 其 holdout/）
+.venv/bin/python T3_figures.py       # 生成论文图表（默认读 results/t3_ga/）
 .venv/bin/python -m cumcm.t3.covering   # 覆盖圆方案自检（旋转不破坏覆盖保证 / 密集扇区选向）
 ```
 

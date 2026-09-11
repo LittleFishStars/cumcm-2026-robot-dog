@@ -185,7 +185,8 @@ def build_parser() -> argparse.ArgumentParser:
                         "配合 --console-port/--robot-port 避免端口冲突）")
     p.add_argument("--seed", type=int, default=SEED,
                    help="演练第 1 局的种子（场景布局与示向度噪声都由它确定，可复现）")
-    p.add_argument("--save-dir", default=RESULTS_DIR, help="结果输出目录（缺省 results/）")
+    p.add_argument("--save-dir", default=RESULTS_DIR,
+                   help=f"结果输出目录（缺省 {RESULTS_DIR}/）")
     p.add_argument("--log", default=None, help="过程日志文件（逐站扫描的文字过程，追加写入）")
     p.add_argument("--k-clear-max", type=int, default=K_CLEAR_MAX,
                    help=f"试清未中后最多再补清几个点（用 K 个半径 20 m 的圆覆盖定位区域；"

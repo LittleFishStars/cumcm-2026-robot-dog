@@ -15,7 +15,7 @@
 用法：
     python T3_validate.py                 # 全部六组
     python T3_validate.py --groups A C    # 只跑指定组
-    python T3_validate.py --out results/validation.json
+    python T3_validate.py --out results/t3_ga/validation.json
 """
 
 from __future__ import annotations
@@ -48,7 +48,9 @@ from cumcm.common import sim_client as T_sim
 sys.path.insert(0, str(PROJECT_ROOT / "jammers-py"))
 from simulator import bearingnoise                                     # noqa: E402
 
-DEFAULT_OUT = Path("results") / "validation.json"
+# E 组的审计对象与验证结论的输出位置都由 GA 方案的结果目录派生，避免路径写两遍走散
+AUDIT_DIRS = [Path(T_cfg.RESULTS_DIR), Path(T_cfg.RESULTS_DIR) / "holdout"]
+DEFAULT_OUT = Path(T_cfg.RESULTS_DIR) / "validation.json"
 SPEED_UM_PER_S = 5_000_000      # 机器狗移动速度 5 m/s（微米/秒），用于虚拟时钟复算
 CLEAR_RADIUS = 20.0             # 清除半径 / m
 TMP_VERIFY_DIR = ".tmp_verify"  # F 组两次演练的暂存目录（跑完即删）
@@ -353,7 +355,7 @@ def group_c(rep: Report, rng: np.random.Generator) -> None:
         # 注意：`_nearest_neighbor` 这个名字在拆分前后都**不存在**（T3_ga.py 里只有
         # `_nearest_order(n, D)`，签名也不同），所以这里一直是走 else 分支的**死代码**，
         # C2 那项"相对最近邻初值的改进"检查从未真正执行。此处刻意维持原样：改用它会让检查
-        # 数由 71 变 72、与已发布的 results/validation.json 不再一致。若要补上，把左侧换成
+        # 数由 71 变 72、与已发布的 results/t3_ga/validation.json 不再一致。若要补上，把左侧换成
         # `T._nearest_order(T._dist_matrix(pts, start), start)` 即可（详见交付说明）。
         nn = T._path_len(T._nearest_neighbor(pts, start), D) if hasattr(T, "_nearest_neighbor") \
             else None
@@ -462,7 +464,7 @@ def group_d(rep: Report) -> None:
 
 
 # ---------------------------------------------------------------------------
-# E 运行记录审计（读已落盘的 results/）
+# E 运行记录审计（读已落盘的 results/t3_ga/ 与其 holdout/）
 # ---------------------------------------------------------------------------
 def _replay_virtual_time(records: Sequence[dict]) -> List[dict]:
     """按引擎规则独立复算每次调用后的虚拟时刻，用于与模拟器报告值比对。
@@ -746,11 +748,14 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     ap = argparse.ArgumentParser(description="T3_ga.py 求解方案验证")
     ap.add_argument("--groups", nargs="*", default=["A", "B", "C", "D", "E", "F"],
                     help="要运行的组：A 几何定位 / B 覆盖 / C 路线 / D 敏感性 / E 记录审计 / F 可复现性")
-    ap.add_argument("--out", default=str(DEFAULT_OUT), help="验证结果 JSON 输出路径")
+    ap.add_argument("--out", default=str(DEFAULT_OUT),
+                    help=f"验证结果 JSON 输出路径（缺省 {DEFAULT_OUT}）")
     ap.add_argument("--no-arena", action="store_true",
                     help="跳过需要模拟器的 F 组（可复现性需开一局演练）")
-    ap.add_argument("--results", nargs="+", default=[str(Path("results"))],
-                    help="待审计的运行结果目录（可给多个：主批 + 独立 seed 批）")
+    ap.add_argument("--results", nargs="+",
+                    default=[str(d) for d in AUDIT_DIRS],
+                    help=f"待审计的运行结果目录（可给多个：主批 + 独立 seed 批；"
+                         f"缺省 {AUDIT_DIRS[0]}/ 与其 holdout/）")
     args = ap.parse_args(argv)
 
     groups = [g.upper() for g in args.groups]

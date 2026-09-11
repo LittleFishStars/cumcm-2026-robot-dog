@@ -31,14 +31,14 @@ $$\text{measure\_result}\in\{\texttt{no\_signal},\ \texttt{near},\ \texttt{direc
 1. **重复测量无益。** 同点同频道误差固定，平均不能降噪，必须换位置才能获取新信息。
 2. **单次测向存在沿视线方向的偏移。** 因此定位不能只靠一次交会，必须多视角，且末端要用"靠近 + 顺着最新示向度逼近"来消除沿射线方向的偏差。
 
-**中间产物落盘**（`results/`，文件名固定，供论文与绘图脚本引用）：
+**中间产物落盘**（`results/t3_ga/`，文件名固定，供论文与绘图脚本引用）：
 
 | 文件 | 内容 |
 | --- | --- |
 | `ga_training.json` | GA 参数、逐局统计（含真值）、每次 GA 运行的初始/最终适应度与解 |
-| `ga_convergence.csv` | 逐代最优/均值/标准差（8872 行） |
+| `ga_convergence.csv` | 逐代最优/均值/标准差（8782 行） |
 | `episodes.csv` | 逐局汇总表 |
-| `api_calls.jsonl` | 逐次 `/enter` `/measure` `/clear` `/exit` 的请求与原始响应（3420 行） |
+| `api_calls.jsonl` | 逐次 `/enter` `/measure` `/clear` `/exit` 的请求与原始响应（3374 行） |
 | `validation.json` | 71 项验证检查的结论与指标 |
 | `holdout/` | 独立 seed 批（seed 100–109）的全部同名产物 |
 
@@ -145,7 +145,7 @@ $$\max_{P\in \text{圆域}}\ \min_{W\in \mathcal{W}} \|P-W\| \le 962\ \text{m} <
 
 ## 5. 约束与一致性校验
 
-`T3_validate.py` 用 71 项检查覆盖算法正确性、覆盖保证、最优性、敏感性、记录一致性与可复现性，**全部通过**（`results/validation.json`）。
+`T3_validate.py` 用 71 项检查覆盖算法正确性、覆盖保证、最优性、敏感性、记录一致性与可复现性，**全部通过**（`results/t3_ga/validation.json`）。
 
 ### 5.1 算法层
 
@@ -201,17 +201,31 @@ $$\max_{P\in \text{圆域}}\ \min_{W\in \mathcal{W}} \|P-W\| \le 962\ \text{m} <
 
 ```
 results/
-├── ga_training.json       GA 训练记录 + 逐局统计（含真值）
-├── ga_convergence.csv     逐代收敛曲线
-├── episodes.csv           逐局汇总表
-├── api_calls.jsonl        逐次接口调用（3374 + 1676 行）
-├── validation.json        71 项验证检查
-├── trajectory/            每局轨迹图 + 同名轨迹表（主批 20 对）
-└── holdout/               独立 seed 批（seed 100–109）同名产物（含 trajectory/ 10 对）
+├── t3/                        确定性方案（T3.py）
+│   ├── t3_cover_plan.json     覆盖圆方案（7 圆、最坏距离、可行区间、文献对照）
+│   ├── t3_cover_circles.csv   7 个圆心坐标
+│   ├── t3_survey.json         10 局巡视扫描 + 清除统计
+│   ├── t3_observations.csv    1118 条逐次测量（含 no_signal）
+│   └── trajectory/            每局轨迹图 + 同名轨迹表（10 对）
+└── t3_ga/                      GA 对照方案（T3_ga.py）
+    ├── ga_training.json       GA 训练记录 + 逐局统计（含真值）
+    ├── ga_convergence.csv     逐代收敛曲线
+    ├── episodes.csv           逐局汇总表
+    ├── api_calls.jsonl        逐次接口调用（3374 行）
+    ├── validation.json        71 项验证检查（主批 + holdout 一起审计）
+    ├── trajectory/            每局轨迹图 + 同名轨迹表（主批 20 对）
+    ├── holdout/               独立 seed 批（seed 100–109）同名产物
+    │   ├── …                  （4 个汇总文件 + api_calls.jsonl 1676 行）
+    │   └── trajectory/        10 对
+    └── official/              官方模式实测留档（无真值，故定位误差字段为空）
 figures/
 ├── fig_t3_*.pdf           10 张论文用图（矢量）
 └── data/*.csv             每张图背后的数据
 ```
+
+> 两棵子树**刻意分开**：早期两套方案的轨迹图都写 `results/trajectory/epNN_seedMM.png`，
+> 同名同目录，实测一次性覆盖掉对方 10 个已提交文件。现在各自有独立的 `trajectory/`，
+> 不会再撞。`--save-dir` 可覆盖默认位置。
 
 ## 8. 可复现运行方式
 
@@ -220,10 +234,10 @@ cd /home/ylxc/Files/数学建模/CUMCM
 
 # 1) 训练与演练（自动拉起 jammers-py；单局墙钟约 3.5 s，20 局约 1.5 分钟）
 .venv/bin/python T3_ga.py --practice 20 --seed 0            # 主训练批
-.venv/bin/python T3_ga.py --practice 10 --seed 100 --save-dir results/holdout
+.venv/bin/python T3_ga.py --practice 10 --seed 100 --save-dir results/t3_ga/holdout
 
 # 2) 验证（六组 71 项检查，约 2 分钟；F 组会自己开一局演练）
-.venv/bin/python T3_validate.py --results results results/holdout
+.venv/bin/python T3_validate.py --results results/t3_ga results/t3_ga/holdout
 
 # 3) 生成论文图表
 .venv/bin/python T3_figures.py
@@ -232,7 +246,7 @@ cd /home/ylxc/Files/数学建模/CUMCM
 .venv/bin/python T3_ga.py --base-url http://127.0.0.1:2026
 ```
 
-**复现性已实测**：同一 `--seed` 两次运行，`ga_training.json`、`ga_convergence.csv`、`episodes.csv` 逐字节一致；接口调用序列除时间戳外逐条一致（354 条 vs 354 条）。这是通过把场景噪声种子由 `seed` 派生（原先每次随机）实现的。
+**复现性已实测**：同一 `--seed` 两次运行，`ga_training.json`、`ga_convergence.csv`、`episodes.csv` 逐字节一致；接口调用序列除时间戳外逐条一致（3374 条 vs 3374 条）。这是通过把场景噪声种子由 `seed` 派生（原先每次随机）实现的。
 
 ## 9. 局限与后续改进
 

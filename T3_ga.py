@@ -8,7 +8,8 @@
     python T3_ga.py --practice 20 --seed 0        # 20 局
     python T3_ga.py --practice 3 --no-plot        # 不出轨迹图
 
-轨迹图写到 <save-dir>/trajectory/（与 T3.py 的 trajectory/t3/ 分开，避免同名覆盖）。
+结果写到 <save-dir>（缺省 results/t3_ga/），轨迹图落在其下的 trajectory/。两套方案的
+结果树互相独立（T3.py 写 results/t3/），早期共用同一目录且轨迹同名曾互相覆盖。
 """
 
 from __future__ import annotations

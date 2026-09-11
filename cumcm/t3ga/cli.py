@@ -51,7 +51,7 @@ def run_official(args: argparse.Namespace) -> int:
     """官方评测平台的正式流程：连 127.0.0.1 上已开放接口的模拟器，跑完一局。
 
     与演练的关键差别：**拿不到干扰源真值**，因此定位误差等需要真值的指标留空；
-    结果默认写到 results/official/，不覆盖演练训练批的数据。
+    结果默认写到 <RESULTS_DIR>/official/，不覆盖演练训练批的数据。
     """
     if args.save_dir is None:
         args.save_dir = str(Path(RESULTS_DIR) / "official")

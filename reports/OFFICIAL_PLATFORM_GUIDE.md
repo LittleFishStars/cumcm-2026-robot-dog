@@ -108,13 +108,13 @@ python -X utf8 T3_ga.py --base-url http://127.0.0.1:8080
 | --- | --- | --- |
 | `--base-url` | `http://127.0.0.1:2026` | 模拟器接口地址，改过端口才需要 |
 | `--robot-id` | `202614023005` | 参赛队号，已内置，不用传 |
-| `--save-dir` | `results/official/` | 结果输出目录 |
+| `--save-dir` | `results/t3_ga/official/` | 结果输出目录 |
 | `--quiet` | 关 | 只打印汇总，不打印过程明细 |
 | `--no-plot` | 关 | 关闭每局结束后的轨迹图 |
 
 ### 2.3 预期输出
 
-（下例是**实测样例**：用与官方同源的复刻模拟器走同一套官方模式代码路径跑出来的，连同 `results/official/` 一起留档，便于对照。）
+（下例是**实测样例**：用与官方同源的复刻模拟器走同一套官方模式代码路径跑出来的，连同 `results/t3_ga/official/` 一起留档，便于对照。）
 
 ```
 ==========================================================================
@@ -124,8 +124,8 @@ python -X utf8 T3_ga.py --base-url http://127.0.0.1:8080
 完成：清除 14 个，虚拟总时间 5008.1 s，平均 357.7 s/个，测向 158 次，清除动作 20 次
 定位 GA：14 次训练（每代 80 个体），提前收敛 2/14 次（判据 适应度<1e-04），否则跑满 150 代...
 路线 GA：覆盖路点巡回（8 点）8145 m → 8117 m，改进 0.3%
-训练结果已保存：results/official/ga_training.json，results/official/ga_convergence.csv，results/official/episodes.csv
-接口调用日志：共 180 次（/clear 20、/enter 1、/exit 1、/measure 158）→ results/official/api_calls.jsonl
+训练结果已保存：results/t3_ga/official/ga_training.json，results/t3_ga/official/ga_convergence.csv，results/t3_ga/official/episodes.csv
+接口调用日志：共 180 次（/clear 20、/enter 1、/exit 1、/measure 158）→ results/t3_ga/official/api_calls.jsonl
 ```
 
 **核对要点**：本程序报的「清除 N 个」应与模拟器界面显示的清除结果一致；
@@ -203,7 +203,7 @@ Linux 上的 `jammers-py` 是用于算法验证的复刻模拟器，**不能替�
 
 ## 6. 产出文件
 
-跑完一局后 `results/official/` 下会有：
+跑完一局后 `results/t3_ga/official/` 下会有：
 
 | 文件 | 内容 | 用途 |
 | --- | --- | --- |

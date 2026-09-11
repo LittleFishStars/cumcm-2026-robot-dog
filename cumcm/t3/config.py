@@ -45,15 +45,16 @@ CHOSEN_RING_RADIUS = 1200.0
 
 SEED = 2026
 
-RESULTS_DIR = "results"
+RESULTS_DIR = "results/t3"       # 问题三确定性方案的结果目录（与 GA 版分开放，见 TRAJ_DIR 说明）
 PLAN_JSON = "t3_cover_plan.json"        # 覆盖圆求解结果
 PLAN_CSV = "t3_cover_circles.csv"       # 覆盖圆圆心坐标
 SURVEY_JSON = "t3_survey.json"          # 逐局巡视扫描统计
 OBS_CSV = "t3_observations.csv"         # 逐条示向度观测
-# 逐局轨迹图与轨迹表所在子目录（相对 --save-dir）。**刻意与 T3_ga.py 分开**：后者把 GA 版的
-# 轨迹图写在 <save-dir>/trajectory/epNN_seedMM.png，两边同名且同目录会互相覆盖（实测踩过，
-# 一次性覆盖掉对方 10 个已提交文件）。故本程序固定写到自己的子目录，互不干扰。
-TRAJ_DIR = "trajectory/t3"
+# 逐局轨迹图与轨迹表所在子目录（相对 --save-dir）。
+# 两套方案的结果树彻底分开：本程序写 results/t3/，GA 版写 results/t3_ga/，各自下面都有
+# trajectory/。早期两者共用 results/trajectory/ 且轨迹同名（epNN_seedMM），实测一次性
+# 覆盖掉对方 10 个已提交文件；现在靠目录隔离，不会再撞。
+TRAJ_DIR = "trajectory"
 TRAJ_DPI = 160.0                        # 轨迹图位图分辨率
 
 # ---- 第二阶段常量：定位区域、清除判据、补测选点准则（文献方法）----

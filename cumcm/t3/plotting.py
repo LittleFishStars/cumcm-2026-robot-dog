@@ -8,9 +8,9 @@
 序号）、从原点起的行驶路径、按结果分类的动作点（测得示向度 / 无信号 / 近距 / 清除尝试 /
 清除成功）、干扰源真值与 20 m 清除半径。
 
-输出目录刻意写成 `<save-dir>/trajectory/t3/`：T3_ga.py（GA 对照方案）会把它的轨迹图写在
-`<save-dir>/trajectory/epNN_seedMM.png`，两边同名且同目录会互相覆盖（实测一次性覆盖掉对方
-10 个已提交文件），故分开。
+输出目录是 `<save-dir>/trajectory/`。本方案结果树落在 results/t3/，GA 对照方案落在
+results/t3_ga/，两者的 trajectory/ 因此天然隔离 —— 早期两边共用 results/trajectory/
+且轨迹文件同名（epNN_seedMM），实测一次性覆盖掉对方 10 个已提交文件。
 """
 
 from __future__ import annotations

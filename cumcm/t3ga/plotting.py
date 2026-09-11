@@ -1,7 +1,8 @@
 """逐局轨迹图与同名轨迹表（GA 对照方案）。
 
-输出到 `<save-dir>/trajectory/epNN_seedMM.png` + 同名 CSV。注意：确定性方案
-（cumcm.t3.plotting）刻意写到 `<save-dir>/trajectory/t3/`，以免两边同名互相覆盖。
+输出到 `<save-dir>/trajectory/epNN_seedMM.png` + 同名 CSV。本方案结果树落在
+results/t3_ga/，确定性方案（cumcm.t3.plotting）落在 results/t3/，两者的 trajectory/ 天然
+隔离，以免同名文件互相覆盖。
 """
 
 from __future__ import annotations

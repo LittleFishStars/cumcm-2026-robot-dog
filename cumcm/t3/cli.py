@@ -84,6 +84,8 @@ def run_practice(args: argparse.Namespace, res: CoverSolveResult, save_dir: Path
                            verbose=not args.quiet, logfile=args.log, episode=ep + 1,
                            clear=clear, k_clear_max=args.k_clear_max,
                            inline_sector_deg=args.inline_sector_deg,
+                           inline_radius_max=(None if args.inline_radius_max <= 0
+                                            else args.inline_radius_max),
                            rotate=not args.no_rotate, api_log=api_log)
             stats = dog.run(res.plan, res.survey_order)
             arena.finish_episode()
@@ -172,6 +174,8 @@ def run_official(args: argparse.Namespace, res: CoverSolveResult, save_dir: Path
         dog = RobotDog(sim, verbose=not args.quiet, logfile=args.log, episode=1,
                        clear=not args.survey_only, k_clear_max=args.k_clear_max,
                        inline_sector_deg=args.inline_sector_deg,
+                           inline_radius_max=(None if args.inline_radius_max <= 0
+                                            else args.inline_radius_max),
                        rotate=not args.no_rotate, api_log=api_log)
         stats = dog.run(res.plan, res.survey_order)
         print(f"完成：清除 {stats['cleared']} 个，巡视 {stats['waypoints_visited']} 个圆心，"
@@ -249,6 +253,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--k-clear-max", type=int, default=K_CLEAR_MAX,
                    help=f"试清未中后最多再补清几个点（用 K 个半径 20 m 的圆覆盖定位区域；"
                         f"缺省 {K_CLEAR_MAX}，只在能盖满区域时才用，盖不满则转入补测）")
+    p.add_argument("--inline-radius-max", type=float, default=0.0,
+                   help="顺路清除扇区**固定**半径上界 / m（0=缺省用'两站半径最大者'；"
+                        "本参数为二分搜索最优半径而设，给 >0 则 _in_azimuth_arc 以此为上界）")
     p.add_argument("--inline-sector-deg", type=float, default=INLINE_SECTOR_DEG,
                    help=f"巡视途中顺路清除的方位扇区半张角 / 度（缺省 {INLINE_SECTOR_DEG:.0f}；"
                         f"判据：估计点与圆心的连线方向落在「本站→圆心」与「下一站→圆心」"

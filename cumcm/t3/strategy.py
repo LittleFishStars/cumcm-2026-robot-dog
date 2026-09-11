@@ -71,6 +71,7 @@ class RobotDog:
                  k_clear_max: int = K_CLEAR_MAX,
                  inline_sector_deg: float = INLINE_SECTOR_DEG,
                  inline_exclude_r: float = INLINE_EXCLUDE_R_M,
+                 inline_radius_max: Optional[float] = None,  # None=两站半径最大者
                  rotate: bool = True,
                  api_log=None) -> None:
         # 传入 api_log 时套一层记录代理：4 个接口的每一次调用都会落盘
@@ -81,6 +82,8 @@ class RobotDog:
         self.k_clear_max = int(k_clear_max)
         self.inline_sector_deg = float(inline_sector_deg)    # 顺路清除扇形（本站为顶点）半张角 / 度
         self.inline_exclude_r = float(inline_exclude_r)      # 顺路清除排除的区域圆心半径 / m
+        self.inline_radius_max = (None if inline_radius_max is None
+                                  else float(inline_radius_max))  # 固定半径上界 / m（None=两站半径）
         self.rotate = bool(rotate)                           # 起始扫描后是否旋转覆盖圆布局
         # 过程日志用 "w"：每局开头重写，于是整份日志只描述**最新一局**。
         # 原先用 "a" 追加，跨局、跨运行无限累积，几轮演练后文件里混着几百局的内容难以查阅。
@@ -516,8 +519,10 @@ class RobotDog:
         r_at = math.hypot(at[0], at[1])
         r_next = math.hypot(next_wp[0], next_wp[1])
         r_est = math.hypot(est[0], est[1])
-        if r_est > max(r_at, r_next) + 1e-6:
-            return None                              # 超出两站半径，不算"两点之间"
+        r_max = (self.inline_radius_max if self.inline_radius_max is not None
+                 else max(r_at, r_next))            # 固定上界或两站半径最大者
+        if r_est > r_max + 1e-6:
+            return None                              # 超出半径上界，不算"两点之间"
         th_at = self._polar_deg(at)
         th_next = self._polar_deg(next_wp)
         th_est = self._polar_deg(est)

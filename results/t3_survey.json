@@ -1,5 +1,5 @@
 {
-  "stage": "覆盖圆求解 + 依次到圆心巡视扫描 + 定位（先清直径<40 m，其余按文献准则补测缩小）",
+  "stage": "覆盖圆求解 + 依次到圆心巡视扫描 + 就近试清（未命中按文献准则补测缩小后再清）",
   "cover_plan": {
     "region_radius_m": 1800.0,
     "cover_radius_m": 1000.0,
@@ -173,25 +173,25 @@
     "boundary_samples": 20000
   },
   "clear_radius_m": 20.0,
-  "diam_clear_m": 40.0,
+  "diam_precise_m": 40.0,
   "summary": {
     "episodes": 10,
     "n_sources": 131,
     "n_cleared": 131,
     "clear_ratio": 1.0,
-    "avg_time_s": 346.506,
-    "virtual_time_s_mean": 4463.553,
-    "travel_m_mean": 18014.3,
-    "n_measure_mean": 132.5,
-    "n_probe_mean": 3.4,
-    "n_ready_at_survey": 30,
+    "avg_time_s": 328.961,
+    "virtual_time_s_mean": 4239.797,
+    "travel_m_mean": 16900.5,
+    "n_measure_mean": 132.3,
+    "n_probe_mean": 3.2,
+    "n_precise_at_survey": 30,
     "n_refined": 30,
-    "localize_err_mean_m": 8.732,
+    "localize_err_mean_m": 8.812,
     "localize_err_max_m": 19.25,
     "n_within_clear_radius": 131,
     "methods": {
-      "opportunistic": 71,
-      "direct": 60
+      "try": 101,
+      "try-refined": 30
     }
   },
   "episodes": [
@@ -200,20 +200,20 @@
       "seed": 0,
       "n_sources": 16,
       "clear_ratio": 1.0,
-      "localize_err_mean_m": 9.217,
+      "localize_err_mean_m": 9.377,
       "localize_err_max_m": 19.05,
       "n_within_clear_radius": 16,
       "n_cleared_after_probe": 4,
       "waypoints_visited": 7,
-      "travel_m": 19879.8208434654,
-      "virtual_time_s": 4801.964158,
+      "travel_m": 18464.139095235852,
+      "virtual_time_s": 4518.827807,
       "n_measure": 124,
       "n_clear": 17,
       "channels_heard": 16,
       "n_bearings": 42,
       "cleared": 16,
-      "avg_time_s": 300.122759875,
-      "n_ready_at_survey": 6,
+      "avg_time_s": 282.4267379375,
+      "n_precise_at_survey": 6,
       "n_refined": 4,
       "n_probe": 4,
       "tracks": {
@@ -228,11 +228,11 @@
           ],
           "clear_radius_m": 28.227,
           "diameter_final_m": 56.455,
-          "clearable_final": false,
+          "precise_final": false,
           "mec_radius_m": 28.227,
           "bounded_final": true,
           "n_obs_total": 3,
-          "method": "opportunistic",
+          "method": "try",
           "cleared": true
         },
         "2": {
@@ -246,11 +246,11 @@
           ],
           "clear_radius_m": 18.411,
           "diameter_final_m": 36.822,
-          "clearable_final": true,
+          "precise_final": true,
           "mec_radius_m": 18.411,
           "bounded_final": true,
           "n_obs_total": 3,
-          "method": "direct",
+          "method": "try",
           "cleared": true
         },
         "3": {
@@ -264,11 +264,11 @@
           ],
           "clear_radius_m": 19.936,
           "diameter_final_m": 39.45,
-          "clearable_final": true,
+          "precise_final": true,
           "mec_radius_m": 19.936,
           "bounded_final": true,
           "n_obs_total": 3,
-          "method": "direct",
+          "method": "try",
           "cleared": true
         },
         "4": {
@@ -282,11 +282,11 @@
           ],
           "clear_radius_m": 22.901,
           "diameter_final_m": 45.801,
-          "clearable_final": false,
+          "precise_final": false,
           "mec_radius_m": 22.901,
           "bounded_final": true,
           "n_obs_total": 2,
-          "method": "opportunistic",
+          "method": "try",
           "cleared": true
         },
         "5": {
@@ -300,11 +300,11 @@
           ],
           "clear_radius_m": 21.28,
           "diameter_final_m": 42.56,
-          "clearable_final": false,
+          "precise_final": false,
           "mec_radius_m": 21.28,
           "bounded_final": true,
           "n_obs_total": 2,
-          "method": "opportunistic",
+          "method": "try",
           "cleared": true
         },
         "6": {
@@ -313,16 +313,16 @@
           "bounded_survey": false,
           "n_probe": 1,
           "clear_point": [
-            652.2309345410278,
-            -1216.0586398964006
+            655.8625133911565,
+            -1227.0823754680491
           ],
-          "clear_radius_m": 10.477,
-          "diameter_final_m": 20.955,
-          "clearable_final": true,
-          "mec_radius_m": 10.477,
+          "clear_radius_m": 10.596,
+          "diameter_final_m": 21.193,
+          "precise_final": true,
+          "mec_radius_m": 10.596,
           "bounded_final": true,
           "n_obs_total": 2,
-          "method": "direct",
+          "method": "try-refined",
           "cleared": true
         },
         "7": {
@@ -336,11 +336,11 @@
           ],
           "clear_radius_m": 9.47,
           "diameter_final_m": 18.939,
-          "clearable_final": true,
+          "precise_final": true,
           "mec_radius_m": 9.47,
           "bounded_final": true,
           "n_obs_total": 2,
-          "method": "direct",
+          "method": "try-refined",
           "cleared": true
         },
         "8": {
@@ -354,11 +354,11 @@
           ],
           "clear_radius_m": 24.04,
           "diameter_final_m": 48.079,
-          "clearable_final": false,
+          "precise_final": false,
           "mec_radius_m": 24.04,
           "bounded_final": true,
           "n_obs_total": 2,
-          "method": "opportunistic",
+          "method": "try",
           "cleared": true
         },
         "9": {
@@ -372,11 +372,11 @@
           ],
           "clear_radius_m": 17.326,
           "diameter_final_m": 34.652,
-          "clearable_final": true,
+          "precise_final": true,
           "mec_radius_m": 17.326,
           "bounded_final": true,
           "n_obs_total": 3,
-          "method": "direct",
+          "method": "try",
           "cleared": true
         },
         "10": {
@@ -385,16 +385,16 @@
           "bounded_survey": false,
           "n_probe": 1,
           "clear_point": [
-            1248.7865952149189,
-            -1248.7025546604566
+            1250.0652828198179,
+            -1249.106493431119
           ],
-          "clear_radius_m": 12.089,
-          "diameter_final_m": 24.143,
-          "clearable_final": true,
-          "mec_radius_m": 12.089,
+          "clear_radius_m": 12.147,
+          "diameter_final_m": 24.289,
+          "precise_final": true,
+          "mec_radius_m": 12.147,
           "bounded_final": true,
           "n_obs_total": 3,
-          "method": "direct",
+          "method": "try-refined",
           "cleared": true
         },
         "12": {
@@ -408,11 +408,11 @@
           ],
           "clear_radius_m": 15.959,
           "diameter_final_m": 31.917,
-          "clearable_final": true,
+          "precise_final": true,
           "mec_radius_m": 15.959,
           "bounded_final": true,
           "n_obs_total": 3,
-          "method": "direct",
+          "method": "try-refined",
           "cleared": true
         },
         "13": {
@@ -426,11 +426,11 @@
           ],
           "clear_radius_m": 19.529,
           "diameter_final_m": 39.059,
-          "clearable_final": true,
+          "precise_final": true,
           "mec_radius_m": 19.529,
           "bounded_final": true,
           "n_obs_total": 3,
-          "method": "direct",
+          "method": "try",
           "cleared": true
         },
         "14": {
@@ -444,11 +444,11 @@
           ],
           "clear_radius_m": 20.958,
           "diameter_final_m": 41.915,
-          "clearable_final": false,
+          "precise_final": false,
           "mec_radius_m": 20.958,
           "bounded_final": true,
           "n_obs_total": 3,
-          "method": "opportunistic",
+          "method": "try",
           "cleared": true
         },
         "16": {
@@ -462,11 +462,11 @@
           ],
           "clear_radius_m": 17.68,
           "diameter_final_m": 35.138,
-          "clearable_final": true,
+          "precise_final": true,
           "mec_radius_m": 17.68,
           "bounded_final": true,
           "n_obs_total": 3,
-          "method": "direct",
+          "method": "try",
           "cleared": true
         },
         "18": {
@@ -480,11 +480,11 @@
           ],
           "clear_radius_m": 18.922,
           "diameter_final_m": 37.812,
-          "clearable_final": true,
+          "precise_final": true,
           "mec_radius_m": 18.922,
           "bounded_final": true,
           "n_obs_total": 3,
-          "method": "direct",
+          "method": "try",
           "cleared": true
         },
         "20": {
@@ -498,11 +498,11 @@
           ],
           "clear_radius_m": 25.23,
           "diameter_final_m": 50.459,
-          "clearable_final": false,
+          "precise_final": false,
           "mec_radius_m": 25.23,
           "bounded_final": true,
           "n_obs_total": 2,
-          "method": "opportunistic",
+          "method": "try",
           "cleared": true
         }
       },
@@ -601,7 +601,7 @@
             "diameter_final_m": 56.455,
             "mec_radius_final_m": 28.227,
             "clear_radius_m": 28.227,
-            "method": "opportunistic",
+            "method": "try",
             "localize_err_m": 7.49
           },
           {
@@ -618,7 +618,7 @@
             "diameter_final_m": 36.822,
             "mec_radius_final_m": 18.411,
             "clear_radius_m": 18.411,
-            "method": "direct",
+            "method": "try",
             "localize_err_m": 5.14
           },
           {
@@ -635,7 +635,7 @@
             "diameter_final_m": 39.45,
             "mec_radius_final_m": 19.936,
             "clear_radius_m": 19.936,
-            "method": "direct",
+            "method": "try",
             "localize_err_m": 18.85
           },
           {
@@ -652,7 +652,7 @@
             "diameter_final_m": 45.801,
             "mec_radius_final_m": 22.901,
             "clear_radius_m": 22.901,
-            "method": "opportunistic",
+            "method": "try",
             "localize_err_m": 13.59
           },
           {
@@ -669,7 +669,7 @@
             "diameter_final_m": 42.56,
             "mec_radius_final_m": 21.28,
             "clear_radius_m": 21.28,
-            "method": "opportunistic",
+            "method": "try",
             "localize_err_m": 10.19
           },
           {
@@ -683,11 +683,11 @@
             "cleared": true,
             "diameter_survey_m": 612.884,
             "n_probe": 1,
-            "diameter_final_m": 20.955,
-            "mec_radius_final_m": 10.477,
-            "clear_radius_m": 10.477,
-            "method": "direct",
-            "localize_err_m": 5.27
+            "diameter_final_m": 21.193,
+            "mec_radius_final_m": 10.596,
+            "clear_radius_m": 10.596,
+            "method": "try-refined",
+            "localize_err_m": 6.82
           },
           {
             "channel": 7,
@@ -703,7 +703,7 @@
             "diameter_final_m": 18.939,
             "mec_radius_final_m": 9.47,
             "clear_radius_m": 9.47,
-            "method": "direct",
+            "method": "try-refined",
             "localize_err_m": 4.45
           },
           {
@@ -720,7 +720,7 @@
             "diameter_final_m": 48.079,
             "mec_radius_final_m": 24.04,
             "clear_radius_m": 24.04,
-            "method": "opportunistic",
+            "method": "try",
             "localize_err_m": 15.57
           },
           {
@@ -737,7 +737,7 @@
             "diameter_final_m": 34.652,
             "mec_radius_final_m": 17.326,
             "clear_radius_m": 17.326,
-            "method": "direct",
+            "method": "try",
             "localize_err_m": 4.8
           },
           {
@@ -751,11 +751,11 @@
             "cleared": true,
             "diameter_survey_m": 49.942,
             "n_probe": 1,
-            "diameter_final_m": 24.143,
-            "mec_radius_final_m": 12.089,
-            "clear_radius_m": 12.089,
-            "method": "direct",
-            "localize_err_m": 2.19
+            "diameter_final_m": 24.289,
+            "mec_radius_final_m": 12.147,
+            "clear_radius_m": 12.147,
+            "method": "try-refined",
+            "localize_err_m": 3.2
           },
           {
             "channel": 12,
@@ -771,7 +771,7 @@
             "diameter_final_m": 31.917,
             "mec_radius_final_m": 15.959,
             "clear_radius_m": 15.959,
-            "method": "direct",
+            "method": "try-refined",
             "localize_err_m": 5.56
           },
           {
@@ -788,7 +788,7 @@
             "diameter_final_m": 39.059,
             "mec_radius_final_m": 19.529,
             "clear_radius_m": 19.529,
-            "method": "direct",
+            "method": "try",
             "localize_err_m": 1.97
           },
           {
@@ -805,7 +805,7 @@
             "diameter_final_m": 41.915,
             "mec_radius_final_m": 20.958,
             "clear_radius_m": 20.958,
-            "method": "opportunistic",
+            "method": "try",
             "localize_err_m": 19.05
           },
           {
@@ -822,7 +822,7 @@
             "diameter_final_m": 35.138,
             "mec_radius_final_m": 17.68,
             "clear_radius_m": 17.68,
-            "method": "direct",
+            "method": "try",
             "localize_err_m": 10.39
           },
           {
@@ -839,7 +839,7 @@
             "diameter_final_m": 37.812,
             "mec_radius_final_m": 18.922,
             "clear_radius_m": 18.922,
-            "method": "direct",
+            "method": "try",
             "localize_err_m": 14.7
           },
           {
@@ -856,7 +856,7 @@
             "diameter_final_m": 50.459,
             "mec_radius_final_m": 25.23,
             "clear_radius_m": 25.23,
-            "method": "opportunistic",
+            "method": "try",
             "localize_err_m": 8.27
           }
         ],
@@ -864,7 +864,7 @@
         "all_within_cover": true,
         "missed_channels": [],
         "n_cleared": 16,
-        "localize_err_mean_m": 9.217,
+        "localize_err_mean_m": 9.377,
         "localize_err_max_m": 19.05,
         "n_within_clear_radius": 16,
         "n_cleared_after_probe": 4
@@ -924,7 +924,7 @@
       "n_bearings": 27,
       "cleared": 11,
       "avg_time_s": 417.61411709090913,
-      "n_ready_at_survey": 1,
+      "n_precise_at_survey": 1,
       "n_refined": 5,
       "n_probe": 5,
       "tracks": {
@@ -939,11 +939,11 @@
           ],
           "clear_radius_m": 25.005,
           "diameter_final_m": 50.009,
-          "clearable_final": false,
+          "precise_final": false,
           "mec_radius_m": 25.005,
           "bounded_final": true,
           "n_obs_total": 2,
-          "method": "opportunistic",
+          "method": "try",
           "cleared": true
         },
         "4": {
@@ -957,11 +957,11 @@
           ],
           "clear_radius_m": 2.76,
           "diameter_final_m": 5.519,
-          "clearable_final": true,
+          "precise_final": true,
           "mec_radius_m": 2.76,
           "bounded_final": true,
           "n_obs_total": 4,
-          "method": "direct",
+          "method": "try-refined",
           "cleared": true
         },
         "7": {
@@ -975,11 +975,11 @@
           ],
           "clear_radius_m": 14.974,
           "diameter_final_m": 29.948,
-          "clearable_final": true,
+          "precise_final": true,
           "mec_radius_m": 14.974,
           "bounded_final": true,
           "n_obs_total": 3,
-          "method": "direct",
+          "method": "try-refined",
           "cleared": true
         },
         "8": {
@@ -993,11 +993,11 @@
           ],
           "clear_radius_m": 22.264,
           "diameter_final_m": 44.527,
-          "clearable_final": false,
+          "precise_final": false,
           "mec_radius_m": 22.264,
           "bounded_final": true,
           "n_obs_total": 2,
-          "method": "opportunistic",
+          "method": "try",
           "cleared": true
         },
         "9": {
@@ -1011,11 +1011,11 @@
           ],
           "clear_radius_m": 26.02,
           "diameter_final_m": 52.04,
-          "clearable_final": false,
+          "precise_final": false,
           "mec_radius_m": 26.02,
           "bounded_final": true,
           "n_obs_total": 2,
-          "method": "opportunistic",
+          "method": "try",
           "cleared": true
         },
         "11": {
@@ -1029,11 +1029,11 @@
           ],
           "clear_radius_m": 17.238,
           "diameter_final_m": 33.424,
-          "clearable_final": true,
+          "precise_final": true,
           "mec_radius_m": 17.238,
           "bounded_final": true,
           "n_obs_total": 3,
-          "method": "direct",
+          "method": "try",
           "cleared": true
         },
         "13": {
@@ -1047,11 +1047,11 @@
           ],
           "clear_radius_m": 22.91,
           "diameter_final_m": 45.82,
-          "clearable_final": false,
+          "precise_final": false,
           "mec_radius_m": 22.91,
           "bounded_final": true,
           "n_obs_total": 2,
-          "method": "opportunistic",
+          "method": "try",
           "cleared": true
         },
         "14": {
@@ -1065,11 +1065,11 @@
           ],
           "clear_radius_m": 23.56,
           "diameter_final_m": 47.121,
-          "clearable_final": false,
+          "precise_final": false,
           "mec_radius_m": 23.56,
           "bounded_final": true,
           "n_obs_total": 2,
-          "method": "opportunistic",
+          "method": "try",
           "cleared": true
         },
         "16": {
@@ -1083,11 +1083,11 @@
           ],
           "clear_radius_m": 10.313,
           "diameter_final_m": 20.626,
-          "clearable_final": true,
+          "precise_final": true,
           "mec_radius_m": 10.313,
           "bounded_final": true,
           "n_obs_total": 3,
-          "method": "direct",
+          "method": "try-refined",
           "cleared": true
         },
         "17": {
@@ -1101,11 +1101,11 @@
           ],
           "clear_radius_m": 14.517,
           "diameter_final_m": 29.035,
-          "clearable_final": true,
+          "precise_final": true,
           "mec_radius_m": 14.517,
           "bounded_final": true,
           "n_obs_total": 2,
-          "method": "direct",
+          "method": "try-refined",
           "cleared": true
         },
         "19": {
@@ -1119,11 +1119,11 @@
           ],
           "clear_radius_m": 16.236,
           "diameter_final_m": 32.473,
-          "clearable_final": true,
+          "precise_final": true,
           "mec_radius_m": 16.236,
           "bounded_final": true,
           "n_obs_total": 2,
-          "method": "direct",
+          "method": "try-refined",
           "cleared": true
         }
       },
@@ -1222,7 +1222,7 @@
             "diameter_final_m": 50.009,
             "mec_radius_final_m": 25.005,
             "clear_radius_m": 25.005,
-            "method": "opportunistic",
+            "method": "try",
             "localize_err_m": 10.23
           },
           {
@@ -1239,7 +1239,7 @@
             "diameter_final_m": 5.519,
             "mec_radius_final_m": 2.76,
             "clear_radius_m": 2.76,
-            "method": "direct",
+            "method": "try-refined",
             "localize_err_m": 1.17
           },
           {
@@ -1256,7 +1256,7 @@
             "diameter_final_m": 29.948,
             "mec_radius_final_m": 14.974,
             "clear_radius_m": 14.974,
-            "method": "direct",
+            "method": "try-refined",
             "localize_err_m": 7.84
           },
           {
@@ -1273,7 +1273,7 @@
             "diameter_final_m": 44.527,
             "mec_radius_final_m": 22.264,
             "clear_radius_m": 22.264,
-            "method": "opportunistic",
+            "method": "try",
             "localize_err_m": 18.66
           },
           {
@@ -1290,7 +1290,7 @@
             "diameter_final_m": 52.04,
             "mec_radius_final_m": 26.02,
             "clear_radius_m": 26.02,
-            "method": "opportunistic",
+            "method": "try",
             "localize_err_m": 5.82
           },
           {
@@ -1307,7 +1307,7 @@
             "diameter_final_m": 33.424,
             "mec_radius_final_m": 17.238,
             "clear_radius_m": 17.238,
-            "method": "direct",
+            "method": "try",
             "localize_err_m": 11.48
           },
           {
@@ -1324,7 +1324,7 @@
             "diameter_final_m": 45.82,
             "mec_radius_final_m": 22.91,
             "clear_radius_m": 22.91,
-            "method": "opportunistic",
+            "method": "try",
             "localize_err_m": 14.97
           },
           {
@@ -1341,7 +1341,7 @@
             "diameter_final_m": 47.121,
             "mec_radius_final_m": 23.56,
             "clear_radius_m": 23.56,
-            "method": "opportunistic",
+            "method": "try",
             "localize_err_m": 10.37
           },
           {
@@ -1358,7 +1358,7 @@
             "diameter_final_m": 20.626,
             "mec_radius_final_m": 10.313,
             "clear_radius_m": 10.313,
-            "method": "direct",
+            "method": "try-refined",
             "localize_err_m": 9.75
           },
           {
@@ -1375,7 +1375,7 @@
             "diameter_final_m": 29.035,
             "mec_radius_final_m": 14.517,
             "clear_radius_m": 14.517,
-            "method": "direct",
+            "method": "try-refined",
             "localize_err_m": 6.72
           },
           {
@@ -1392,7 +1392,7 @@
             "diameter_final_m": 32.473,
             "mec_radius_final_m": 16.236,
             "clear_radius_m": 16.236,
-            "method": "direct",
+            "method": "try-refined",
             "localize_err_m": 11.45
           }
         ],
@@ -1450,7 +1450,7 @@
       "n_bearings": 38,
       "cleared": 16,
       "avg_time_s": 276.5680909375,
-      "n_ready_at_survey": 1,
+      "n_precise_at_survey": 1,
       "n_refined": 3,
       "n_probe": 3,
       "tracks": {
@@ -1465,11 +1465,11 @@
           ],
           "clear_radius_m": 23.603,
           "diameter_final_m": 47.205,
-          "clearable_final": false,
+          "precise_final": false,
           "mec_radius_m": 23.603,
           "bounded_final": true,
           "n_obs_total": 2,
-          "method": "opportunistic",
+          "method": "try",
           "cleared": true
         },
         "2": {
@@ -1483,11 +1483,11 @@
           ],
           "clear_radius_m": 11.793,
           "diameter_final_m": 23.585,
-          "clearable_final": true,
+          "precise_final": true,
           "mec_radius_m": 11.793,
           "bounded_final": true,
           "n_obs_total": 2,
-          "method": "direct",
+          "method": "try-refined",
           "cleared": true
         },
         "3": {
@@ -1501,11 +1501,11 @@
           ],
           "clear_radius_m": 20.807,
           "diameter_final_m": 41.614,
-          "clearable_final": false,
+          "precise_final": false,
           "mec_radius_m": 20.807,
           "bounded_final": true,
           "n_obs_total": 3,
-          "method": "opportunistic",
+          "method": "try",
           "cleared": true
         },
         "4": {
@@ -1519,11 +1519,11 @@
           ],
           "clear_radius_m": 27.231,
           "diameter_final_m": 54.463,
-          "clearable_final": false,
+          "precise_final": false,
           "mec_radius_m": 27.231,
           "bounded_final": true,
           "n_obs_total": 2,
-          "method": "opportunistic",
+          "method": "try",
           "cleared": true
         },
         "5": {
@@ -1537,11 +1537,11 @@
           ],
           "clear_radius_m": 10.976,
           "diameter_final_m": 21.953,
-          "clearable_final": true,
+          "precise_final": true,
           "mec_radius_m": 10.976,
           "bounded_final": true,
           "n_obs_total": 2,
-          "method": "direct",
+          "method": "try-refined",
           "cleared": true
         },
         "6": {
@@ -1555,11 +1555,11 @@
           ],
           "clear_radius_m": 20.866,
           "diameter_final_m": 41.731,
-          "clearable_final": false,
+          "precise_final": false,
           "mec_radius_m": 20.866,
           "bounded_final": true,
           "n_obs_total": 3,
-          "method": "opportunistic",
+          "method": "try",
           "cleared": true
         },
         "10": {
@@ -1573,11 +1573,11 @@
           ],
           "clear_radius_m": 20.143,
           "diameter_final_m": 40.287,
-          "clearable_final": false,
+          "precise_final": false,
           "mec_radius_m": 20.143,
           "bounded_final": true,
           "n_obs_total": 3,
-          "method": "opportunistic",
+          "method": "try",
           "cleared": true
         },
         "11": {
@@ -1591,11 +1591,11 @@
           ],
           "clear_radius_m": 22.141,
           "diameter_final_m": 44.282,
-          "clearable_final": false,
+          "precise_final": false,
           "mec_radius_m": 22.141,
           "bounded_final": true,
           "n_obs_total": 2,
-          "method": "opportunistic",
+          "method": "try",
           "cleared": true
         },
         "12": {
@@ -1609,11 +1609,11 @@
           ],
           "clear_radius_m": 20.977,
           "diameter_final_m": 41.91,
-          "clearable_final": false,
+          "precise_final": false,
           "mec_radius_m": 20.977,
           "bounded_final": true,
           "n_obs_total": 3,
-          "method": "opportunistic",
+          "method": "try",
           "cleared": true
         },
         "13": {
@@ -1627,11 +1627,11 @@
           ],
           "clear_radius_m": 20.409,
           "diameter_final_m": 40.818,
-          "clearable_final": false,
+          "precise_final": false,
           "mec_radius_m": 20.409,
           "bounded_final": true,
           "n_obs_total": 3,
-          "method": "opportunistic",
+          "method": "try",
           "cleared": true
         },
         "14": {
@@ -1645,11 +1645,11 @@
           ],
           "clear_radius_m": 17.147,
           "diameter_final_m": 34.295,
-          "clearable_final": true,
+          "precise_final": true,
           "mec_radius_m": 17.147,
           "bounded_final": true,
           "n_obs_total": 3,
-          "method": "direct",
+          "method": "try",
           "cleared": true
         },
         "15": {
@@ -1663,11 +1663,11 @@
           ],
           "clear_radius_m": 44.779,
           "diameter_final_m": 89.558,
-          "clearable_final": false,
+          "precise_final": false,
           "mec_radius_m": 44.779,
           "bounded_final": true,
           "n_obs_total": 2,
-          "method": "opportunistic",
+          "method": "try",
           "cleared": true
         },
         "16": {
@@ -1681,11 +1681,11 @@
           ],
           "clear_radius_m": 21.272,
           "diameter_final_m": 42.544,
-          "clearable_final": false,
+          "precise_final": false,
           "mec_radius_m": 21.272,
           "bounded_final": true,
           "n_obs_total": 2,
-          "method": "opportunistic",
+          "method": "try",
           "cleared": true
         },
         "17": {
@@ -1699,11 +1699,11 @@
           ],
           "clear_radius_m": 22.335,
           "diameter_final_m": 44.67,
-          "clearable_final": false,
+          "precise_final": false,
           "mec_radius_m": 22.335,
           "bounded_final": true,
           "n_obs_total": 2,
-          "method": "opportunistic",
+          "method": "try",
           "cleared": true
         },
         "19": {
@@ -1717,11 +1717,11 @@
           ],
           "clear_radius_m": 23.236,
           "diameter_final_m": 46.472,
-          "clearable_final": false,
+          "precise_final": false,
           "mec_radius_m": 23.236,
           "bounded_final": true,
           "n_obs_total": 2,
-          "method": "opportunistic",
+          "method": "try",
           "cleared": true
         },
         "20": {
@@ -1735,11 +1735,11 @@
           ],
           "clear_radius_m": 8.09,
           "diameter_final_m": 16.179,
-          "clearable_final": true,
+          "precise_final": true,
           "mec_radius_m": 8.09,
           "bounded_final": true,
           "n_obs_total": 2,
-          "method": "direct",
+          "method": "try-refined",
           "cleared": true
         }
       },
@@ -1838,7 +1838,7 @@
             "diameter_final_m": 47.205,
             "mec_radius_final_m": 23.603,
             "clear_radius_m": 23.603,
-            "method": "opportunistic",
+            "method": "try",
             "localize_err_m": 10.02
           },
           {
@@ -1855,7 +1855,7 @@
             "diameter_final_m": 23.585,
             "mec_radius_final_m": 11.793,
             "clear_radius_m": 11.793,
-            "method": "direct",
+            "method": "try-refined",
             "localize_err_m": 2.43
           },
           {
@@ -1872,7 +1872,7 @@
             "diameter_final_m": 41.614,
             "mec_radius_final_m": 20.807,
             "clear_radius_m": 20.807,
-            "method": "opportunistic",
+            "method": "try",
             "localize_err_m": 11.84
           },
           {
@@ -1889,7 +1889,7 @@
             "diameter_final_m": 54.463,
             "mec_radius_final_m": 27.231,
             "clear_radius_m": 27.231,
-            "method": "opportunistic",
+            "method": "try",
             "localize_err_m": 4.46
           },
           {
@@ -1906,7 +1906,7 @@
             "diameter_final_m": 21.953,
             "mec_radius_final_m": 10.976,
             "clear_radius_m": 10.976,
-            "method": "direct",
+            "method": "try-refined",
             "localize_err_m": 4.87
           },
           {
@@ -1923,7 +1923,7 @@
             "diameter_final_m": 41.731,
             "mec_radius_final_m": 20.866,
             "clear_radius_m": 20.866,
-            "method": "opportunistic",
+            "method": "try",
             "localize_err_m": 1.19
           },
           {
@@ -1940,7 +1940,7 @@
             "diameter_final_m": 40.287,
             "mec_radius_final_m": 20.143,
             "clear_radius_m": 20.143,
-            "method": "opportunistic",
+            "method": "try",
             "localize_err_m": 2.72
           },
           {
@@ -1957,7 +1957,7 @@
             "diameter_final_m": 44.282,
             "mec_radius_final_m": 22.141,
             "clear_radius_m": 22.141,
-            "method": "opportunistic",
+            "method": "try",
             "localize_err_m": 15.3
           },
           {
@@ -1974,7 +1974,7 @@
             "diameter_final_m": 41.91,
             "mec_radius_final_m": 20.977,
             "clear_radius_m": 20.977,
-            "method": "opportunistic",
+            "method": "try",
             "localize_err_m": 9.71
           },
           {
@@ -1991,7 +1991,7 @@
             "diameter_final_m": 40.818,
             "mec_radius_final_m": 20.409,
             "clear_radius_m": 20.409,
-            "method": "opportunistic",
+            "method": "try",
             "localize_err_m": 14.7
           },
           {
@@ -2008,7 +2008,7 @@
             "diameter_final_m": 34.295,
             "mec_radius_final_m": 17.147,
             "clear_radius_m": 17.147,
-            "method": "direct",
+            "method": "try",
             "localize_err_m": 8.17
           },
           {
@@ -2025,7 +2025,7 @@
             "diameter_final_m": 89.558,
             "mec_radius_final_m": 44.779,
             "clear_radius_m": 44.779,
-            "method": "opportunistic",
+            "method": "try",
             "localize_err_m": 16.72
           },
           {
@@ -2042,7 +2042,7 @@
             "diameter_final_m": 42.544,
             "mec_radius_final_m": 21.272,
             "clear_radius_m": 21.272,
-            "method": "opportunistic",
+            "method": "try",
             "localize_err_m": 11.92
           },
           {
@@ -2059,7 +2059,7 @@
             "diameter_final_m": 44.67,
             "mec_radius_final_m": 22.335,
             "clear_radius_m": 22.335,
-            "method": "opportunistic",
+            "method": "try",
             "localize_err_m": 10.71
           },
           {
@@ -2076,7 +2076,7 @@
             "diameter_final_m": 46.472,
             "mec_radius_final_m": 23.236,
             "clear_radius_m": 23.236,
-            "method": "opportunistic",
+            "method": "try",
             "localize_err_m": 6.32
           },
           {
@@ -2093,7 +2093,7 @@
             "diameter_final_m": 16.179,
             "mec_radius_final_m": 8.09,
             "clear_radius_m": 8.09,
-            "method": "direct",
+            "method": "try-refined",
             "localize_err_m": 7.23
           }
         ],
@@ -2148,20 +2148,20 @@
       "seed": 3,
       "n_sources": 11,
       "clear_ratio": 1.0,
-      "localize_err_mean_m": 10.136,
+      "localize_err_mean_m": 10.111,
       "localize_err_max_m": 18.4,
       "n_within_clear_radius": 11,
       "n_cleared_after_probe": 2,
       "waypoints_visited": 7,
-      "travel_m": 15939.783646183068,
-      "virtual_time_s": 4018.95672,
+      "travel_m": 14767.755751155695,
+      "virtual_time_s": 3784.551142,
       "n_measure": 129,
       "n_clear": 12,
       "channels_heard": 11,
       "n_bearings": 28,
       "cleared": 11,
-      "avg_time_s": 365.3597018181818,
-      "n_ready_at_survey": 1,
+      "avg_time_s": 344.0501038181818,
+      "n_precise_at_survey": 1,
       "n_refined": 2,
       "n_probe": 2,
       "tracks": {
@@ -2176,11 +2176,11 @@
           ],
           "clear_radius_m": 21.898,
           "diameter_final_m": 43.796,
-          "clearable_final": false,
+          "precise_final": false,
           "mec_radius_m": 21.898,
           "bounded_final": true,
           "n_obs_total": 3,
-          "method": "opportunistic",
+          "method": "try",
           "cleared": true
         },
         "2": {
@@ -2194,11 +2194,11 @@
           ],
           "clear_radius_m": 11.363,
           "diameter_final_m": 22.726,
-          "clearable_final": true,
+          "precise_final": true,
           "mec_radius_m": 11.363,
           "bounded_final": true,
           "n_obs_total": 4,
-          "method": "direct",
+          "method": "try-refined",
           "cleared": true
         },
         "5": {
@@ -2212,11 +2212,11 @@
           ],
           "clear_radius_m": 17.498,
           "diameter_final_m": 34.673,
-          "clearable_final": true,
+          "precise_final": true,
           "mec_radius_m": 17.498,
           "bounded_final": true,
           "n_obs_total": 3,
-          "method": "direct",
+          "method": "try",
           "cleared": true
         },
         "8": {
@@ -2225,16 +2225,16 @@
           "bounded_survey": false,
           "n_probe": 1,
           "clear_point": [
-            702.1473934576453,
-            -1395.7830289936255
+            702.9055566368943,
+            -1398.5411088419487
           ],
-          "clear_radius_m": 8.852,
-          "diameter_final_m": 17.704,
-          "clearable_final": true,
-          "mec_radius_m": 8.852,
+          "clear_radius_m": 7.826,
+          "diameter_final_m": 15.651,
+          "precise_final": true,
+          "mec_radius_m": 7.826,
           "bounded_final": true,
           "n_obs_total": 2,
-          "method": "direct",
+          "method": "try-refined",
           "cleared": true
         },
         "10": {
@@ -2248,11 +2248,11 @@
           ],
           "clear_radius_m": 25.105,
           "diameter_final_m": 50.21,
-          "clearable_final": false,
+          "precise_final": false,
           "mec_radius_m": 25.105,
           "bounded_final": true,
           "n_obs_total": 2,
-          "method": "opportunistic",
+          "method": "try",
           "cleared": true
         },
         "11": {
@@ -2266,11 +2266,11 @@
           ],
           "clear_radius_m": 21.095,
           "diameter_final_m": 42.189,
-          "clearable_final": false,
+          "precise_final": false,
           "mec_radius_m": 21.095,
           "bounded_final": true,
           "n_obs_total": 2,
-          "method": "opportunistic",
+          "method": "try",
           "cleared": true
         },
         "12": {
@@ -2284,11 +2284,11 @@
           ],
           "clear_radius_m": 23.095,
           "diameter_final_m": 46.19,
-          "clearable_final": false,
+          "precise_final": false,
           "mec_radius_m": 23.095,
           "bounded_final": true,
           "n_obs_total": 2,
-          "method": "opportunistic",
+          "method": "try",
           "cleared": true
         },
         "14": {
@@ -2302,11 +2302,11 @@
           ],
           "clear_radius_m": 22.38,
           "diameter_final_m": 44.761,
-          "clearable_final": false,
+          "precise_final": false,
           "mec_radius_m": 22.38,
           "bounded_final": true,
           "n_obs_total": 3,
-          "method": "opportunistic",
+          "method": "try",
           "cleared": true
         },
         "16": {
@@ -2320,11 +2320,11 @@
           ],
           "clear_radius_m": 21.247,
           "diameter_final_m": 42.494,
-          "clearable_final": false,
+          "precise_final": false,
           "mec_radius_m": 21.247,
           "bounded_final": true,
           "n_obs_total": 3,
-          "method": "opportunistic",
+          "method": "try",
           "cleared": true
         },
         "18": {
@@ -2338,11 +2338,11 @@
           ],
           "clear_radius_m": 21.365,
           "diameter_final_m": 42.731,
-          "clearable_final": false,
+          "precise_final": false,
           "mec_radius_m": 21.365,
           "bounded_final": true,
           "n_obs_total": 2,
-          "method": "opportunistic",
+          "method": "try",
           "cleared": true
         },
         "19": {
@@ -2356,11 +2356,11 @@
           ],
           "clear_radius_m": 22.995,
           "diameter_final_m": 45.99,
-          "clearable_final": false,
+          "precise_final": false,
           "mec_radius_m": 22.995,
           "bounded_final": true,
           "n_obs_total": 2,
-          "method": "opportunistic",
+          "method": "try",
           "cleared": true
         }
       },
@@ -2459,7 +2459,7 @@
             "diameter_final_m": 43.796,
             "mec_radius_final_m": 21.898,
             "clear_radius_m": 21.898,
-            "method": "opportunistic",
+            "method": "try",
             "localize_err_m": 4.8
           },
           {
@@ -2476,7 +2476,7 @@
             "diameter_final_m": 22.726,
             "mec_radius_final_m": 11.363,
             "clear_radius_m": 11.363,
-            "method": "direct",
+            "method": "try-refined",
             "localize_err_m": 10.94
           },
           {
@@ -2493,7 +2493,7 @@
             "diameter_final_m": 34.673,
             "mec_radius_final_m": 17.498,
             "clear_radius_m": 17.498,
-            "method": "direct",
+            "method": "try",
             "localize_err_m": 10.13
           },
           {
@@ -2507,11 +2507,11 @@
             "cleared": true,
             "diameter_survey_m": 613.838,
             "n_probe": 1,
-            "diameter_final_m": 17.704,
-            "mec_radius_final_m": 8.852,
-            "clear_radius_m": 8.852,
-            "method": "direct",
-            "localize_err_m": 6.05
+            "diameter_final_m": 15.651,
+            "mec_radius_final_m": 7.826,
+            "clear_radius_m": 7.826,
+            "method": "try-refined",
+            "localize_err_m": 5.77
           },
           {
             "channel": 10,
@@ -2527,7 +2527,7 @@
             "diameter_final_m": 50.21,
             "mec_radius_final_m": 25.105,
             "clear_radius_m": 25.105,
-            "method": "opportunistic",
+            "method": "try",
             "localize_err_m": 15.46
           },
           {
@@ -2544,7 +2544,7 @@
             "diameter_final_m": 42.189,
             "mec_radius_final_m": 21.095,
             "clear_radius_m": 21.095,
-            "method": "opportunistic",
+            "method": "try",
             "localize_err_m": 6.86
           },
           {
@@ -2561,7 +2561,7 @@
             "diameter_final_m": 46.19,
             "mec_radius_final_m": 23.095,
             "clear_radius_m": 23.095,
-            "method": "opportunistic",
+            "method": "try",
             "localize_err_m": 4.56
           },
           {
@@ -2578,7 +2578,7 @@
             "diameter_final_m": 44.761,
             "mec_radius_final_m": 22.38,
             "clear_radius_m": 22.38,
-            "method": "opportunistic",
+            "method": "try",
             "localize_err_m": 18.4
           },
           {
@@ -2595,7 +2595,7 @@
             "diameter_final_m": 42.494,
             "mec_radius_final_m": 21.247,
             "clear_radius_m": 21.247,
-            "method": "opportunistic",
+            "method": "try",
             "localize_err_m": 2.65
           },
           {
@@ -2612,7 +2612,7 @@
             "diameter_final_m": 42.731,
             "mec_radius_final_m": 21.365,
             "clear_radius_m": 21.365,
-            "method": "opportunistic",
+            "method": "try",
             "localize_err_m": 13.35
           },
           {
@@ -2629,7 +2629,7 @@
             "diameter_final_m": 45.99,
             "mec_radius_final_m": 22.995,
             "clear_radius_m": 22.995,
-            "method": "opportunistic",
+            "method": "try",
             "localize_err_m": 18.3
           }
         ],
@@ -2637,7 +2637,7 @@
         "all_within_cover": true,
         "missed_channels": [],
         "n_cleared": 11,
-        "localize_err_mean_m": 10.136,
+        "localize_err_mean_m": 10.111,
         "localize_err_max_m": 18.4,
         "n_within_clear_radius": 11,
         "n_cleared_after_probe": 2
@@ -2679,15 +2679,15 @@
       "n_within_clear_radius": 11,
       "n_cleared_after_probe": 1,
       "waypoints_visited": 7,
-      "travel_m": 17068.834697240574,
-      "virtual_time_s": 4235.76693,
+      "travel_m": 14998.992142546616,
+      "virtual_time_s": 3821.798419,
       "n_measure": 128,
       "n_clear": 11,
       "channels_heard": 11,
       "n_bearings": 28,
       "cleared": 11,
-      "avg_time_s": 385.0697209090909,
-      "n_ready_at_survey": 5,
+      "avg_time_s": 347.43621990909094,
+      "n_precise_at_survey": 5,
       "n_refined": 1,
       "n_probe": 1,
       "tracks": {
@@ -2702,11 +2702,11 @@
           ],
           "clear_radius_m": 27.618,
           "diameter_final_m": 55.236,
-          "clearable_final": false,
+          "precise_final": false,
           "mec_radius_m": 27.618,
           "bounded_final": true,
           "n_obs_total": 2,
-          "method": "opportunistic",
+          "method": "try",
           "cleared": true
         },
         "2": {
@@ -2720,11 +2720,11 @@
           ],
           "clear_radius_m": 17.155,
           "diameter_final_m": 34.309,
-          "clearable_final": true,
+          "precise_final": true,
           "mec_radius_m": 17.155,
           "bounded_final": true,
           "n_obs_total": 3,
-          "method": "direct",
+          "method": "try",
           "cleared": true
         },
         "4": {
@@ -2738,11 +2738,11 @@
           ],
           "clear_radius_m": 24.503,
           "diameter_final_m": 49.006,
-          "clearable_final": false,
+          "precise_final": false,
           "mec_radius_m": 24.503,
           "bounded_final": true,
           "n_obs_total": 2,
-          "method": "opportunistic",
+          "method": "try",
           "cleared": true
         },
         "5": {
@@ -2756,11 +2756,11 @@
           ],
           "clear_radius_m": 17.758,
           "diameter_final_m": 35.494,
-          "clearable_final": true,
+          "precise_final": true,
           "mec_radius_m": 17.758,
           "bounded_final": true,
           "n_obs_total": 3,
-          "method": "direct",
+          "method": "try",
           "cleared": true
         },
         "7": {
@@ -2774,11 +2774,11 @@
           ],
           "clear_radius_m": 22.818,
           "diameter_final_m": 45.636,
-          "clearable_final": false,
+          "precise_final": false,
           "mec_radius_m": 22.818,
           "bounded_final": true,
           "n_obs_total": 2,
-          "method": "opportunistic",
+          "method": "try",
           "cleared": true
         },
         "9": {
@@ -2792,11 +2792,11 @@
           ],
           "clear_radius_m": 13.803,
           "diameter_final_m": 26.124,
-          "clearable_final": true,
+          "precise_final": true,
           "mec_radius_m": 13.803,
           "bounded_final": true,
           "n_obs_total": 3,
-          "method": "direct",
+          "method": "try",
           "cleared": true
         },
         "10": {
@@ -2810,11 +2810,11 @@
           ],
           "clear_radius_m": 11.733,
           "diameter_final_m": 23.465,
-          "clearable_final": true,
+          "precise_final": true,
           "mec_radius_m": 11.733,
           "bounded_final": true,
           "n_obs_total": 3,
-          "method": "direct",
+          "method": "try",
           "cleared": true
         },
         "13": {
@@ -2828,11 +2828,11 @@
           ],
           "clear_radius_m": 19.711,
           "diameter_final_m": 39.422,
-          "clearable_final": true,
+          "precise_final": true,
           "mec_radius_m": 19.711,
           "bounded_final": true,
           "n_obs_total": 3,
-          "method": "direct",
+          "method": "try",
           "cleared": true
         },
         "15": {
@@ -2846,11 +2846,11 @@
           ],
           "clear_radius_m": 22.484,
           "diameter_final_m": 44.965,
-          "clearable_final": false,
+          "precise_final": false,
           "mec_radius_m": 22.484,
           "bounded_final": true,
           "n_obs_total": 3,
-          "method": "opportunistic",
+          "method": "try",
           "cleared": true
         },
         "16": {
@@ -2864,11 +2864,11 @@
           ],
           "clear_radius_m": 72.743,
           "diameter_final_m": 145.485,
-          "clearable_final": false,
+          "precise_final": false,
           "mec_radius_m": 72.743,
           "bounded_final": true,
           "n_obs_total": 2,
-          "method": "opportunistic",
+          "method": "try",
           "cleared": true
         },
         "17": {
@@ -2882,11 +2882,11 @@
           ],
           "clear_radius_m": 13.515,
           "diameter_final_m": 27.03,
-          "clearable_final": true,
+          "precise_final": true,
           "mec_radius_m": 13.515,
           "bounded_final": true,
           "n_obs_total": 2,
-          "method": "direct",
+          "method": "try-refined",
           "cleared": true
         }
       },
@@ -2985,7 +2985,7 @@
             "diameter_final_m": 55.236,
             "mec_radius_final_m": 27.618,
             "clear_radius_m": 27.618,
-            "method": "opportunistic",
+            "method": "try",
             "localize_err_m": 19.25
           },
           {
@@ -3002,7 +3002,7 @@
             "diameter_final_m": 34.309,
             "mec_radius_final_m": 17.155,
             "clear_radius_m": 17.155,
-            "method": "direct",
+            "method": "try",
             "localize_err_m": 5.82
           },
           {
@@ -3019,7 +3019,7 @@
             "diameter_final_m": 49.006,
             "mec_radius_final_m": 24.503,
             "clear_radius_m": 24.503,
-            "method": "opportunistic",
+            "method": "try",
             "localize_err_m": 8.2
           },
           {
@@ -3036,7 +3036,7 @@
             "diameter_final_m": 35.494,
             "mec_radius_final_m": 17.758,
             "clear_radius_m": 17.758,
-            "method": "direct",
+            "method": "try",
             "localize_err_m": 6.62
           },
           {
@@ -3053,7 +3053,7 @@
             "diameter_final_m": 45.636,
             "mec_radius_final_m": 22.818,
             "clear_radius_m": 22.818,
-            "method": "opportunistic",
+            "method": "try",
             "localize_err_m": 2.62
           },
           {
@@ -3070,7 +3070,7 @@
             "diameter_final_m": 26.124,
             "mec_radius_final_m": 13.803,
             "clear_radius_m": 13.803,
-            "method": "direct",
+            "method": "try",
             "localize_err_m": 4.39
           },
           {
@@ -3087,7 +3087,7 @@
             "diameter_final_m": 23.465,
             "mec_radius_final_m": 11.733,
             "clear_radius_m": 11.733,
-            "method": "direct",
+            "method": "try",
             "localize_err_m": 6.63
           },
           {
@@ -3104,7 +3104,7 @@
             "diameter_final_m": 39.422,
             "mec_radius_final_m": 19.711,
             "clear_radius_m": 19.711,
-            "method": "direct",
+            "method": "try",
             "localize_err_m": 9.15
           },
           {
@@ -3121,7 +3121,7 @@
             "diameter_final_m": 44.965,
             "mec_radius_final_m": 22.484,
             "clear_radius_m": 22.484,
-            "method": "opportunistic",
+            "method": "try",
             "localize_err_m": 8.29
           },
           {
@@ -3138,7 +3138,7 @@
             "diameter_final_m": 145.485,
             "mec_radius_final_m": 72.743,
             "clear_radius_m": 72.743,
-            "method": "opportunistic",
+            "method": "try",
             "localize_err_m": 17.86
           },
           {
@@ -3155,7 +3155,7 @@
             "diameter_final_m": 27.03,
             "mec_radius_final_m": 13.515,
             "clear_radius_m": 13.515,
-            "method": "direct",
+            "method": "try-refined",
             "localize_err_m": 3.21
           }
         ],
@@ -3200,22 +3200,22 @@
       "seed": 5,
       "n_sources": 14,
       "clear_ratio": 1.0,
-      "localize_err_mean_m": 6.354,
+      "localize_err_mean_m": 7.287,
       "localize_err_max_m": 16.27,
       "n_within_clear_radius": 14,
       "n_cleared_after_probe": 5,
       "waypoints_visited": 7,
-      "travel_m": 19376.522046908944,
-      "virtual_time_s": 4763.304398,
-      "n_measure": 137,
+      "travel_m": 17899.280015733795,
+      "virtual_time_s": 4457.855992,
+      "n_measure": 135,
       "n_clear": 14,
       "channels_heard": 14,
-      "n_bearings": 39,
+      "n_bearings": 37,
       "cleared": 14,
-      "avg_time_s": 340.23602842857144,
-      "n_ready_at_survey": 2,
+      "avg_time_s": 318.41828514285714,
+      "n_precise_at_survey": 2,
       "n_refined": 5,
-      "n_probe": 8,
+      "n_probe": 6,
       "tracks": {
         "1": {
           "n_obs_survey": 3,
@@ -3228,11 +3228,11 @@
           ],
           "clear_radius_m": 18.714,
           "diameter_final_m": 37.428,
-          "clearable_final": true,
+          "precise_final": true,
           "mec_radius_m": 18.714,
           "bounded_final": true,
           "n_obs_total": 3,
-          "method": "direct",
+          "method": "try",
           "cleared": true
         },
         "2": {
@@ -3241,34 +3241,34 @@
           "bounded_survey": false,
           "n_probe": 1,
           "clear_point": [
-            970.2765630226537,
-            994.1804152330868
+            969.3239401796285,
+            993.9950723186028
           ],
-          "clear_radius_m": 10.813,
-          "diameter_final_m": 21.625,
-          "clearable_final": true,
-          "mec_radius_m": 10.813,
+          "clear_radius_m": 10.714,
+          "diameter_final_m": 21.428,
+          "precise_final": true,
+          "mec_radius_m": 10.714,
           "bounded_final": true,
           "n_obs_total": 2,
-          "method": "direct",
+          "method": "try-refined",
           "cleared": true
         },
         "3": {
           "n_obs_survey": 1,
           "diameter_survey_m": 762.475,
           "bounded_survey": false,
-          "n_probe": 2,
+          "n_probe": 1,
           "clear_point": [
-            415.9329630771502,
-            1598.2544903126632
+            425.2964272366386,
+            1600.6754115748693
           ],
-          "clear_radius_m": 2.512,
-          "diameter_final_m": 4.973,
-          "clearable_final": true,
-          "mec_radius_m": 2.512,
+          "clear_radius_m": 17.667,
+          "diameter_final_m": 35.335,
+          "precise_final": true,
+          "mec_radius_m": 17.667,
           "bounded_final": true,
-          "n_obs_total": 3,
-          "method": "direct",
+          "n_obs_total": 2,
+          "method": "try-refined",
           "cleared": true
         },
         "4": {
@@ -3282,11 +3282,11 @@
           ],
           "clear_radius_m": 4.029,
           "diameter_final_m": 7.957,
-          "clearable_final": true,
+          "precise_final": true,
           "mec_radius_m": 4.029,
           "bounded_final": true,
           "n_obs_total": 3,
-          "method": "direct",
+          "method": "try-refined",
           "cleared": true
         },
         "6": {
@@ -3300,11 +3300,11 @@
           ],
           "clear_radius_m": 28.505,
           "diameter_final_m": 57.01,
-          "clearable_final": false,
+          "precise_final": false,
           "mec_radius_m": 28.505,
           "bounded_final": true,
           "n_obs_total": 2,
-          "method": "opportunistic",
+          "method": "try",
           "cleared": true
         },
         "7": {
@@ -3318,11 +3318,11 @@
           ],
           "clear_radius_m": 23.659,
           "diameter_final_m": 47.318,
-          "clearable_final": false,
+          "precise_final": false,
           "mec_radius_m": 23.659,
           "bounded_final": true,
           "n_obs_total": 3,
-          "method": "opportunistic",
+          "method": "try",
           "cleared": true
         },
         "8": {
@@ -3336,29 +3336,29 @@
           ],
           "clear_radius_m": 25.854,
           "diameter_final_m": 51.708,
-          "clearable_final": false,
+          "precise_final": false,
           "mec_radius_m": 25.854,
           "bounded_final": true,
           "n_obs_total": 2,
-          "method": "opportunistic",
+          "method": "try",
           "cleared": true
         },
         "9": {
           "n_obs_survey": 2,
           "diameter_survey_m": 890.758,
           "bounded_survey": true,
-          "n_probe": 2,
+          "n_probe": 1,
           "clear_point": [
-            534.7297630809845,
-            918.3177123824346
+            532.5672013210395,
+            914.8815556200775
           ],
-          "clear_radius_m": 3.724,
-          "diameter_final_m": 7.447,
-          "clearable_final": true,
-          "mec_radius_m": 3.724,
+          "clear_radius_m": 18.608,
+          "diameter_final_m": 37.217,
+          "precise_final": true,
+          "mec_radius_m": 18.608,
           "bounded_final": true,
-          "n_obs_total": 4,
-          "method": "direct",
+          "n_obs_total": 3,
+          "method": "try-refined",
           "cleared": true
         },
         "11": {
@@ -3372,11 +3372,11 @@
           ],
           "clear_radius_m": 20.986,
           "diameter_final_m": 41.972,
-          "clearable_final": false,
+          "precise_final": false,
           "mec_radius_m": 20.986,
           "bounded_final": true,
           "n_obs_total": 3,
-          "method": "opportunistic",
+          "method": "try",
           "cleared": true
         },
         "12": {
@@ -3390,11 +3390,11 @@
           ],
           "clear_radius_m": 22.481,
           "diameter_final_m": 44.962,
-          "clearable_final": false,
+          "precise_final": false,
           "mec_radius_m": 22.481,
           "bounded_final": true,
           "n_obs_total": 3,
-          "method": "opportunistic",
+          "method": "try",
           "cleared": true
         },
         "13": {
@@ -3408,11 +3408,11 @@
           ],
           "clear_radius_m": 23.062,
           "diameter_final_m": 45.961,
-          "clearable_final": false,
+          "precise_final": false,
           "mec_radius_m": 23.062,
           "bounded_final": true,
           "n_obs_total": 3,
-          "method": "opportunistic",
+          "method": "try",
           "cleared": true
         },
         "15": {
@@ -3426,11 +3426,11 @@
           ],
           "clear_radius_m": 18.209,
           "diameter_final_m": 36.417,
-          "clearable_final": true,
+          "precise_final": true,
           "mec_radius_m": 18.209,
           "bounded_final": true,
           "n_obs_total": 3,
-          "method": "direct",
+          "method": "try",
           "cleared": true
         },
         "17": {
@@ -3444,11 +3444,11 @@
           ],
           "clear_radius_m": 22.481,
           "diameter_final_m": 44.962,
-          "clearable_final": false,
+          "precise_final": false,
           "mec_radius_m": 22.481,
           "bounded_final": true,
           "n_obs_total": 3,
-          "method": "opportunistic",
+          "method": "try",
           "cleared": true
         },
         "18": {
@@ -3462,11 +3462,11 @@
           ],
           "clear_radius_m": 7.776,
           "diameter_final_m": 15.551,
-          "clearable_final": true,
+          "precise_final": true,
           "mec_radius_m": 7.776,
           "bounded_final": true,
           "n_obs_total": 2,
-          "method": "direct",
+          "method": "try-refined",
           "cleared": true
         }
       },
@@ -3565,7 +3565,7 @@
             "diameter_final_m": 37.428,
             "mec_radius_final_m": 18.714,
             "clear_radius_m": 18.714,
-            "method": "direct",
+            "method": "try",
             "localize_err_m": 2.7
           },
           {
@@ -3579,11 +3579,11 @@
             "cleared": true,
             "diameter_survey_m": 964.717,
             "n_probe": 1,
-            "diameter_final_m": 21.625,
-            "mec_radius_final_m": 10.813,
-            "clear_radius_m": 10.813,
-            "method": "direct",
-            "localize_err_m": 2.65
+            "diameter_final_m": 21.428,
+            "mec_radius_final_m": 10.714,
+            "clear_radius_m": 10.714,
+            "method": "try-refined",
+            "localize_err_m": 3.59
           },
           {
             "channel": 3,
@@ -3592,15 +3592,15 @@
             "receive_m": 1107.74,
             "nearest_center_m": 589.08,
             "heard": true,
-            "n_bearings": 3,
+            "n_bearings": 2,
             "cleared": true,
             "diameter_survey_m": 762.475,
-            "n_probe": 2,
-            "diameter_final_m": 4.973,
-            "mec_radius_final_m": 2.512,
-            "clear_radius_m": 2.512,
-            "method": "direct",
-            "localize_err_m": 0.83
+            "n_probe": 1,
+            "diameter_final_m": 35.335,
+            "mec_radius_final_m": 17.667,
+            "clear_radius_m": 17.667,
+            "method": "try-refined",
+            "localize_err_m": 9.09
           },
           {
             "channel": 4,
@@ -3616,7 +3616,7 @@
             "diameter_final_m": 7.957,
             "mec_radius_final_m": 4.029,
             "clear_radius_m": 4.029,
-            "method": "direct",
+            "method": "try-refined",
             "localize_err_m": 1.7
           },
           {
@@ -3633,7 +3633,7 @@
             "diameter_final_m": 57.01,
             "mec_radius_final_m": 28.505,
             "clear_radius_m": 28.505,
-            "method": "opportunistic",
+            "method": "try",
             "localize_err_m": 14.54
           },
           {
@@ -3650,7 +3650,7 @@
             "diameter_final_m": 47.318,
             "mec_radius_final_m": 23.659,
             "clear_radius_m": 23.659,
-            "method": "opportunistic",
+            "method": "try",
             "localize_err_m": 13.48
           },
           {
@@ -3667,7 +3667,7 @@
             "diameter_final_m": 51.708,
             "mec_radius_final_m": 25.854,
             "clear_radius_m": 25.854,
-            "method": "opportunistic",
+            "method": "try",
             "localize_err_m": 9.6
           },
           {
@@ -3677,15 +3677,15 @@
             "receive_m": 1072.85,
             "nearest_center_m": 136.35,
             "heard": true,
-            "n_bearings": 4,
+            "n_bearings": 3,
             "cleared": true,
             "diameter_survey_m": 890.758,
-            "n_probe": 2,
-            "diameter_final_m": 7.447,
-            "mec_radius_final_m": 3.724,
-            "clear_radius_m": 3.724,
-            "method": "direct",
-            "localize_err_m": 1.36
+            "n_probe": 1,
+            "diameter_final_m": 37.217,
+            "mec_radius_final_m": 18.608,
+            "clear_radius_m": 18.608,
+            "method": "try-refined",
+            "localize_err_m": 5.23
           },
           {
             "channel": 11,
@@ -3701,7 +3701,7 @@
             "diameter_final_m": 41.972,
             "mec_radius_final_m": 20.986,
             "clear_radius_m": 20.986,
-            "method": "opportunistic",
+            "method": "try",
             "localize_err_m": 5.55
           },
           {
@@ -3718,7 +3718,7 @@
             "diameter_final_m": 44.962,
             "mec_radius_final_m": 22.481,
             "clear_radius_m": 22.481,
-            "method": "opportunistic",
+            "method": "try",
             "localize_err_m": 1.75
           },
           {
@@ -3735,7 +3735,7 @@
             "diameter_final_m": 45.961,
             "mec_radius_final_m": 23.062,
             "clear_radius_m": 23.062,
-            "method": "opportunistic",
+            "method": "try",
             "localize_err_m": 9.32
           },
           {
@@ -3752,7 +3752,7 @@
             "diameter_final_m": 36.417,
             "mec_radius_final_m": 18.209,
             "clear_radius_m": 18.209,
-            "method": "direct",
+            "method": "try",
             "localize_err_m": 3.87
           },
           {
@@ -3769,7 +3769,7 @@
             "diameter_final_m": 44.962,
             "mec_radius_final_m": 22.481,
             "clear_radius_m": 22.481,
-            "method": "opportunistic",
+            "method": "try",
             "localize_err_m": 16.27
           },
           {
@@ -3786,7 +3786,7 @@
             "diameter_final_m": 15.551,
             "mec_radius_final_m": 7.776,
             "clear_radius_m": 7.776,
-            "method": "direct",
+            "method": "try-refined",
             "localize_err_m": 5.33
           }
         ],
@@ -3794,7 +3794,7 @@
         "all_within_cover": true,
         "missed_channels": [],
         "n_cleared": 14,
-        "localize_err_mean_m": 6.354,
+        "localize_err_mean_m": 7.287,
         "localize_err_max_m": 16.27,
         "n_within_clear_radius": 14,
         "n_cleared_after_probe": 5
@@ -3802,12 +3802,12 @@
       "bearings_per_channel": {
         "1": 3,
         "2": 2,
-        "3": 3,
+        "3": 2,
         "4": 3,
         "6": 2,
         "7": 3,
         "8": 2,
-        "9": 4,
+        "9": 3,
         "11": 3,
         "12": 3,
         "13": 3,
@@ -3837,20 +3837,20 @@
       "seed": 6,
       "n_sources": 16,
       "clear_ratio": 1.0,
-      "localize_err_mean_m": 6.712,
+      "localize_err_mean_m": 6.465,
       "localize_err_max_m": 16.66,
       "n_within_clear_radius": 16,
       "n_cleared_after_probe": 3,
       "waypoints_visited": 7,
-      "travel_m": 20174.41450197957,
-      "virtual_time_s": 4917.882889,
+      "travel_m": 18844.68804141004,
+      "virtual_time_s": 4651.937597,
       "n_measure": 134,
       "n_clear": 16,
       "channels_heard": 16,
       "n_bearings": 40,
       "cleared": 16,
-      "avg_time_s": 307.3676805625,
-      "n_ready_at_survey": 5,
+      "avg_time_s": 290.7460998125,
+      "n_precise_at_survey": 5,
       "n_refined": 3,
       "n_probe": 3,
       "tracks": {
@@ -3865,11 +3865,11 @@
           ],
           "clear_radius_m": 20.941,
           "diameter_final_m": 41.881,
-          "clearable_final": false,
+          "precise_final": false,
           "mec_radius_m": 20.941,
           "bounded_final": true,
           "n_obs_total": 3,
-          "method": "opportunistic",
+          "method": "try",
           "cleared": true
         },
         "2": {
@@ -3883,11 +3883,11 @@
           ],
           "clear_radius_m": 21.808,
           "diameter_final_m": 43.615,
-          "clearable_final": false,
+          "precise_final": false,
           "mec_radius_m": 21.808,
           "bounded_final": true,
           "n_obs_total": 2,
-          "method": "opportunistic",
+          "method": "try",
           "cleared": true
         },
         "3": {
@@ -3901,11 +3901,11 @@
           ],
           "clear_radius_m": 21.017,
           "diameter_final_m": 42.035,
-          "clearable_final": false,
+          "precise_final": false,
           "mec_radius_m": 21.017,
           "bounded_final": true,
           "n_obs_total": 2,
-          "method": "opportunistic",
+          "method": "try",
           "cleared": true
         },
         "4": {
@@ -3914,16 +3914,16 @@
           "bounded_survey": false,
           "n_probe": 1,
           "clear_point": [
-            792.5336313629082,
-            -1481.3302168137307
+            794.7327623553214,
+            -1485.6301222850293
           ],
-          "clear_radius_m": 11.736,
-          "diameter_final_m": 23.472,
-          "clearable_final": true,
-          "mec_radius_m": 11.736,
+          "clear_radius_m": 12.301,
+          "diameter_final_m": 24.602,
+          "precise_final": true,
+          "mec_radius_m": 12.301,
           "bounded_final": true,
           "n_obs_total": 2,
-          "method": "direct",
+          "method": "try-refined",
           "cleared": true
         },
         "6": {
@@ -3932,16 +3932,16 @@
           "bounded_survey": false,
           "n_probe": 1,
           "clear_point": [
-            615.7346129285155,
-            -1078.1561257291412
+            614.1530057429361,
+            -1074.2614975924025
           ],
-          "clear_radius_m": 15.536,
-          "diameter_final_m": 31.072,
-          "clearable_final": true,
-          "mec_radius_m": 15.536,
+          "clear_radius_m": 13.593,
+          "diameter_final_m": 27.185,
+          "precise_final": true,
+          "mec_radius_m": 13.593,
           "bounded_final": true,
           "n_obs_total": 2,
-          "method": "direct",
+          "method": "try-refined",
           "cleared": true
         },
         "8": {
@@ -3955,11 +3955,11 @@
           ],
           "clear_radius_m": 11.83,
           "diameter_final_m": 23.596,
-          "clearable_final": true,
+          "precise_final": true,
           "mec_radius_m": 11.83,
           "bounded_final": true,
           "n_obs_total": 3,
-          "method": "direct",
+          "method": "try",
           "cleared": true
         },
         "9": {
@@ -3973,11 +3973,11 @@
           ],
           "clear_radius_m": 7.44,
           "diameter_final_m": 14.029,
-          "clearable_final": true,
+          "precise_final": true,
           "mec_radius_m": 7.44,
           "bounded_final": true,
           "n_obs_total": 3,
-          "method": "direct",
+          "method": "try",
           "cleared": true
         },
         "10": {
@@ -3991,11 +3991,11 @@
           ],
           "clear_radius_m": 17.665,
           "diameter_final_m": 35.19,
-          "clearable_final": true,
+          "precise_final": true,
           "mec_radius_m": 17.665,
           "bounded_final": true,
           "n_obs_total": 3,
-          "method": "direct",
+          "method": "try",
           "cleared": true
         },
         "11": {
@@ -4009,11 +4009,11 @@
           ],
           "clear_radius_m": 18.932,
           "diameter_final_m": 37.863,
-          "clearable_final": true,
+          "precise_final": true,
           "mec_radius_m": 18.932,
           "bounded_final": true,
           "n_obs_total": 3,
-          "method": "direct",
+          "method": "try",
           "cleared": true
         },
         "12": {
@@ -4027,11 +4027,11 @@
           ],
           "clear_radius_m": 17.532,
           "diameter_final_m": 35.063,
-          "clearable_final": true,
+          "precise_final": true,
           "mec_radius_m": 17.532,
           "bounded_final": true,
           "n_obs_total": 3,
-          "method": "direct",
+          "method": "try",
           "cleared": true
         },
         "14": {
@@ -4045,11 +4045,11 @@
           ],
           "clear_radius_m": 21.134,
           "diameter_final_m": 42.267,
-          "clearable_final": false,
+          "precise_final": false,
           "mec_radius_m": 21.134,
           "bounded_final": true,
           "n_obs_total": 2,
-          "method": "opportunistic",
+          "method": "try",
           "cleared": true
         },
         "15": {
@@ -4063,11 +4063,11 @@
           ],
           "clear_radius_m": 29.303,
           "diameter_final_m": 55.967,
-          "clearable_final": false,
+          "precise_final": false,
           "mec_radius_m": 29.303,
           "bounded_final": true,
           "n_obs_total": 3,
-          "method": "opportunistic",
+          "method": "try",
           "cleared": true
         },
         "16": {
@@ -4076,16 +4076,16 @@
           "bounded_survey": false,
           "n_probe": 1,
           "clear_point": [
-            479.83200282955613,
-            1184.6358890269103
+            479.8586870560485,
+            1185.3650050114604
           ],
-          "clear_radius_m": 15.719,
-          "diameter_final_m": 31.438,
-          "clearable_final": true,
-          "mec_radius_m": 15.719,
+          "clear_radius_m": 12.806,
+          "diameter_final_m": 25.613,
+          "precise_final": true,
+          "mec_radius_m": 12.806,
           "bounded_final": true,
           "n_obs_total": 2,
-          "method": "direct",
+          "method": "try-refined",
           "cleared": true
         },
         "18": {
@@ -4099,11 +4099,11 @@
           ],
           "clear_radius_m": 22.401,
           "diameter_final_m": 44.802,
-          "clearable_final": false,
+          "precise_final": false,
           "mec_radius_m": 22.401,
           "bounded_final": true,
           "n_obs_total": 2,
-          "method": "opportunistic",
+          "method": "try",
           "cleared": true
         },
         "19": {
@@ -4117,11 +4117,11 @@
           ],
           "clear_radius_m": 22.443,
           "diameter_final_m": 44.886,
-          "clearable_final": false,
+          "precise_final": false,
           "mec_radius_m": 22.443,
           "bounded_final": true,
           "n_obs_total": 2,
-          "method": "opportunistic",
+          "method": "try",
           "cleared": true
         },
         "20": {
@@ -4135,11 +4135,11 @@
           ],
           "clear_radius_m": 20.947,
           "diameter_final_m": 41.893,
-          "clearable_final": false,
+          "precise_final": false,
           "mec_radius_m": 20.947,
           "bounded_final": true,
           "n_obs_total": 3,
-          "method": "opportunistic",
+          "method": "try",
           "cleared": true
         }
       },
@@ -4238,7 +4238,7 @@
             "diameter_final_m": 41.881,
             "mec_radius_final_m": 20.941,
             "clear_radius_m": 20.941,
-            "method": "opportunistic",
+            "method": "try",
             "localize_err_m": 15.07
           },
           {
@@ -4255,7 +4255,7 @@
             "diameter_final_m": 43.615,
             "mec_radius_final_m": 21.808,
             "clear_radius_m": 21.808,
-            "method": "opportunistic",
+            "method": "try",
             "localize_err_m": 7.47
           },
           {
@@ -4272,7 +4272,7 @@
             "diameter_final_m": 42.035,
             "mec_radius_final_m": 21.017,
             "clear_radius_m": 21.017,
-            "method": "opportunistic",
+            "method": "try",
             "localize_err_m": 16.66
           },
           {
@@ -4286,11 +4286,11 @@
             "cleared": true,
             "diameter_survey_m": 603.259,
             "n_probe": 1,
-            "diameter_final_m": 23.472,
-            "mec_radius_final_m": 11.736,
-            "clear_radius_m": 11.736,
-            "method": "direct",
-            "localize_err_m": 3.46
+            "diameter_final_m": 24.602,
+            "mec_radius_final_m": 12.301,
+            "clear_radius_m": 12.301,
+            "method": "try-refined",
+            "localize_err_m": 4.25
           },
           {
             "channel": 6,
@@ -4303,11 +4303,11 @@
             "cleared": true,
             "diameter_survey_m": 605.315,
             "n_probe": 1,
-            "diameter_final_m": 31.072,
-            "mec_radius_final_m": 15.536,
-            "clear_radius_m": 15.536,
-            "method": "direct",
-            "localize_err_m": 6.85
+            "diameter_final_m": 27.185,
+            "mec_radius_final_m": 13.593,
+            "clear_radius_m": 13.593,
+            "method": "try-refined",
+            "localize_err_m": 2.65
           },
           {
             "channel": 8,
@@ -4323,7 +4323,7 @@
             "diameter_final_m": 23.596,
             "mec_radius_final_m": 11.83,
             "clear_radius_m": 11.83,
-            "method": "direct",
+            "method": "try",
             "localize_err_m": 6.28
           },
           {
@@ -4340,7 +4340,7 @@
             "diameter_final_m": 14.029,
             "mec_radius_final_m": 7.44,
             "clear_radius_m": 7.44,
-            "method": "direct",
+            "method": "try",
             "localize_err_m": 0.94
           },
           {
@@ -4357,7 +4357,7 @@
             "diameter_final_m": 35.19,
             "mec_radius_final_m": 17.665,
             "clear_radius_m": 17.665,
-            "method": "direct",
+            "method": "try",
             "localize_err_m": 12.69
           },
           {
@@ -4374,7 +4374,7 @@
             "diameter_final_m": 37.863,
             "mec_radius_final_m": 18.932,
             "clear_radius_m": 18.932,
-            "method": "direct",
+            "method": "try",
             "localize_err_m": 3.74
           },
           {
@@ -4391,7 +4391,7 @@
             "diameter_final_m": 35.063,
             "mec_radius_final_m": 17.532,
             "clear_radius_m": 17.532,
-            "method": "direct",
+            "method": "try",
             "localize_err_m": 4.26
           },
           {
@@ -4408,7 +4408,7 @@
             "diameter_final_m": 42.267,
             "mec_radius_final_m": 21.134,
             "clear_radius_m": 21.134,
-            "method": "opportunistic",
+            "method": "try",
             "localize_err_m": 10.94
           },
           {
@@ -4425,7 +4425,7 @@
             "diameter_final_m": 55.967,
             "mec_radius_final_m": 29.303,
             "clear_radius_m": 29.303,
-            "method": "opportunistic",
+            "method": "try",
             "localize_err_m": 5.14
           },
           {
@@ -4439,11 +4439,11 @@
             "cleared": true,
             "diameter_survey_m": 999.386,
             "n_probe": 1,
-            "diameter_final_m": 31.438,
-            "mec_radius_final_m": 15.719,
-            "clear_radius_m": 15.719,
-            "method": "direct",
-            "localize_err_m": 0.87
+            "diameter_final_m": 25.613,
+            "mec_radius_final_m": 12.806,
+            "clear_radius_m": 12.806,
+            "method": "try-refined",
+            "localize_err_m": 0.33
           },
           {
             "channel": 18,
@@ -4459,7 +4459,7 @@
             "diameter_final_m": 44.802,
             "mec_radius_final_m": 22.401,
             "clear_radius_m": 22.401,
-            "method": "opportunistic",
+            "method": "try",
             "localize_err_m": 5.57
           },
           {
@@ -4476,7 +4476,7 @@
             "diameter_final_m": 44.886,
             "mec_radius_final_m": 22.443,
             "clear_radius_m": 22.443,
-            "method": "opportunistic",
+            "method": "try",
             "localize_err_m": 6.58
           },
           {
@@ -4493,7 +4493,7 @@
             "diameter_final_m": 41.893,
             "mec_radius_final_m": 20.947,
             "clear_radius_m": 20.947,
-            "method": "opportunistic",
+            "method": "try",
             "localize_err_m": 0.87
           }
         ],
@@ -4501,7 +4501,7 @@
         "all_within_cover": true,
         "missed_channels": [],
         "n_cleared": 16,
-        "localize_err_mean_m": 6.712,
+        "localize_err_mean_m": 6.465,
         "localize_err_max_m": 16.66,
         "n_within_clear_radius": 16,
         "n_cleared_after_probe": 3
@@ -4548,20 +4548,20 @@
       "seed": 7,
       "n_sources": 12,
       "clear_ratio": 1.0,
-      "localize_err_mean_m": 10.127,
+      "localize_err_mean_m": 10.057,
       "localize_err_max_m": 18.71,
       "n_within_clear_radius": 12,
       "n_cleared_after_probe": 2,
       "waypoints_visited": 7,
-      "travel_m": 18569.72948242673,
-      "virtual_time_s": 4534.945888,
+      "travel_m": 16022.340388065542,
+      "virtual_time_s": 4025.468069,
       "n_measure": 127,
       "n_clear": 12,
       "channels_heard": 12,
       "n_bearings": 30,
       "cleared": 12,
-      "avg_time_s": 377.91215733333337,
-      "n_ready_at_survey": 2,
+      "avg_time_s": 335.4556724166667,
+      "n_precise_at_survey": 2,
       "n_refined": 2,
       "n_probe": 2,
       "tracks": {
@@ -4576,11 +4576,11 @@
           ],
           "clear_radius_m": 23.698,
           "diameter_final_m": 47.396,
-          "clearable_final": false,
+          "precise_final": false,
           "mec_radius_m": 23.698,
           "bounded_final": true,
           "n_obs_total": 3,
-          "method": "opportunistic",
+          "method": "try",
           "cleared": true
         },
         "2": {
@@ -4594,11 +4594,11 @@
           ],
           "clear_radius_m": 20.273,
           "diameter_final_m": 40.546,
-          "clearable_final": false,
+          "precise_final": false,
           "mec_radius_m": 20.273,
           "bounded_final": true,
           "n_obs_total": 3,
-          "method": "opportunistic",
+          "method": "try",
           "cleared": true
         },
         "3": {
@@ -4612,11 +4612,11 @@
           ],
           "clear_radius_m": 16.94,
           "diameter_final_m": 33.558,
-          "clearable_final": true,
+          "precise_final": true,
           "mec_radius_m": 16.94,
           "bounded_final": true,
           "n_obs_total": 3,
-          "method": "direct",
+          "method": "try",
           "cleared": true
         },
         "4": {
@@ -4625,16 +4625,16 @@
           "bounded_survey": false,
           "n_probe": 1,
           "clear_point": [
-            674.0575909724388,
-            1446.8404970512238
+            674.3124289448131,
+            1447.1814715827225
           ],
-          "clear_radius_m": 9.066,
-          "diameter_final_m": 18.132,
-          "clearable_final": true,
-          "mec_radius_m": 9.066,
+          "clear_radius_m": 9.23,
+          "diameter_final_m": 18.46,
+          "precise_final": true,
+          "mec_radius_m": 9.23,
           "bounded_final": true,
           "n_obs_total": 2,
-          "method": "direct",
+          "method": "try-refined",
           "cleared": true
         },
         "5": {
@@ -4648,11 +4648,11 @@
           ],
           "clear_radius_m": 21.806,
           "diameter_final_m": 43.611,
-          "clearable_final": false,
+          "precise_final": false,
           "mec_radius_m": 21.806,
           "bounded_final": true,
           "n_obs_total": 2,
-          "method": "opportunistic",
+          "method": "try",
           "cleared": true
         },
         "6": {
@@ -4666,11 +4666,11 @@
           ],
           "clear_radius_m": 20.744,
           "diameter_final_m": 41.489,
-          "clearable_final": false,
+          "precise_final": false,
           "mec_radius_m": 20.744,
           "bounded_final": true,
           "n_obs_total": 3,
-          "method": "opportunistic",
+          "method": "try",
           "cleared": true
         },
         "9": {
@@ -4684,11 +4684,11 @@
           ],
           "clear_radius_m": 22.239,
           "diameter_final_m": 44.477,
-          "clearable_final": false,
+          "precise_final": false,
           "mec_radius_m": 22.239,
           "bounded_final": true,
           "n_obs_total": 2,
-          "method": "opportunistic",
+          "method": "try",
           "cleared": true
         },
         "10": {
@@ -4702,11 +4702,11 @@
           ],
           "clear_radius_m": 24.023,
           "diameter_final_m": 48.047,
-          "clearable_final": false,
+          "precise_final": false,
           "mec_radius_m": 24.023,
           "bounded_final": true,
           "n_obs_total": 2,
-          "method": "opportunistic",
+          "method": "try",
           "cleared": true
         },
         "13": {
@@ -4715,16 +4715,16 @@
           "bounded_survey": false,
           "n_probe": 1,
           "clear_point": [
-            -492.5674719757275,
-            -1492.5095239828704
+            -491.0248522600793,
+            -1497.7568212546328
           ],
-          "clear_radius_m": 11.111,
-          "diameter_final_m": 22.222,
-          "clearable_final": true,
-          "mec_radius_m": 11.111,
+          "clear_radius_m": 12.196,
+          "diameter_final_m": 24.392,
+          "precise_final": true,
+          "mec_radius_m": 12.196,
           "bounded_final": true,
           "n_obs_total": 2,
-          "method": "direct",
+          "method": "try-refined",
           "cleared": true
         },
         "16": {
@@ -4738,11 +4738,11 @@
           ],
           "clear_radius_m": 10.395,
           "diameter_final_m": 20.576,
-          "clearable_final": true,
+          "precise_final": true,
           "mec_radius_m": 10.395,
           "bounded_final": true,
           "n_obs_total": 3,
-          "method": "direct",
+          "method": "try",
           "cleared": true
         },
         "18": {
@@ -4756,11 +4756,11 @@
           ],
           "clear_radius_m": 21.071,
           "diameter_final_m": 42.141,
-          "clearable_final": false,
+          "precise_final": false,
           "mec_radius_m": 21.071,
           "bounded_final": true,
           "n_obs_total": 2,
-          "method": "opportunistic",
+          "method": "try",
           "cleared": true
         },
         "19": {
@@ -4774,11 +4774,11 @@
           ],
           "clear_radius_m": 22.531,
           "diameter_final_m": 45.019,
-          "clearable_final": false,
+          "precise_final": false,
           "mec_radius_m": 22.531,
           "bounded_final": true,
           "n_obs_total": 3,
-          "method": "opportunistic",
+          "method": "try",
           "cleared": true
         }
       },
@@ -4877,7 +4877,7 @@
             "diameter_final_m": 47.396,
             "mec_radius_final_m": 23.698,
             "clear_radius_m": 23.698,
-            "method": "opportunistic",
+            "method": "try",
             "localize_err_m": 6.39
           },
           {
@@ -4894,7 +4894,7 @@
             "diameter_final_m": 40.546,
             "mec_radius_final_m": 20.273,
             "clear_radius_m": 20.273,
-            "method": "opportunistic",
+            "method": "try",
             "localize_err_m": 14.9
           },
           {
@@ -4911,7 +4911,7 @@
             "diameter_final_m": 33.558,
             "mec_radius_final_m": 16.94,
             "clear_radius_m": 16.94,
-            "method": "direct",
+            "method": "try",
             "localize_err_m": 6.86
           },
           {
@@ -4925,11 +4925,11 @@
             "cleared": true,
             "diameter_survey_m": 626.63,
             "n_probe": 1,
-            "diameter_final_m": 18.132,
-            "mec_radius_final_m": 9.066,
-            "clear_radius_m": 9.066,
-            "method": "direct",
-            "localize_err_m": 3.08
+            "diameter_final_m": 18.46,
+            "mec_radius_final_m": 9.23,
+            "clear_radius_m": 9.23,
+            "method": "try-refined",
+            "localize_err_m": 2.74
           },
           {
             "channel": 5,
@@ -4945,7 +4945,7 @@
             "diameter_final_m": 43.611,
             "mec_radius_final_m": 21.806,
             "clear_radius_m": 21.806,
-            "method": "opportunistic",
+            "method": "try",
             "localize_err_m": 13.76
           },
           {
@@ -4962,7 +4962,7 @@
             "diameter_final_m": 41.489,
             "mec_radius_final_m": 20.744,
             "clear_radius_m": 20.744,
-            "method": "opportunistic",
+            "method": "try",
             "localize_err_m": 18.71
           },
           {
@@ -4979,7 +4979,7 @@
             "diameter_final_m": 44.477,
             "mec_radius_final_m": 22.239,
             "clear_radius_m": 22.239,
-            "method": "opportunistic",
+            "method": "try",
             "localize_err_m": 3.05
           },
           {
@@ -4996,7 +4996,7 @@
             "diameter_final_m": 48.047,
             "mec_radius_final_m": 24.023,
             "clear_radius_m": 24.023,
-            "method": "opportunistic",
+            "method": "try",
             "localize_err_m": 17.43
           },
           {
@@ -5010,11 +5010,11 @@
             "cleared": true,
             "diameter_survey_m": 734.336,
             "n_probe": 1,
-            "diameter_final_m": 22.222,
-            "mec_radius_final_m": 11.111,
-            "clear_radius_m": 11.111,
-            "method": "direct",
-            "localize_err_m": 6.46
+            "diameter_final_m": 24.392,
+            "mec_radius_final_m": 12.196,
+            "clear_radius_m": 12.196,
+            "method": "try-refined",
+            "localize_err_m": 5.96
           },
           {
             "channel": 16,
@@ -5030,7 +5030,7 @@
             "diameter_final_m": 20.576,
             "mec_radius_final_m": 10.395,
             "clear_radius_m": 10.395,
-            "method": "direct",
+            "method": "try",
             "localize_err_m": 6.98
           },
           {
@@ -5047,7 +5047,7 @@
             "diameter_final_m": 42.141,
             "mec_radius_final_m": 21.071,
             "clear_radius_m": 21.071,
-            "method": "opportunistic",
+            "method": "try",
             "localize_err_m": 13.91
           },
           {
@@ -5064,7 +5064,7 @@
             "diameter_final_m": 45.019,
             "mec_radius_final_m": 22.531,
             "clear_radius_m": 22.531,
-            "method": "opportunistic",
+            "method": "try",
             "localize_err_m": 9.99
           }
         ],
@@ -5072,7 +5072,7 @@
         "all_within_cover": true,
         "missed_channels": [],
         "n_cleared": 12,
-        "localize_err_mean_m": 10.127,
+        "localize_err_mean_m": 10.057,
         "localize_err_max_m": 18.71,
         "n_within_clear_radius": 12,
         "n_cleared_after_probe": 2
@@ -5116,15 +5116,15 @@
       "n_within_clear_radius": 11,
       "n_cleared_after_probe": 2,
       "waypoints_visited": 7,
-      "travel_m": 14752.217119296785,
-      "virtual_time_s": 3787.443415,
+      "travel_m": 14540.70099585466,
+      "virtual_time_s": 3745.140191,
       "n_measure": 130,
       "n_clear": 12,
       "channels_heard": 11,
       "n_bearings": 30,
       "cleared": 11,
-      "avg_time_s": 344.31303772727273,
-      "n_ready_at_survey": 3,
+      "avg_time_s": 340.4672900909091,
+      "n_precise_at_survey": 3,
       "n_refined": 2,
       "n_probe": 2,
       "tracks": {
@@ -5139,11 +5139,11 @@
           ],
           "clear_radius_m": 22.122,
           "diameter_final_m": 44.245,
-          "clearable_final": false,
+          "precise_final": false,
           "mec_radius_m": 22.122,
           "bounded_final": true,
           "n_obs_total": 3,
-          "method": "opportunistic",
+          "method": "try",
           "cleared": true
         },
         "3": {
@@ -5157,11 +5157,11 @@
           ],
           "clear_radius_m": 11.322,
           "diameter_final_m": 22.644,
-          "clearable_final": true,
+          "precise_final": true,
           "mec_radius_m": 11.322,
           "bounded_final": true,
           "n_obs_total": 4,
-          "method": "direct",
+          "method": "try-refined",
           "cleared": true
         },
         "4": {
@@ -5175,11 +5175,11 @@
           ],
           "clear_radius_m": 8.302,
           "diameter_final_m": 16.603,
-          "clearable_final": true,
+          "precise_final": true,
           "mec_radius_m": 8.302,
           "bounded_final": true,
           "n_obs_total": 2,
-          "method": "direct",
+          "method": "try-refined",
           "cleared": true
         },
         "5": {
@@ -5193,11 +5193,11 @@
           ],
           "clear_radius_m": 20.946,
           "diameter_final_m": 41.884,
-          "clearable_final": false,
+          "precise_final": false,
           "mec_radius_m": 20.946,
           "bounded_final": true,
           "n_obs_total": 2,
-          "method": "opportunistic",
+          "method": "try",
           "cleared": true
         },
         "7": {
@@ -5211,11 +5211,11 @@
           ],
           "clear_radius_m": 17.015,
           "diameter_final_m": 34.03,
-          "clearable_final": true,
+          "precise_final": true,
           "mec_radius_m": 17.015,
           "bounded_final": true,
           "n_obs_total": 3,
-          "method": "direct",
+          "method": "try",
           "cleared": true
         },
         "9": {
@@ -5229,11 +5229,11 @@
           ],
           "clear_radius_m": 18.499,
           "diameter_final_m": 36.998,
-          "clearable_final": true,
+          "precise_final": true,
           "mec_radius_m": 18.499,
           "bounded_final": true,
           "n_obs_total": 3,
-          "method": "direct",
+          "method": "try",
           "cleared": true
         },
         "12": {
@@ -5247,11 +5247,11 @@
           ],
           "clear_radius_m": 20.982,
           "diameter_final_m": 41.952,
-          "clearable_final": false,
+          "precise_final": false,
           "mec_radius_m": 20.982,
           "bounded_final": true,
           "n_obs_total": 3,
-          "method": "opportunistic",
+          "method": "try",
           "cleared": true
         },
         "13": {
@@ -5265,11 +5265,11 @@
           ],
           "clear_radius_m": 13.657,
           "diameter_final_m": 27.3,
-          "clearable_final": true,
+          "precise_final": true,
           "mec_radius_m": 13.657,
           "bounded_final": true,
           "n_obs_total": 3,
-          "method": "direct",
+          "method": "try",
           "cleared": true
         },
         "16": {
@@ -5283,11 +5283,11 @@
           ],
           "clear_radius_m": 20.394,
           "diameter_final_m": 40.788,
-          "clearable_final": false,
+          "precise_final": false,
           "mec_radius_m": 20.394,
           "bounded_final": true,
           "n_obs_total": 3,
-          "method": "opportunistic",
+          "method": "try",
           "cleared": true
         },
         "17": {
@@ -5301,11 +5301,11 @@
           ],
           "clear_radius_m": 24.993,
           "diameter_final_m": 49.987,
-          "clearable_final": false,
+          "precise_final": false,
           "mec_radius_m": 24.993,
           "bounded_final": true,
           "n_obs_total": 2,
-          "method": "opportunistic",
+          "method": "try",
           "cleared": true
         },
         "19": {
@@ -5319,11 +5319,11 @@
           ],
           "clear_radius_m": 21.054,
           "diameter_final_m": 42.108,
-          "clearable_final": false,
+          "precise_final": false,
           "mec_radius_m": 21.054,
           "bounded_final": true,
           "n_obs_total": 2,
-          "method": "opportunistic",
+          "method": "try",
           "cleared": true
         }
       },
@@ -5422,7 +5422,7 @@
             "diameter_final_m": 44.245,
             "mec_radius_final_m": 22.122,
             "clear_radius_m": 22.122,
-            "method": "opportunistic",
+            "method": "try",
             "localize_err_m": 11.44
           },
           {
@@ -5439,7 +5439,7 @@
             "diameter_final_m": 22.644,
             "mec_radius_final_m": 11.322,
             "clear_radius_m": 11.322,
-            "method": "direct",
+            "method": "try-refined",
             "localize_err_m": 9.9
           },
           {
@@ -5456,7 +5456,7 @@
             "diameter_final_m": 16.603,
             "mec_radius_final_m": 8.302,
             "clear_radius_m": 8.302,
-            "method": "direct",
+            "method": "try-refined",
             "localize_err_m": 4.64
           },
           {
@@ -5473,7 +5473,7 @@
             "diameter_final_m": 41.884,
             "mec_radius_final_m": 20.946,
             "clear_radius_m": 20.946,
-            "method": "opportunistic",
+            "method": "try",
             "localize_err_m": 18.69
           },
           {
@@ -5490,7 +5490,7 @@
             "diameter_final_m": 34.03,
             "mec_radius_final_m": 17.015,
             "clear_radius_m": 17.015,
-            "method": "direct",
+            "method": "try",
             "localize_err_m": 3.34
           },
           {
@@ -5507,7 +5507,7 @@
             "diameter_final_m": 36.998,
             "mec_radius_final_m": 18.499,
             "clear_radius_m": 18.499,
-            "method": "direct",
+            "method": "try",
             "localize_err_m": 9.37
           },
           {
@@ -5524,7 +5524,7 @@
             "diameter_final_m": 41.952,
             "mec_radius_final_m": 20.982,
             "clear_radius_m": 20.982,
-            "method": "opportunistic",
+            "method": "try",
             "localize_err_m": 13.0
           },
           {
@@ -5541,7 +5541,7 @@
             "diameter_final_m": 27.3,
             "mec_radius_final_m": 13.657,
             "clear_radius_m": 13.657,
-            "method": "direct",
+            "method": "try",
             "localize_err_m": 12.7
           },
           {
@@ -5558,7 +5558,7 @@
             "diameter_final_m": 40.788,
             "mec_radius_final_m": 20.394,
             "clear_radius_m": 20.394,
-            "method": "opportunistic",
+            "method": "try",
             "localize_err_m": 12.61
           },
           {
@@ -5575,7 +5575,7 @@
             "diameter_final_m": 49.987,
             "mec_radius_final_m": 24.993,
             "clear_radius_m": 24.993,
-            "method": "opportunistic",
+            "method": "try",
             "localize_err_m": 12.9
           },
           {
@@ -5592,7 +5592,7 @@
             "diameter_final_m": 42.108,
             "mec_radius_final_m": 21.054,
             "clear_radius_m": 21.054,
-            "method": "opportunistic",
+            "method": "try",
             "localize_err_m": 10.65
           }
         ],
@@ -5642,15 +5642,15 @@
       "n_within_clear_radius": 13,
       "n_cleared_after_probe": 3,
       "waypoints_visited": 7,
-      "travel_m": 18387.117494157166,
-      "virtual_time_s": 4556.423488,
+      "travel_m": 17472.706531817006,
+      "virtual_time_s": 4373.541296,
       "n_measure": 136,
       "n_clear": 13,
       "channels_heard": 13,
       "n_bearings": 32,
       "cleared": 13,
-      "avg_time_s": 350.4941144615385,
-      "n_ready_at_survey": 4,
+      "avg_time_s": 336.42625353846154,
+      "n_precise_at_survey": 4,
       "n_refined": 3,
       "n_probe": 4,
       "tracks": {
@@ -5665,11 +5665,11 @@
           ],
           "clear_radius_m": 19.589,
           "diameter_final_m": 39.171,
-          "clearable_final": true,
+          "precise_final": true,
           "mec_radius_m": 19.589,
           "bounded_final": true,
           "n_obs_total": 3,
-          "method": "direct",
+          "method": "try",
           "cleared": true
         },
         "2": {
@@ -5683,11 +5683,11 @@
           ],
           "clear_radius_m": 24.416,
           "diameter_final_m": 48.832,
-          "clearable_final": false,
+          "precise_final": false,
           "mec_radius_m": 24.416,
           "bounded_final": true,
           "n_obs_total": 2,
-          "method": "opportunistic",
+          "method": "try",
           "cleared": true
         },
         "5": {
@@ -5701,11 +5701,11 @@
           ],
           "clear_radius_m": 21.332,
           "diameter_final_m": 42.663,
-          "clearable_final": false,
+          "precise_final": false,
           "mec_radius_m": 21.332,
           "bounded_final": true,
           "n_obs_total": 2,
-          "method": "opportunistic",
+          "method": "try",
           "cleared": true
         },
         "6": {
@@ -5719,11 +5719,11 @@
           ],
           "clear_radius_m": 21.916,
           "diameter_final_m": 43.833,
-          "clearable_final": false,
+          "precise_final": false,
           "mec_radius_m": 21.916,
           "bounded_final": true,
           "n_obs_total": 2,
-          "method": "opportunistic",
+          "method": "try",
           "cleared": true
         },
         "8": {
@@ -5737,11 +5737,11 @@
           ],
           "clear_radius_m": 17.115,
           "diameter_final_m": 33.958,
-          "clearable_final": true,
+          "precise_final": true,
           "mec_radius_m": 17.115,
           "bounded_final": true,
           "n_obs_total": 3,
-          "method": "direct",
+          "method": "try",
           "cleared": true
         },
         "9": {
@@ -5755,11 +5755,11 @@
           ],
           "clear_radius_m": 23.039,
           "diameter_final_m": 46.078,
-          "clearable_final": false,
+          "precise_final": false,
           "mec_radius_m": 23.039,
           "bounded_final": true,
           "n_obs_total": 3,
-          "method": "opportunistic",
+          "method": "try",
           "cleared": true
         },
         "11": {
@@ -5773,11 +5773,11 @@
           ],
           "clear_radius_m": 17.53,
           "diameter_final_m": 35.06,
-          "clearable_final": true,
+          "precise_final": true,
           "mec_radius_m": 17.53,
           "bounded_final": true,
           "n_obs_total": 2,
-          "method": "direct",
+          "method": "try-refined",
           "cleared": true
         },
         "12": {
@@ -5791,11 +5791,11 @@
           ],
           "clear_radius_m": 1.715,
           "diameter_final_m": 3.408,
-          "clearable_final": true,
+          "precise_final": true,
           "mec_radius_m": 1.715,
           "bounded_final": true,
           "n_obs_total": 3,
-          "method": "direct",
+          "method": "try-refined",
           "cleared": true
         },
         "14": {
@@ -5809,11 +5809,11 @@
           ],
           "clear_radius_m": 57.414,
           "diameter_final_m": 114.828,
-          "clearable_final": false,
+          "precise_final": false,
           "mec_radius_m": 57.414,
           "bounded_final": true,
           "n_obs_total": 2,
-          "method": "opportunistic",
+          "method": "try",
           "cleared": true
         },
         "16": {
@@ -5827,11 +5827,11 @@
           ],
           "clear_radius_m": 23.368,
           "diameter_final_m": 46.735,
-          "clearable_final": false,
+          "precise_final": false,
           "mec_radius_m": 23.368,
           "bounded_final": true,
           "n_obs_total": 2,
-          "method": "opportunistic",
+          "method": "try",
           "cleared": true
         },
         "18": {
@@ -5845,11 +5845,11 @@
           ],
           "clear_radius_m": 17.38,
           "diameter_final_m": 34.76,
-          "clearable_final": true,
+          "precise_final": true,
           "mec_radius_m": 17.38,
           "bounded_final": true,
           "n_obs_total": 2,
-          "method": "direct",
+          "method": "try-refined",
           "cleared": true
         },
         "19": {
@@ -5863,11 +5863,11 @@
           ],
           "clear_radius_m": 19.447,
           "diameter_final_m": 38.893,
-          "clearable_final": true,
+          "precise_final": true,
           "mec_radius_m": 19.447,
           "bounded_final": true,
           "n_obs_total": 3,
-          "method": "direct",
+          "method": "try",
           "cleared": true
         },
         "20": {
@@ -5881,11 +5881,11 @@
           ],
           "clear_radius_m": 19.67,
           "diameter_final_m": 39.339,
-          "clearable_final": true,
+          "precise_final": true,
           "mec_radius_m": 19.67,
           "bounded_final": true,
           "n_obs_total": 3,
-          "method": "direct",
+          "method": "try",
           "cleared": true
         }
       },
@@ -5984,7 +5984,7 @@
             "diameter_final_m": 39.171,
             "mec_radius_final_m": 19.589,
             "clear_radius_m": 19.589,
-            "method": "direct",
+            "method": "try",
             "localize_err_m": 1.11
           },
           {
@@ -6001,7 +6001,7 @@
             "diameter_final_m": 48.832,
             "mec_radius_final_m": 24.416,
             "clear_radius_m": 24.416,
-            "method": "opportunistic",
+            "method": "try",
             "localize_err_m": 12.91
           },
           {
@@ -6018,7 +6018,7 @@
             "diameter_final_m": 42.663,
             "mec_radius_final_m": 21.332,
             "clear_radius_m": 21.332,
-            "method": "opportunistic",
+            "method": "try",
             "localize_err_m": 10.77
           },
           {
@@ -6035,7 +6035,7 @@
             "diameter_final_m": 43.833,
             "mec_radius_final_m": 21.916,
             "clear_radius_m": 21.916,
-            "method": "opportunistic",
+            "method": "try",
             "localize_err_m": 12.18
           },
           {
@@ -6052,7 +6052,7 @@
             "diameter_final_m": 33.958,
             "mec_radius_final_m": 17.115,
             "clear_radius_m": 17.115,
-            "method": "direct",
+            "method": "try",
             "localize_err_m": 9.22
           },
           {
@@ -6069,7 +6069,7 @@
             "diameter_final_m": 46.078,
             "mec_radius_final_m": 23.039,
             "clear_radius_m": 23.039,
-            "method": "opportunistic",
+            "method": "try",
             "localize_err_m": 10.32
           },
           {
@@ -6086,7 +6086,7 @@
             "diameter_final_m": 35.06,
             "mec_radius_final_m": 17.53,
             "clear_radius_m": 17.53,
-            "method": "direct",
+            "method": "try-refined",
             "localize_err_m": 9.67
           },
           {
@@ -6103,7 +6103,7 @@
             "diameter_final_m": 3.408,
             "mec_radius_final_m": 1.715,
             "clear_radius_m": 1.715,
-            "method": "direct",
+            "method": "try-refined",
             "localize_err_m": 0.7
           },
           {
@@ -6120,7 +6120,7 @@
             "diameter_final_m": 114.828,
             "mec_radius_final_m": 57.414,
             "clear_radius_m": 57.414,
-            "method": "opportunistic",
+            "method": "try",
             "localize_err_m": 1.67
           },
           {
@@ -6137,7 +6137,7 @@
             "diameter_final_m": 46.735,
             "mec_radius_final_m": 23.368,
             "clear_radius_m": 23.368,
-            "method": "opportunistic",
+            "method": "try",
             "localize_err_m": 17.68
           },
           {
@@ -6154,7 +6154,7 @@
             "diameter_final_m": 34.76,
             "mec_radius_final_m": 17.38,
             "clear_radius_m": 17.38,
-            "method": "direct",
+            "method": "try-refined",
             "localize_err_m": 3.9
           },
           {
@@ -6171,7 +6171,7 @@
             "diameter_final_m": 38.893,
             "mec_radius_final_m": 19.447,
             "clear_radius_m": 19.447,
-            "method": "direct",
+            "method": "try",
             "localize_err_m": 8.58
           },
           {
@@ -6188,7 +6188,7 @@
             "diameter_final_m": 39.339,
             "mec_radius_final_m": 19.67,
             "clear_radius_m": 19.67,
-            "method": "direct",
+            "method": "try",
             "localize_err_m": 10.26
           }
         ],

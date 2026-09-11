@@ -50,8 +50,7 @@ def _episode_printer(clear: bool):
                   f"巡视后估计已够准的（覆盖圆半径 < {CLEAR_RADIUS:.0f} m，诊断）"
                   f"{stats['n_precise_at_survey']} 个；判定必无信号跳过测量 "
                   f"{stats['n_skip_measure']} 次；途中顺路清除 {stats['n_inline_cleared']} 个"
-                  f"（白跑 {stats['n_inline_fail']} 次）；"
-                  f"清除途中顺带测向 {stats['n_piggyback']} 次")
+                  f"（白跑 {stats['n_inline_fail']} 次）")
             print(f"  清除：{stats['cleared']}/{n_sources}（平均 {stats['avg_time_s']:.1f} s/个），"
                   f"定位误差均值 {check['localize_err_mean_m']} m / 最大 "
                   f"{check['localize_err_max_m']} m，清除点在 20 m 内 "
@@ -86,8 +85,7 @@ def run_practice(args: argparse.Namespace, res: CoverSolveResult, save_dir: Path
                            clear=clear, k_clear_max=args.k_clear_max,
                            inline_try_radius=args.inline_try_radius,
                            inline_detour=args.inline_detour,
-                           rotate=not args.no_rotate,
-                           piggyback=args.piggyback, api_log=api_log)
+                           rotate=not args.no_rotate, api_log=api_log)
             stats = dog.run(res.plan, res.survey_order)
             arena.finish_episode()
             # 用 dog.plan / dog.survey_order_used：布局在起始扫描后按源密集方向旋转过，
@@ -176,8 +174,7 @@ def run_official(args: argparse.Namespace, res: CoverSolveResult, save_dir: Path
                        clear=not args.survey_only, k_clear_max=args.k_clear_max,
                        inline_try_radius=args.inline_try_radius,
                        inline_detour=args.inline_detour,
-                       rotate=not args.no_rotate,
-                       piggyback=args.piggyback, api_log=api_log)
+                       rotate=not args.no_rotate, api_log=api_log)
         stats = dog.run(res.plan, res.survey_order)
         print(f"完成：清除 {stats['cleared']} 个，巡视 {stats['waypoints_visited']} 个圆心，"
               f"里程 {stats['travel_m']:.0f} m，虚拟时间 {stats['virtual_time_s']:.0f} s，"
@@ -264,10 +261,6 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--traj-dir", default=TRAJ_DIR,
                    help=f"轨迹图输出子目录（相对 --save-dir；缺省 {TRAJ_DIR}，"
                         f"与 T3_ga.py 的 trajectory/ 分开以免互相覆盖）")
-    p.add_argument("--piggyback", action="store_true",
-                   help="开启阶段二的「边清边扫」：走到清缺点时顺手给别的频道补测向（零额外"
-                        "里程，但实测虚拟时间 +6.2 s、0/10 局改善，故默认关闭；开启后观测量"
-                        "更多、逐步扫描图也覆盖清除阶段）")
     p.add_argument("--no-rotate", action="store_true",
                    help="不做起始扫描后的布局旋转（保持设计基准朝向，用于对照实验）")
     p.add_argument("--no-plot", action="store_true",

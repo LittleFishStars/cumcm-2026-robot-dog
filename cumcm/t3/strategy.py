@@ -6,8 +6,7 @@
             第 1 站就在原点，于是它天然是一次**起始全频道扫描**（一次拿到"哪些频道在
             1000 m 内"），并用它锚定到的方位调整巡视绕向与落脚点；每站结束还会顺路清除。
     阶段二  诊断 -> 按估计点距离求**精确**最短开放路径定序 -> 逐频道四级清除：
-            就近试清 -> 多清几次（K 个半径 20 m 的圆盖满区域）-> 补测后清 -> 沿示向度逼近兜底；
-            每到一个清缺点还会**顺手给别的频道补一条方位**（边清边扫，零额外里程）。
+            就近试清 -> 多清几次（K 个半径 20 m 的圆盖满区域）-> 补测后清 -> 沿示向度逼近兜底。
 
 贯穿其中的两条"省时间"原则：
 * 硬约束（见 regions.ProbRegion）让"必然听不到"的测量可直接**跳过**（省 6 s/次）；
@@ -25,7 +24,7 @@ import numpy as np
 
 from functools import partial
 
-from cumcm.common.geometry import bearing, dist
+from cumcm.common.geometry import dist
 from cumcm.common.geometry import clamp_to_region as _clamp_to_region
 from cumcm.common.routing import (dist_matrix, exact_open_by_end, exact_open_order,
                                   nearest_order)
@@ -33,12 +32,11 @@ from cumcm.common.sim_client import RecordedSim
 from cumcm.t3.config import (BEARING_ERROR_DEG, CHANNELS, CLEAR_RADIUS, CLIP_ERR, CLIP_SIDES,
                              COVER_RADIUS, HOMING_CAP, HOMING_MAX, HOMING_STEP,
                              INLINE_DETOUR, INLINE_TRY_RADIUS, K_CLEAR_MAX, K_COVER_SAMPLES,
-                             K_COVER_STEP_MIN, NEAR_RADIUS, OBS_CAP, PIGGYBACK_GAP,
-                             PIGGYBACK_MAX, PIGGYBACK_SIGMA_M, RECEIVE_MAX, RECEIVE_MID,
+                             K_COVER_STEP_MIN, NEAR_RADIUS, OBS_CAP, RECEIVE_MAX, RECEIVE_MID,
                              REFINE_MAX, REGION_MARGIN, REGION_RADIUS, SAFETY_MARGIN, TOL,
                              TRY_CLEAR_RADIUS)
 from cumcm.t3.covering import CoverPlan, dense_sector_rotation
-from cumcm.t3.probing import fisher_sigma, hypothesis_points, probe_candidates
+from cumcm.t3.probing import hypothesis_points, probe_candidates
 from cumcm.t3.regions import Meas, Obs, ProbRegion
 
 # 把坐标拉回作业圆域（半径留 1 m 数值余量）。公共层不内置默认半径，这里按本题常量绑定，
@@ -73,7 +71,6 @@ class RobotDog:
                  inline_try_radius: float = INLINE_TRY_RADIUS,
                  inline_detour: float = INLINE_DETOUR,
                  rotate: bool = True,
-                 piggyback: bool = False,
                  api_log=None) -> None:
         # 传入 api_log 时套一层记录代理：4 个接口的每一次调用都会落盘
         # （官方模式下这是唯一的证据链 —— 拿不到真值，但每次请求/响应都有记录）
@@ -84,13 +81,6 @@ class RobotDog:
         self.inline_try_radius = float(inline_try_radius)    # 顺路试清允许的覆盖圆半径上限 / m
         self.inline_detour = float(inline_detour)            # 顺路试清允许的绕行里程上限 / m
         self.rotate = bool(rotate)                           # 起始扫描后是否旋转覆盖圆布局
-        # 阶段二"边清边扫"（到了清缺点顺手给别的频道补一条方位）。**默认关闭**：实测它结构性
-        # 不划算 —— 同 seed 10 局成对比较，虚拟时间 +6.2 s（t = +2.97，0/10 局改善）、测向
-        # 次数 +1.2 次，里程只省 2.3 m。原因清楚：补测点本就选在源附近（PROBE_RADII ≤ 800 m），
-        # 所以省下的那趟补测只值十几米（实测 13 m ≈ 2.6 s），而多测一次要 6 s。机制本身有效
-        # （确有 1/10 局把补测 2 次降到 1 次），只是收益小于代价。留着开关用于"要更厚的观测
-        # 数据 / 更完整的逐步扫描图"的场合（见 --piggyback）。
-        self.piggyback_enabled = bool(piggyback)
         # 过程日志用 "w"：每局开头重写，于是整份日志只描述**最新一局**。
         # 原先用 "a" 追加，跨局、跨运行无限累积，几轮演练后文件里混着几百局的内容难以查阅。
         self._logfile = open(logfile, "w", encoding="utf-8") if logfile else None
@@ -98,7 +88,6 @@ class RobotDog:
         self.meas: Dict[int, List[Meas]] = defaultdict(list)   # 全部测量（含 no_signal）
         self.n_skip = 0                                        # 判定必无信号而跳过的测量次数
         self.n_inline_fail = 0                                 # 巡视途中顺路试清白跑的次数
-        self.n_piggyback = 0                                   # 阶段二顺手测向的次数
         self.initial_scan: Dict[str, Any] = {}                 # 起始全频道扫描的统计
         self.actions: List[Dict[str, Any]] = []                # 逐次动作记录（供轨迹图/轨迹表）
         self.regions: Dict[int, ProbRegion] = {}
@@ -122,9 +111,6 @@ class RobotDog:
         # 站）。仅登记、不在此处绘图 —— 绘图统一在 /exit 之后做，不占用现实时间预算。
         self.scan_steps: List[Dict[str, Any]] = []
         self._cur_step: Optional[Dict[str, Any]] = None
-        # 下一个可用的扫描步序号。阶段一用 0（起点扫描）与 1..7（巡视站）；阶段二的顺手测向
-        # 接着往后排，序号**单调递增**才不会让两张图落到同一个文件名上。
-        self._scan_step_next = 0
 
     # ---- 日志 ----
     def log(self, msg: str) -> None:
@@ -210,7 +196,6 @@ class RobotDog:
     def _begin_scan_step(self, index: int, label: str, at: Sequence[float],
                          n_channels: int) -> None:
         """开始记录一步扫描（见 `scan_steps`）。动作由 measure/clear 自动挂到当前步上。"""
-        self._scan_step_next = max(self._scan_step_next, int(index) + 1)
         self._cur_step = {
             "index": int(index), "label": label,
             "x": float(at[0]), "y": float(at[1]), "n_channels": int(n_channels),
@@ -667,87 +652,6 @@ class RobotDog:
             return tag
         return None
 
-    # ---- 阶段二：清除途中顺手测向 ----
-    @staticmethod
-    def _mean_pred_sigma(base: Sequence[Sequence[float]],
-                         hyps: Sequence[Sequence[float]],
-                         extra: Optional[Sequence[float]] = None) -> Optional[float]:
-        """给定已有观测 `base`（(检测点x, 检测点y, 示向度)）与假设源位置 `hyps`，预测平均
-        位置 1σ / m；`extra` 非空时把"在 extra 处测得朝向各假设点的方位"当作一条新观测一并算入。
-
-        口径与补测选点完全一致（`probing` 的 Fisher 信息），"对全部假设取平均"也是那里的既定
-        做法：单射线时假设点排成一条直线，用最坏值会让所有候选都不可用。任一假设给出 inf
-        （与已有射线共线、无法定距）即返回 None —— 这条新观测不提供有效信息。
-        """
-        total = 0.0
-        for h in hyps:
-            bear = list(base)
-            if extra is not None:
-                bear.append((extra[0], extra[1], bearing(extra, h)))
-            sig = fisher_sigma(h, bear)
-            if sig == math.inf:
-                return None
-            total += sig
-        return total / len(hyps)
-
-    def _piggyback_candidates(self, at: Sequence[float],
-                              exclude: int) -> List[int]:
-        """挑出"在 at 顺手测一次正好能推过可清除门槛"的频道，按收益从大到小排序。
-
-        判据只有一条跨阈：测前预测 σ ≥ PIGGYBACK_SIGMA_M（还没到可清除量级）**且**测后
-        预测 σ < PIGGYBACK_SIGMA_M（这下到了）。两侧都要判才是"正好推过门槛"：
-        测前已经低于阈值说明该频道本就快能清了，这 6 s 帮不上它；测后仍高于阈值说明这次测了
-        也清不了，同样白花。σ 对"最小覆盖圆半径"只是**筛子**而非定理（两者不同源），故它只
-        用来挑出值得花 6 s 的频道；测完到底能不能清，仍由 `_precise` 与随后的试清决定。
-        """
-        picks: List[Tuple[float, int]] = []
-        for ch in sorted(self.obs):                    # 没听到过的频道没有基线方位，跳过
-            if ch == exclude or ch in self.cleared:
-                continue
-            obs = self.obs[ch]
-            if len(obs) >= OBS_CAP or self._precise(ch):
-                continue
-            if any(dist(at, (o.x, o.y)) < PIGGYBACK_GAP for o in obs):
-                continue        # 与已有检测点太近：同处复测不提供新信息（沿用 PROBE_GAP 的口径）
-            hyps = hypothesis_points(self.region(ch), obs)
-            if not hyps:
-                continue
-            base = [(o.x, o.y, o.theta) for o in obs]
-            before = self._mean_pred_sigma(base, hyps)
-            if before is None or before < PIGGYBACK_SIGMA_M:
-                continue
-            after = self._mean_pred_sigma(base, hyps, extra=at)
-            if after is None or after >= PIGGYBACK_SIGMA_M:
-                continue
-            picks.append((after, ch))
-        picks.sort()                                   # 收益从大到小；并列取频道号小者
-        return [ch for _, ch in picks[:PIGGYBACK_MAX]]
-
-    def _piggyback(self, at: Sequence[float], exclude: int, tag: str) -> int:
-        """在已到达的点 `at` 顺手给其他频道补一条方位；返回实际新测的频道数。
-
-        为什么划算：清除必须走到源的近处，绕不过去 —— 到了这里，里程就已经付过了（实测阶段二
-        里程占全局 50.6%，而阶段一扫描只占 29.8%）。于是在同一个点上多测一个频道，只多花
-        5 s 测向 + 1 s 切换，**零额外里程**，换来的是"下一趟专程补测"（往返数百米、约 100 s）
-        有可能被免掉。反过来，无脑把尚未清除的频道在每个点都测一遍会让虚拟时间**变差**
-        （实测），所以只测 `_piggyback_candidates` 挑出的、正好跨过门槛的那几个。
-
-        测向本身复用 `_sweep`：于是这条路径同样会登记成一步扫描（收尾出一张扫描结果图），
-        并沿用其"必然听不到就跳过""near 就地清除"的处理。
-        """
-        if not self.piggyback_enabled or self._out_of_time():
-            return 0
-        picks = self._piggyback_candidates(at, exclude)
-        if not picks:
-            return 0
-        self.log(f"    [顺带测向] 清除途中 @ ({at[0]:.1f}, {at[1]:.1f})："
-                 f"{len(picks)} 个频道正好能被这一测推过门槛 {picks}（零额外里程）")
-        counts = self._sweep(picks, at, label=f"{tag}顺带测向", index=self._scan_step_next)
-        self.n_piggyback += sum(counts.values())
-        self.log(f"      有示向度 {counts['direction']}、无信号 {counts['no_signal']}、"
-                 f"近距清除 {counts['near']}、判定必无信号而跳过 {counts['skip']}")
-        return sum(counts.values())
-
     def _nearby_try_clear(self, channel: int) -> Optional[str]:
         """就近试清：走到当前估计点，直接 /clear 一次；未命中则就地复测。
 
@@ -773,17 +677,12 @@ class RobotDog:
             return None
         if not self.region(channel).bounded:     # 区域被圆域截断：方向还存在"跑掉"的可能
             return None
-        cx, cy = mec[0], mec[1]
-        ok = self._try_clear(channel, "try")
-        # 到了这个点，里程就已经付过了 —— 顺手给别的频道补一条方位（零额外里程，见 _piggyback）。
-        # 放在试清之后：本频道的处理（试清 -> 未命中则就地复测）保持连续，日志与逐步扫描图好读；
-        # 而别的频道不依赖它的成败，谁先谁后不影响结果。
-        self._piggyback((cx, cy), exclude=channel, tag=f"清缺点（频道{channel}）")
-        if ok:
+        if self._try_clear(channel, "try"):
             return "try"
         rec = self.tracks.setdefault(channel, {})
         rec["n_probe"] = int(rec.get("n_probe", 0)) + 1
         self.stage = "refine"
+        cx, cy = mec[0], mec[1]
         res = self.measure(cx, cy, channel).get("measure_result", "no_signal")
         if res == "direction":
             self.log(f"    [就近试清] 频道{channel} @ ({cx:.1f}, {cy:.1f}) 未命中，"
@@ -966,7 +865,6 @@ class RobotDog:
                               else round(self.dense_dir_deg, 4)),
             "n_face_scanned": self.n_face_scanned,
             "survey_order_used": list(self.survey_order_used),
-            "n_piggyback": self.n_piggyback,
             "n_inline_cleared": sum(1 for r in self.tracks.values()
                                     if r.get("method") == "survey-inline"),
             "n_inline_fail": self.n_inline_fail,

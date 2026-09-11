@@ -123,10 +123,21 @@ r ≤ 直径/2。求交时圆域用内接 256 边形（与真圆的偏差 0.14 m
 源位置求平均 σ 后排序，并在 σ 与最优值相差 2% 以内的候选里取里程最短者。单射线频道的假设
 源位置沿该射线按 200~1400 m 枚举（源的距离未知，只能枚举假设）。
 
-**清除流程（无门槛）。** 每个频道依次做：① 走到估计点试一次 /clear（失败 3 s，命中即完成）；
-② 未命中就地复测，若估计仍不够准则按文献准则补测选点，直到直径 < 40 m 或达到轮次上限；
-③ 再到新的估计点试清；④ 万一仍未清除，沿最新实测示向度以 16 m 步长逼近（步数按到区域最远顶点的
-距离自适应）。10 局演练中 131 个源全部清除，除个别外全部在第 ①② 步解决，从未走到第 ④ 步。
+**清除流程（无门槛、四级递进）。** 每个频道依次做：
+
+① **就近试清**：走到估计点 /clear 一次。失败只花 3 s，命中即完成（实测 101/131 个在这一步解决）。
+② **多清几次**：未命中就在区域内取细网格为覆盖目标，贪心选至多 `--k-clear-max`（缺省 4）个补充
+   清缺点，使这些半径 20 m 的圆把定位区域盖满，然后由近及远逐个清 —— 盖满即保证命中，可省掉
+   一轮补测；盖不满（区域被作业圆域截断、需要十几个圆）就不赌，直接进入 ③。补清一个点的边际
+   代价只有一个点间距的移动（≤ 40 m ≈ 8 s）加失败时的 3 s，比补测便宜一个量级。
+   实测这一步只覆盖到 2/131 个频道：试清未中的 30 个里 24 个区域被圆域截断、直径 > 320 m
+   （需 K = 10~70 个圆），另 4 个在就地复测后区域已缩到 40 m 以内（K = 1 即可）。它真正的价值是
+   把"区域不大不小"这一档从"必须补测"变成"多跑几十米即可"，代价近乎为零。
+③ **补测**：就地复测一次（该点是区域内离源最近、Fisher 权重最大的位置），若估计仍不够准则按
+   文献准则选点补测，直到直径 < 40 m 或达到轮次上限，再到新的估计点清。
+④ **兜底**：万一仍未清除，沿最新实测示向度以 16 m 步长逼近（步数按到区域最远顶点的距离自适应）。
+
+10 局演练中 131 个源全部清除，其中 ① 101 个、② 2 个、③ 28 个，从未走到 ④。
 
 与参考文献（覆盖圆部分）的关系
 ------------------------------
@@ -231,6 +242,9 @@ PROBE_GAP = 60.0                # 补测点与已有检测点的最小间距 / m
 SINGLE_HYP = (200.0, 400.0, 600.0, 800.0, 1000.0, 1200.0, 1400.0)   # 单射线时沿射线的假设距离
 REFINE_MAX = 6                  # 每个频道最多补测几轮
 TRY_CLEAR_RADIUS = 400.0        # 就近试清的前提：最小覆盖圆半径 ≤ 该值（估计不离谱，值得跑过去试）
+K_CLEAR_MAX = 4                 # 试清未中后，最多再补清几个点（用 K 个半径 20 m 的圆覆盖定位区域）
+K_COVER_SAMPLES = 40            # K 圆覆盖的采样格数（最长方向切成这么多格，据此定采样步长）
+K_COVER_STEP_MIN = 3.0          # K 圆覆盖的采样步长下限 / m
 HOMING_STEP = 16.0              # 末端沿最新示向度逼近的步长 / m
 HOMING_MAX = 24                 # 末端沿示向度逼近的最少迭代次数
 HOMING_CAP = 120                # 末端逼近的迭代上限（离得远时按距离自适应加长，但不超过此值）
@@ -810,10 +824,12 @@ class RobotDog:
     """
 
     def __init__(self, sim, verbose: bool = True, logfile: Optional[str] = None,
-                 episode: int = 0, clear: bool = True) -> None:
+                 episode: int = 0, clear: bool = True,
+                 k_clear_max: int = K_CLEAR_MAX) -> None:
         self.sim = sim
         self.verbose = verbose
         self.clear_enabled = clear
+        self.k_clear_max = int(k_clear_max)
         self._logfile = open(logfile, "a", encoding="utf-8") if logfile else None
         self.obs: Dict[int, List[Obs]] = defaultdict(list)
         self.regions: Dict[int, TriangulationRegion] = {}
@@ -1139,6 +1155,82 @@ class RobotDog:
             return "near@center"
         return None
 
+    def _k_cover_points(self, channel: int, k_extra: int,
+                        radius: float = CLEAR_RADIUS) -> Tuple[List[Tuple[float, float]], float]:
+        """用"当前估计点已清过一次"为起点，再贪心选 k_extra 个清除点，使半径 radius 的圆尽量
+        覆盖整个定位区域；返回（补充清除点列表, 未被覆盖的目标点比例）。
+
+        思路（"区域大就多清几次"）：清除半径只有 20 m，一个点保证不了命中时就多清几个点 ——
+        只要这几个半径 20 m 的圆把定位区域盖满，逐个清过去必然命中，省掉一轮补测（补测要绕
+        几百米、约 100 s 量级里程）。补清一个点的边际代价只有一个点间距的移动（≤ 40 m ≈ 8 s）
+        加失败时的 3 s，比补测便宜一个量级。
+
+        点怎么选：在区域内取细网格作为目标点，候选点同样取区域内的网格；估计点（已经去过、
+        已失败）的圆所覆盖的目标点先划掉，然后每轮选"新增覆盖目标点最多"的候选点（贪心最大
+        覆盖，与覆盖圆求解里的贪心集合覆盖同一手法）。比例 = 0 表示覆盖完整，可以保证命中。
+        """
+        region = self.region(channel)
+        mec = region.enclosing_circle
+        if mec is None or region.region.is_empty:
+            return [], 1.0
+        b = region.region.bounds
+        span = max(b[2] - b[0], b[3] - b[1])
+        step = max(K_COVER_STEP_MIN, span / K_COVER_SAMPLES)
+        gx, gy = np.meshgrid(np.arange(b[0], b[2] + 1e-9, step),
+                             np.arange(b[1], b[3] + 1e-9, step))
+        grid = np.stack((gx.ravel(), gy.ravel()), axis=1)
+        inside = np.array([region.contains(p) for p in grid])
+        targets = grid[inside]
+        if len(targets) == 0:
+            return [], 1.0
+        cand = targets
+        if len(cand) > 2500:                    # 候选点抽稀，控制距离矩阵规模
+            cand = cand[:: len(cand) // 2500 + 1]
+
+        covered = np.linalg.norm(targets - np.asarray(mec[:2]), axis=1) <= radius + TOL
+        points: List[Tuple[float, float]] = []
+        for _ in range(k_extra):
+            if covered.all():
+                break
+            dists = np.linalg.norm(cand[:, None, :] - targets[None, :, :], axis=2)
+            reach = (dists <= radius + TOL) & ~covered[None, :]
+            gain = reach.sum(axis=1)
+            j = int(gain.argmax())
+            if gain[j] == 0:
+                break
+            points.append((float(cand[j][0]), float(cand[j][1])))
+            covered |= dists[j] <= radius + TOL
+        return points, float(1.0 - covered.mean())
+
+    def _multi_try_clear(self, channel: int) -> Optional[str]:
+        """试清未中后就地"多清几次"：用至多 k_clear_max 个半径 20 m 的圆覆盖定位区域，依次补清。
+
+        只在"这几个圆能把区域盖满"时才动手（否则白跑，直接交给补测）；顺序按最近邻，从当前
+        位置由近及远，命中即停。返回方法标签，覆盖不全或都没命中时返回 None。
+        """
+        if not self.clear_enabled or self._out_of_time():
+            return None
+        pts, leftover = self._k_cover_points(channel, self.k_clear_max)
+        if not pts or leftover > 1e-9:          # 盖不满整个区域：不值得赌，交给补测
+            return None
+        rec = self.tracks.setdefault(channel, {})
+        rec["k_clear"] = len(pts) + 1
+        rec["k_cover_leftover"] = round(leftover, 6)
+        self.log(f"    [多清几次] 频道{channel}：{len(pts) + 1} 个半径 {CLEAR_RADIUS:.0f} m 的圆"
+                 f"可覆盖整个定位区域，依次补清")
+        cur = np.array(self.pos, dtype=float)
+        rest = list(pts)
+        while rest:                             # 最近邻：从当前位置由近及远
+            k = min(range(len(rest)),
+                    key=lambda i: (float(np.linalg.norm(np.asarray(rest[i]) - cur)), i))
+            x, y = rest.pop(k)
+            if self.clear(x, y, channel):
+                self.log(f"    [多清几次] 频道{channel} @ ({x:.1f}, {y:.1f}) 命中")
+                return "multi"
+            cur = np.array([x, y], dtype=float)
+        self.log(f"    [多清几次] 频道{channel}：{len(pts) + 1} 个点都未命中，转入补测")
+        return None
+
     def _finish_clear(self, channel: int) -> str:
         """补测之后的收尾：再到新的估计点试清，失败则就地复测，最后兜底沿示向度逼近。"""
         if self._try_clear(channel, "try-refined"):
@@ -1167,8 +1259,10 @@ class RobotDog:
                 self.refine(channel)
             method: Optional[str] = "skipped"
         else:
-            method = self._nearby_try_clear(channel)     # 就近试清（唯一的清除入口）
-            if method is None:                           # 未命中：按文献准则补测缩小范围
+            method = self._nearby_try_clear(channel)     # ① 就近试清
+            if method is None:                           # ② 未命中：多清几次（几个 20 m 圆盖满区域）
+                method = self._multi_try_clear(channel)
+            if method is None:                           # ③ 还不行：按文献准则补测缩小范围
                 self.refine(channel)
                 method = self._finish_clear(channel)
         d = self.diameter(channel)
@@ -1560,7 +1654,7 @@ def run_practice(args: argparse.Namespace, res: CoverSolveResult, save_dir: Path
             dog = RobotDog(sim_api.Simulator(robot_id=args.robot_id, base_url=arena.robot_url,
                                              timeout=args.timeout),
                            verbose=not args.quiet, logfile=args.log, episode=ep + 1,
-                           clear=clear)
+                           clear=clear, k_clear_max=args.k_clear_max)
             stats = dog.run(res.plan, res.survey_order)
             arena.finish_episode()
             check = truth_check(truth, res.plan, dog.obs, dog.cleared, dog.tracks)
@@ -1608,7 +1702,7 @@ def run_official(args: argparse.Namespace, res: CoverSolveResult, save_dir: Path
     sim = sim_api.Simulator(robot_id=args.robot_id, base_url=args.base_url, timeout=args.timeout)
     print(f"连接模拟器 {args.base_url}（robot_id={args.robot_id}）")
     dog = RobotDog(sim, verbose=not args.quiet, logfile=args.log, episode=1,
-                   clear=not args.survey_only)
+                   clear=not args.survey_only, k_clear_max=args.k_clear_max)
     stats = dog.run(res.plan, res.survey_order)
     print(f"完成：清除 {stats['cleared']} 个，巡视 {stats['waypoints_visited']} 个圆心，"
           f"里程 {stats['travel_m']:.0f} m，虚拟时间 {stats['virtual_time_s']:.0f} s，"
@@ -1660,6 +1754,9 @@ def build_parser() -> argparse.ArgumentParser:
                    help="演练第 1 局的种子（场景布局与示向度噪声都由它确定，可复现）")
     p.add_argument("--save-dir", default=RESULTS_DIR, help="结果输出目录（缺省 results/）")
     p.add_argument("--log", default=None, help="过程日志文件（逐站扫描的文字过程，追加写入）")
+    p.add_argument("--k-clear-max", type=int, default=K_CLEAR_MAX,
+                   help=f"试清未中后最多再补清几个点（用 K 个半径 20 m 的圆覆盖定位区域；"
+                        f"缺省 {K_CLEAR_MAX}，只在能盖满区域时才用，盖不满则转入补测）")
     p.add_argument("--survey-only", action="store_true",
                    help="只做阶段一（巡视扫描 + 覆盖核对），不做定位与清除")
     p.add_argument("--quiet", action="store_true", help="只输出汇总，不打印过程")

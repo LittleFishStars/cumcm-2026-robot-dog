@@ -15,3 +15,7 @@ logs/*.jsonl
 
 # 验证脚本 F 组的暂存目录（正常跑完会自删，异常中断时兜底）
 .tmp_verify/
+
+# 模拟器运行痕迹（每次演练自动重建，非源码/交付物）
+jammers-py/data/behavior-logs/
+jammers-py/data/practice-statistics-queue.sqlite3

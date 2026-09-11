@@ -1,0 +1,13 @@
+ga,param,value,metric
+localize,gens,40,4.669669962676013
+localize,gens,80,4.657002064037947
+localize,gens,150,4.65381912570404
+localize,gens,300,4.653511695928485
+localize,pop,20,4.653528809687247
+localize,pop,40,4.655964411384091
+localize,pop,80,4.65381912570404
+localize,pop,160,4.652455473391916
+route,gens,50,0.4549117647839092
+route,gens,150,0.0
+route,gens,300,0.0
+route,gens,600,0.0

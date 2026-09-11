@@ -6,9 +6,9 @@
 策略（四个阶段，定位与路线全用遗传算法）
 ======================================
 1. 起点扫描：在原点对全部 20 个频道测向，先拿到一批示向度。
-2. 覆盖观测：贪心集合覆盖挑出尽量少的路点，使半径 1800 m 圆域内任意点都落在某个路点
-   950 m 内（< 有效接收半径下界 1000 m），再用路线 GA 定序依次访问；每个路点对尚未
-   确认的频道测向。既不漏源，又天然形成多视角交会。
+2. 覆盖观测：贪心集合覆盖挑出尽量少的路点，使整个半径 1800 m 圆域内任意点到最近路点
+   不超过 920 m（< 有效接收半径下界 1000 m，实算最坏点 962 m，余量 38 m），再用路线 GA
+   定序依次访问；每个路点对尚未确认的频道测向。既不漏源，又天然形成多视角交会。
 3. GA 定位：个体是干扰源位置 (x, y)，适应度为示向度残差 RMS（度）+ 越界惩罚（距离超过
    有效接收半径上界、位置越出圆域）；初始种子用射线两两交点加速收敛。若交会几何病态
    （位置 1σ 过大或射线近共线），或某频道只有单条射线，则补测"垂直视角"。
@@ -82,14 +82,25 @@ BEARING_ERROR_DEG = 1.0         # 示向度误差半宽 / 度
 CHANNELS: Tuple[int, ...] = tuple(range(1, 21))
 COORD_LIMIT = 2.0e6             # 坐标分量绝对值上限 / m
 
-COVER_RADIUS = 950.0            # 覆盖路点设计半径（<1000 下界，留网格离散余量）/ m
-COVER_GRID = 100.0              # 目标圆域离散网格 / m
-COVER_STEP = 120.0              # 候选路点网格 / m
+# 覆盖路点设计：三个参数共同决定"圆域内任意点到最近路点 ≤ COVER_RADIUS"的保证强度。
+# 离散化越细，实际能达到的最坏距离越接近 COVER_RADIUS。实算（连续圆域上求最坏点）：
+#   100/120/950 → 8 路点，最坏 1008.4 m（>1000，圆域边缘存在听不到的源 ❌）
+#    60/ 80/920 → 8 路点，最坏  962.4 m（余量 +37.6 m，巡视里程还短 480 m ✅ 现用）
+COVER_RADIUS = 920.0            # 覆盖路点设计半径（<1000 接收下界）/ m
+COVER_GRID = 60.0               # 目标圆域离散网格 / m
+COVER_STEP = 80.0               # 候选路点网格 / m
+REGION_MARGIN = 1.0             # 坐标裁剪时保留的数值余量 / m（机器狗须在圆域内）
 OBS_PER_SOURCE = 3              # 每个频道尽量采集的示向度条数
 
-GEOM_SIGMA = 15.0               # 位置 1σ 超过该值视为交会几何病态 / m
+# 位置 1σ 超过该值即视为交会几何病态并补测垂直视角。校准依据（200 组随机交会实验）：
+# σ > 40 m 的频道约占 10%，其真实定位误差中位数 28 m（已超过 20 m 清除半径），而
+# σ < 40 m 的频道误差中位数仅 4~6 m —— 阈值正好把"会失败的交会"挑出来。
+GEOM_SIGMA = 40.0               # 位置 1σ 超过该值视为交会几何病态 / m
 GEOM_SIN_MIN = 0.20             # 两射线夹角 |sin| 小于该值视为近共线
 PERP_STEPS = (250.0, 500.0, 800.0)      # 补测垂直视角时外移的距离 / m
+# 说明：补测点按"沿某方向外移固定距离"生成，源靠近圆域边缘时可能挪到圆域之外（机器狗
+# 不允许离开作业圆域，虽然模拟器不会拒绝）。所有动作坐标统一由 clamp_to_region 拉回域内，
+# 因此无需在各处候选点生成逻辑里重复裁剪，代价只是基线略短、σ 略大。
 SINGLE_PROBES = ((600.0, 35.0), (400.0, 45.0), (800.0, 25.0))   # 单射线补测：前移距离/侧偏角
 HOMING_STEP = 16.0              # 末端沿示向度逼近的步长 / m
 HOMING_MAX = 24                 # 末端逼近最大迭代次数
@@ -315,16 +326,20 @@ class GeneticLocalizer:
 
     @staticmethod
     def covariance(obs_list: Sequence[Obs], G: Sequence[float]) -> np.ndarray:
-        """位置协方差近似：射线法向信息矩阵的逆（每条射线给出一个法向约束）。
+        """位置协方差：射线法向信息矩阵的逆（每条射线给出一个"垂向"约束）。
 
-        权重 ∝ 1/(d·σ_θ)²，d 取 50 m 下限以免近距时权重爆炸；信息矩阵退化（近共线）时
-        返回大方差矩阵，交由调用方补测视角。
+        信息矩阵按 Fisher 信息累积：A = Σ 1/(d_i·σ_θ)² · n_i n_iᵀ，其中 n_i 是第 i 条
+        射线的单位法向、d_i 为观测点到解的距离（取 50 m 下限以免近距权重爆炸）。
+        注意 A 必须从**零矩阵**起（不可加单位阵）：多一个 1 m⁻² 的先验会让 σ 恒等于
+        1.4 m，既失去随几何变化的信息，也让 GEOM_SIGMA 判据永远不触发。
+        射线近共线时 A 近乎奇异，此时返回大方差矩阵，由调用方补测视角。
         """
-        A = np.eye(2)
+        A = np.zeros((2, 2))
         for o in obs_list:
             d = max(float(np.linalg.norm(np.asarray(G, dtype=float) - o.point)), 50.0)
             w = 1.0 / (d * math.radians(BEARING_ERROR_DEG)) ** 2
             A += w * np.outer(o.normal, o.normal)
+        A += np.eye(2) * 1e-12              # 仅用于数值可逆，量级远小于真实信息
         try:
             return np.linalg.inv(A)
         except np.linalg.LinAlgError:
@@ -465,6 +480,20 @@ def route_ga(
 # ----------------------------------------------------------------------------
 # 覆盖路点：贪心集合覆盖（保证圆域内任意点都在某路点 COVER_RADIUS 内）
 # ----------------------------------------------------------------------------
+def clamp_to_region(x: float, y: float,
+                    radius: float = REGION_RADIUS - REGION_MARGIN) -> Tuple[float, float]:
+    """把坐标拉回作业圆域内（出域时沿原方向缩到边界）。
+
+    用于所有 /measure 与 /clear 的入口：定位 GA 的解、垂直/单射线补测点、末端归航步进都
+    可能落在圆域之外，统一在此裁剪，内部逻辑无需各自判断。
+    """
+    r = math.hypot(x, y)
+    if r <= radius or r == 0.0:
+        return x, y
+    k = radius / r
+    return x * k, y * k
+
+
 def _disk_grid(radius: float, step: float) -> np.ndarray:
     ax = np.arange(-radius, radius + 1e-9, step)
     gx, gy = np.meshgrid(ax, ax)
@@ -589,12 +618,12 @@ class RecordedSim:
         return self._call("/enter", {}, lambda rid: self._sim.enter(request_id=rid))
 
     def measure(self, x: float, y: float, channel: int) -> dict:
-        x, y = float(x), float(y)
+        x, y = clamp_to_region(float(x), float(y))
         return self._call("/measure", {"x": x, "y": y, "channel": int(channel)},
                           lambda rid: self._sim.measure(x, y, int(channel), request_id=rid))
 
     def clear(self, x: float, y: float, channel: int) -> dict:
-        x, y = float(x), float(y)
+        x, y = clamp_to_region(float(x), float(y))
         return self._call("/clear", {"x": x, "y": y, "channel": int(channel)},
                           lambda rid: self._sim.clear(x, y, int(channel), request_id=rid))
 
@@ -877,8 +906,9 @@ class RobotDog:
                 return
             if res == "direction":
                 th = math.radians(float(r["svd_deg"]))
-                est[channel] = Estimate(e.x + HOMING_STEP * math.cos(th),
-                                        e.y + HOMING_STEP * math.sin(th), e.sigma)
+                nx, ny = clamp_to_region(e.x + HOMING_STEP * math.cos(th),
+                                         e.y + HOMING_STEP * math.sin(th))
+                est[channel] = Estimate(nx, ny, e.sigma)
                 continue
             # no_signal：定位偏了，用新示向度重新定位；仍不行则补测视角
             ne = self._estimate(channel)

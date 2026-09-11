@@ -104,7 +104,8 @@ def run_practice(args: argparse.Namespace) -> int:
     traj_paths: List[Path] = []
     with _api_log(args, not args.quiet) as api_log, \
             PracticeArena(jammers_dir, robot_id=args.robot_id,
-                          console_port=args.console_port) as arena:
+                          robot_port=args.robot_port, console_port=args.console_port,
+                          reuse_existing=not args.no_reuse) as arena:
         print(f"jammers-py 已就绪：机器狗接口 {arena.robot_url}，控制台 {arena.console_url}")
         for ep in range(args.practice):
             seed = args.seed + ep
@@ -173,6 +174,12 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--jammers-dir", default=None, help="jammers-py 目录（缺省为本仓库根目录下的 jammers-py/）")
     p.add_argument("--console-port", type=int, default=8090,
                    help="演练时 jammers-py 控制台端口（缺省 8090，被占用则自动顺延）")
+    p.add_argument("--robot-port", type=int, default=2026,
+                   help="演练时 jammers-py 的机器狗接口端口（缺省 2026，与官方一致；"
+                        "若官方模拟器正占用 2026，另起本地演练实例时需改此端口）")
+    p.add_argument("--no-reuse", action="store_true",
+                   help="不使用已在运行的 jammers-py，另起一个独占实例（多会话并行演练时用；"
+                        "配合 --console-port/--robot-port 避免端口冲突）")
     p.add_argument("--seed", type=int, default=0,
                    help="随机种子（演练第 1 局的场景布局、示向度噪声与 GA 都由它确定）")
     p.add_argument("--save-dir", default=None,

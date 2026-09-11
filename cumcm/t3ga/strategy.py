@@ -23,7 +23,7 @@ import numpy as np
 from cumcm.common.geometry import ang_diff, bearing, dist
 from cumcm.common.geometry import clamp_to_region as _clamp_to_region
 from cumcm.common.sim_client import RecordedSim
-from cumcm.t3ga.config import (CHANNELS, CONVERGED_FITNESS, COORD_LIMIT, COVER_RADIUS, GEOM_SIGMA, GEOM_SIN_MIN, HOMING_MAX, HOMING_STEP, OBS_PER_SOURCE, PERP_STEPS, REGION_MARGIN, REGION_RADIUS, RHO_GATE, SAFETY_MARGIN, SEED, SINGLE_PROBES)
+from cumcm.t3ga.config import (CHANNELS, CONVERGED_FITNESS, COORD_LIMIT, COVER_RADIUS, GEOM_SIGMA, GEOM_SIN_MIN, HOMING_MAX, HOMING_STEP, OBS_PER_SOURCE, PERP_STEPS, PRECISE_SIGMA, REGION_MARGIN, REGION_RADIUS, RHO_GATE, SAFETY_MARGIN, SEED, SINGLE_PROBES)
 from cumcm.t3ga.localize import (Estimate, GeneticLocalizer, Obs, max_ray_sine, position_sigma)
 from cumcm.t3ga.covering import covering_waypoints
 from cumcm.common.routing import dist_matrix as _dist_matrix
@@ -259,19 +259,40 @@ class RobotDog:
                  f"近距清除 {counts['near']} 个，无信号 {counts['no_signal']} 个")
 
     # ---- 阶段 2：滚动重规划（覆盖巡视与定位清除合并）----
-    def _active_channels(self) -> List[int]:
-        """仍需测向的频道：未清除且示向度条数未达上限（未听到的频道也在内，故不会漏源）。"""
-        return [c for c in CHANNELS if c not in self.cleared
-                and len(self.obs.get(c, ())) < OBS_PER_SOURCE]
+    def _precise(self, channel: int) -> bool:
+        """该频道当前估计是否已足够准（位置 1σ ≤ PRECISE_SIGMA），无需再测向。
 
-    def _localize_ready(self, exclude: set) -> Dict[int, Estimate]:
-        """对"已有 ≥2 条示向度、尚未清除且不在 exclude 里"的频道跑定位 GA。
+        只用已缓存的定位解判断，且要求缓存与当前观测条数一致，避免拿过期解做决定。缓存由
+        本类每轮先调用的 `_localize_ready` 填充；首轮缓存为空时返回 False（照常测向），故
+        不改变第一轮行为。PRECISE_SIGMA=0 时恒为 False（关闭本优化）。
+        """
+        if PRECISE_SIGMA <= 0:
+            return False
+        e = self._est_cache.get(channel)
+        return (e is not None
+                and self._est_key.get(channel) == len(self.obs.get(channel, ()))
+                and e.sigma <= PRECISE_SIGMA)
+
+    def _active_channels(self) -> List[int]:
+        """仍需测向的频道：未清除、示向度条数未达上限，且**估计还不够准**。
+
+        第三条（`_precise`）是滚动重规划版的"提前收工"：估计已够准的频道再测只能把 σ 从
+        20 m 压到 15 m，却要每站多花 5 s；它会被当作已定位源插入同一条路线，走到就近清掉，
+        而真正的兜底（收尾 localize_all + _clear_all）保证仍能 100% 清除。未听到的频道不在
+        任何缓存里，`_precise` 返回 False，故绝不会因本优化而漏源。
+        """
+        return [c for c in CHANNELS if c not in self.cleared
+                and len(self.obs.get(c, ())) < OBS_PER_SOURCE
+                and not self._precise(c)]
+
+    def _localize_ready(self) -> Dict[int, Estimate]:
+        """对"已有 ≥2 条示向度、尚未清除"的频道跑定位 GA，返回估计字典。
 
         以观测条数为缓存键：同一批观测只训练一次，避免滚动循环每步重复跑 GA 记录训练数据。
         """
         out: Dict[int, Estimate] = {}
         for ch in sorted(self.obs):
-            if ch in self.cleared or ch in exclude:
+            if ch in self.cleared:
                 continue
             n = len(self.obs[ch])
             if n < 2:
@@ -284,6 +305,20 @@ class RobotDog:
                 out[ch] = e
         return out
 
+    def _gated(self, attempted: set) -> Dict[int, Estimate]:
+        """挑出"值得插入当前路线顺路清除"的已定位源。
+
+        条件：位置 1σ ≤ RHO_GATE（估计可信），且不在 `attempted` 里 —— 后者是"已试过一次
+        （无论成败）"的频道集合，避免在同一估计上反复绕路白跑；没清掉的源留给收尾的
+        localize_all + _clear_all 专程处理。
+        """
+        out: Dict[int, Estimate] = {}
+        for ch, e in self._localize_ready().items():
+            if e.sigma > RHO_GATE or ch in attempted:
+                continue
+            out[ch] = e
+        return out
+
     def _rolling_survey_clear(self) -> None:
         """把覆盖路点与已定位源放进同一条 GA 路线，每步只执行第一个目标并重排。
 
@@ -291,28 +326,39 @@ class RobotDog:
         已定位源只是**可选任务**，仅当位置 1σ ≤ RHO_GATE 时才插入，防止为不可信估计白跑。
         每步更新观测后重排，是"边测边定位边清"的关键：清掉的源立即从后续路线消失，省掉
         巡视结束后的专程往返。未能就地清除的源留给收尾的 localize_all + _clear_all 兜底。
+
+        两处相对旧版的收紧（都为省时，且不削弱"不漏源 + 必清除"的保证）：
+        ① `_active_channels` 对已够准（σ≤PRECISE_SIGMA）的频道停测，只清不测 —— 继续测只
+           能小幅降 σ，却要每个路点多花 5 s 测向 + 1 s 换频；
+        ② 当没有任何频道需要测（`active` 为空）时，不再走访剩余路点（走访只为测量），直接
+           沿路线把已定位源清掉，然后收尾 —— 路点覆盖保证的是"能听到"，不是"必须走完"。
+        实测（20 局 seed 0~19）虚拟时间 4220→4135 s、测向 2816→2663 次，256/256 全清。
         """
         waypoints = covering_waypoints()
         visited = [False] * len(waypoints)
-        attempted: set = set()
-        n_step = 1                      # 步骤编号（0 已被起点全频道扫描占用）          # 已在滚动中试清过（无论成败）的频道，收尾再处理
+        attempted: set = set()          # 已在滚动中试清过（无论成败）的频道，收尾再处理
+        n_step = 1                      # 步骤编号（0 已被起点全频道扫描占用）
         self.log(f"阶段2：滚动重规划，{len(waypoints)} 个覆盖路点（覆盖半径 "
-                 f"{COVER_RADIUS:.0f} m，插入门 σ≤{RHO_GATE:.0f} m）")
+                 f"{COVER_RADIUS:.0f} m，插入门 σ≤{RHO_GATE:.0f} m，停测门 "
+                 f"σ≤{PRECISE_SIGMA:.0f} m）")
         while not self._out_of_time():
+            gated = self._gated(attempted)      # 先跑定位、填缓存，再判是否还需测向
             active = self._active_channels()
             pending = [i for i in range(len(waypoints)) if not visited[i]]
-            if not pending or not active:
+            has_station = bool(active) and bool(pending)
+            if not has_station and not gated:
                 break
-            gated = {ch: e for ch, e in self._localize_ready(attempted).items()
-                     if e.sigma <= RHO_GATE}
-            station_pts = waypoints[pending]
-            pts = (np.vstack((station_pts,
-                              np.array([gated[ch].point for ch in gated], dtype=float)))
-                   if gated else station_pts)
+            blocks = []
+            if has_station:
+                blocks.append(waypoints[pending])
+            if gated:
+                blocks.append(np.array([gated[ch].point for ch in gated], dtype=float))
+            pts = blocks[0] if len(blocks) == 1 else np.vstack(blocks)
+            n_station = len(pending) if has_station else 0
             order, _ = self._plan_route(pts, "滚动重规划")
             nxt = order[0]
-            if nxt >= len(pending):             # 下一站是源：就地逼近清除
-                ch = list(gated)[nxt - len(pending)]
+            if nxt >= n_station:                # 下一站是源：就地逼近清除
+                ch = list(gated)[nxt - n_station]
                 attempted.add(ch)
                 self.log(f"  滚动：先清频道{ch}（估计 σ={gated[ch].sigma:.1f} m，"
                          f"剩余路点 {len(pending)} 个、待清源 {len(gated)} 个）")

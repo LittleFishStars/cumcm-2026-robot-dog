@@ -31,8 +31,7 @@ from cumcm.common.routing import (dist_matrix, exact_open_by_end, exact_open_ord
 from cumcm.common.sim_client import RecordedSim
 from cumcm.t3.config import (BEARING_ERROR_DEG, CHANNELS, CLEAR_RADIUS, CLIP_ERR, CLIP_SIDES,
                              COVER_RADIUS, HOMING_CAP, HOMING_MAX, HOMING_STEP,
-                             INLINE_EXCLUDE_R_M, INLINE_PROBE_DIAM_M, INLINE_RADIUS_MAX_M, INLINE_SECTOR_DEG,
-                             K_CLEAR_MAX,
+                             INLINE_EXCLUDE_R_M, INLINE_SECTOR_DEG, K_CLEAR_MAX,
                              K_COVER_SAMPLES,
                              K_COVER_STEP_MIN, NEAR_RADIUS, OBS_CAP, RECEIVE_MAX, RECEIVE_MID,
                              REFINE_MAX, REGION_MARGIN, REGION_RADIUS, SAFETY_MARGIN, TOL,
@@ -71,9 +70,7 @@ class RobotDog:
                  episode: int = 0, clear: bool = True,
                  k_clear_max: int = K_CLEAR_MAX,
                  inline_sector_deg: float = INLINE_SECTOR_DEG,
-                 inline_radius_max: float = INLINE_RADIUS_MAX_M,
                  inline_exclude_r: float = INLINE_EXCLUDE_R_M,
-                 inline_probe_diam: float = INLINE_PROBE_DIAM_M,
                  rotate: bool = True,
                  api_log=None) -> None:
         # 传入 api_log 时套一层记录代理：4 个接口的每一次调用都会落盘
@@ -83,12 +80,7 @@ class RobotDog:
         self.clear_enabled = clear
         self.k_clear_max = int(k_clear_max)
         self.inline_sector_deg = float(inline_sector_deg)    # 顺路清除扇形（本站为顶点）半张角 / 度
-        self.inline_radius_max = float(inline_radius_max)  # 顺路清除扇区半径上界 / m
         self.inline_exclude_r = float(inline_exclude_r)      # 顺路清除排除的区域圆心半径 / m
-        self.inline_probe_diam = float(inline_probe_diam) # 顺路清除时顺手补测的直径阈值 / m
-        self.n_inline_probe = 0                         # 顺路清除时顺手补测的次数
-        self._probed_inline: set = set()               # 本局已被顺路补测过的频道（去重：同一频道
-                                                       # 只补测一次，避免在同一位置反复测收敛不动）
         self.rotate = bool(rotate)                           # 起始扫描后是否旋转覆盖圆布局
         # 过程日志用 "w"：每局开头重写，于是整份日志只描述**最新一局**。
         # 原先用 "a" 追加，跨局、跨运行无限累积，几轮演练后文件里混着几百局的内容难以查阅。
@@ -509,21 +501,23 @@ class RobotDog:
                         est: Sequence[float]) -> Optional[Tuple[float, float, float]]:
         """估计点 est 是否落在「本站→圆心」与「下一站→圆心」两条连线之间的扇区内。
 
-        判据（以区域圆心为参照的极角扇区）：
+        判据（以区域圆心为参照的极角扇区，**半径以两站为限**）：
           · 方位：est 与圆心的连线方向 th_est 位于 th_at 与 th_next 夹出的**较短弧**上，即
                 ang_diff(th_est, th_at) + ang_diff(th_est, th_next) == ang_diff(th_at, th_next)
             （三角不等式取等；ang_diff 取值 [0,180]，故"较短弧"是唯一候选）；
-          · 半径：r_est ≤ inline_radius_max（缺省=区域半径 1800，即圆域内都算；用户确认放宽
-            到 1800 —— 半径不再以两站为限，以便清到距圆心 1300~1800 m 的远源）。
+          · 半径：r_est ≤ max(r_at, r_next) —— 两条"到圆心连线"的端点就是本站与下一站本身，
+            "点与圆心连线在两条连线之间"便自然止于两站所在的半径，不延伸到圆域深处。
 
         反侧点（th_est 与 th_at 差 180°）会被三角不等式排除；必须用**角度**比较而不能用
         sin：|sin 180°| = 0，反侧点会被误判成同向。
 
         返回 (在短弧上的进度 0~1, 距圆心半径, 与 th_at 的角度差)；并列时按频道号定序。
         """
+        r_at = math.hypot(at[0], at[1])
+        r_next = math.hypot(next_wp[0], next_wp[1])
         r_est = math.hypot(est[0], est[1])
-        if r_est > self.inline_radius_max + 1e-6:
-            return None                              # 超出区域半径（圆域内都算扇区候选）
+        if r_est > max(r_at, r_next) + 1e-6:
+            return None                              # 超出两站半径，不算"两点之间"
         th_at = self._polar_deg(at)
         th_next = self._polar_deg(next_wp)
         th_est = self._polar_deg(est)
@@ -566,34 +560,6 @@ class RobotDog:
         有没有生效"必须能独立验证，不能埋在 _inline_clear 的循环里无从检查。
         """
         return math.hypot(est[0], est[1]) < self.inline_exclude_r
-
-    def _probe_coarse_at(self) -> int:
-        """清除动作后在当前位置顺手补测一个"已扫到但区域直径还大"的频道。
-
-        机器狗刚 clear 完一个点、正停在估计点附近 —— 这是补测的零里程时机。目标频道：已经扫到
-        （ch 在 self.obs 里有示向度）、还没清除、可能源集合直径 > inline_probe_diam（还没收敛到
-        可直接清除的量级）；挑其中直径**最大**的一个原地 measure（传当前位置 ⇒ 移动 0，只花
-        切换 + 5 s 测向）。补测让粗估计快速收敛，后续顺路/阶段二清除时更可能命中（白跑变命中）。
-
-        返回补测次数（0 或 1）。
-        """
-        if self.inline_probe_diam <= 0:
-            return 0
-        best, best_d = None, self.inline_probe_diam
-        for ch in sorted(self.obs):
-            if ch in self.cleared or ch in self._probed_inline:
-                continue
-            d = self.diameter(ch)                    # 区域为空/退化时返回 0，天然排除
-            if d > best_d:
-                best, best_d = ch, d
-        if best is None:
-            return 0
-        self.measure(float(self.pos[0]), float(self.pos[1]), best)   # 原地测向，不走动
-        self.n_inline_probe += 1
-        self._probed_inline.add(best)                # 同一频道本局只补测一次
-        self.log(f"    [顺路补测] 在清除点顺手测频道{best}（区域直径 {best_d:.0f} m > 阈值"
-                 f" {self.inline_probe_diam:.0f} m），原地补一条示向度")
-        return 1
 
     def _inline_clear(self, at: Sequence[float], next_wp: Sequence[float]) -> int:
         """巡视途中顺路清除：把「本站与圆心的连线 → 下一站与圆心的连线」之间的点顺路清掉。
@@ -670,7 +636,6 @@ class RobotDog:
                 self.n_inline_fail += 1
                 self.log(f"    [顺路清除] 频道{ch} @ ({est[0]:.1f}, {est[1]:.1f}) 未命中"
                          f"（{where}，留到阶段二处理）")
-            self._probe_coarse_at()          # 清除同时：顺手补测"已扫到但直径大"的粗频道
         if n:
             self.log(f"    本段顺路清除 {n} 个，累计已清 {len(self.cleared)} 个")
         return n
@@ -1039,7 +1004,6 @@ class RobotDog:
             "n_inline_cleared": sum(1 for r in self.tracks.values()
                                     if r.get("method") == "survey-inline"),
             "n_inline_fail": self.n_inline_fail,
-            "n_inline_probe": self.n_inline_probe,
             "n_refined": sum(1 for r in self.tracks.values() if r.get("n_probe")),
             "n_probe": sum(int(r.get("n_probe", 0)) for r in self.tracks.values()),
             "tracks": self.tracks,

@@ -19,8 +19,19 @@ Windows 机器
 
 | 程序 | 说明 | 官方模式结果目录 |
 | --- | --- | --- |
-| `T3.py` | 确定性主线方案（**建议正式测试用它**） | `results/t3/official/` |
-| `T3_ga.py` | GA 对照方案 | `results/t3_ga/official/` |
+| `T3.py` | 确定性主线方案（**建议正式测试用它**） | `results/t3/` |
+| `T3_ga.py` | GA 对照方案 | `results/t3_ga/` |
+
+> **结果目录不按模式分家**：官方模式与本地演练写同一个目录，一个结果目录 = 最新一次运行。
+> 跑完官方测试后，该目录里的演练批产物（多局统计、真值相关字段）会被这次单局结果覆盖。
+>
+> 因此有一个固定次序：**先跑演练批 → 再跑验证/出图**。官方产物没有真值（接口不返回），
+> 靠它无法出论文图 —— `T3_figures.py` 会直接提示，`T3_validate.py` 则把需要真值的几项
+> 标为"跳过"（而不是判失败）。演练批逐字节可复现，重跑一次即可：
+> `.venv/bin/python T3_ga.py --practice 20 --seed 0`（注意它会反过来覆盖官方留档）。
+>
+> 想知道某个目录是哪一次运行留下的，看 `ga_training.json` 的 `meta.mode`
+> （或 `t3_survey.json` 的 `meta.mode`）：`practice` / `official`。
 
 ## 1. 一次性准备（约 5 分钟）
 
@@ -121,13 +132,14 @@ python -X utf8 T3.py --plan-only
 | --- | --- | --- |
 | `--base-url` | `http://127.0.0.1:2026` | 模拟器接口地址，改过端口才需要 |
 | `--robot-id` | `202614023005` | 参赛队号，已内置，不用传 |
-| `--save-dir` | `results/t3_ga/official/` | 结果输出目录 |
+| `--save-dir` | `results/t3_ga/` | 结果输出目录（不按演练/官方分家） |
 | `--quiet` | 关 | 只打印汇总，不打印过程明细 |
 | `--no-plot` | 关 | 关闭每局结束后的轨迹图 |
 
 ### 2.3 预期输出
 
-（下例是**实测样例**：用与官方同源的复刻模拟器走同一套官方模式代码路径跑出来的，连同 `results/t3_ga/official/` 一起留档，便于对照。）
+（下例是**实测样例**：用与官方同源的复刻模拟器走同一套官方模式代码路径跑出来的，连同
+`results/t3/`、`results/t3_ga/` 的顶层内容一起留档，便于对照。）
 
 ```
 ==========================================================================
@@ -135,17 +147,17 @@ python -X utf8 T3.py --plan-only
 ==========================================================================
 连接模拟器 http://127.0.0.1:2026（robot_id=202614023005）
 完成：清除 16 个，巡视 7 个圆心，里程 15489 m，虚拟时间 3864 s，测向 113 次（补测 2 次），听到 16 个频道（40 条示向度）
-结果已保存：results/t3/official/t3_cover_plan.json，results/t3/official/t3_cover_circles.csv，results/t3/official/t3_survey.json，results/t3/official/t3_observations.csv
-轨迹图：results/t3/official/trajectory/ep01_official.png，results/t3/official/trajectory/ep01_official.csv
-接口调用日志：共 134 次（/clear 19、/enter 1、/exit 1、/measure 113）→ results/t3/official/api_calls.jsonl
+结果已保存：results/t3/t3_cover_plan.json，results/t3/t3_cover_circles.csv，results/t3/t3_survey.json，results/t3/t3_observations.csv
+总轨迹图：results/t3/trajectory/ep01.png，results/t3/trajectory/ep01.csv
+接口调用日志：共 138 次（/clear 11、/enter 1、/exit 1、/measure 125）→ results/t3/api_calls.jsonl
 定位 GA：14 次训练（每代 80 个体），提前收敛 2/14 次（判据 适应度<1e-04），否则跑满 150 代...
 路线 GA：覆盖路点巡回（8 点）8145 m → 8117 m，改进 0.3%
-训练结果已保存：results/t3_ga/official/ga_training.json，results/t3_ga/official/ga_convergence.csv，results/t3_ga/official/episodes.csv
-接口调用日志：共 180 次（/clear 20、/enter 1、/exit 1、/measure 158）→ results/t3_ga/official/api_calls.jsonl
+训练结果已保存：results/t3_ga/ga_training.json，results/t3_ga/ga_convergence.csv，results/t3_ga/episodes.csv
+接口调用日志：共 166 次（/clear 11、/enter 1、/exit 1、/measure 153）→ results/t3_ga/api_calls.jsonl
 ```
 
-上面是 **T3.py（确定性主线）** 的实测样例（与 `results/t3/official/` 一起留档，便于对照；
-`T3_ga.py` 的输出格式不同，样例见 `results/t3_ga/official/`）。
+上面是 **T3.py（确定性主线）** 的实测样例（与 `results/t3/` 一起留档，便于对照；
+`T3_ga.py` 的输出格式不同，样例见 `results/t3_ga/`）。
 
 **核对要点**：本程序报的「清除 N 个」应与模拟器界面显示的清除结果一致；
 `/enter`、`/exit` 各恰好 1 次；`/measure` 次数 = 测向次数。
@@ -187,7 +199,8 @@ python -X utf8 T3.py --plan-only
 python -X utf8 T3.py --base-url http://127.0.0.1:2026 --save-dir results\formal
 ```
 
-（官方模式缺省另写 `<结果目录>/official/`，所以不加 `--save-dir` 也不会覆盖演练批数据。）
+（官方模式与演练写**同一目录**，所以 `T3.py` 与 `T3_ga.py` 不加 `--save-dir` 都写 `results/t3/`、
+`results/t3_ga/`。）
 
 3. 正式测试结束后，**导出模拟器生成的加密行为日志**（界面 4.6 节路径），
    连同本程序的 `results\formal\api_calls.jsonl` 一起作为支撑材料。
@@ -231,7 +244,7 @@ Linux 上的 `jammers-py` 是用于算法验证的复刻模拟器，**不能替�
 
 ## 6. 产出文件
 
-跑完一局后 `results/t3_ga/official/` 下会有：
+跑完一局后 `results/t3_ga/` 下会有：
 
 | 文件 | 内容 | 用途 |
 | --- | --- | --- |

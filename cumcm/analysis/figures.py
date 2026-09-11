@@ -598,6 +598,17 @@ def main(argv: Sequence[str] | None = None) -> int:
     calls = load_calls(res / "api_calls.jsonl")
     val = load_json(res / "validation.json") if (res / "validation.json").exists() else {}
 
+    # 结果目录现在"一个目录 = 最新一次运行"，装的可能是不带真值的**官方产物** ——
+    # 官方模式接口不返回真值，清除比例与定位误差全是 null，图会画成空白甚至在 matplotlib
+    # 里抛 TypeError（int + None）。这里提前判明并给出可执行的下一步，别让它以栈回溯收场。
+    if not any((ep.get("n_sources") or 0) > 0 for ep in train.get("episodes", [])):
+        print(f"无法出图：{res} 里没有真值（{train.get('meta', {}).get('mode', '?')} 产物）。")
+        print("论文图需要逐局清除比例与定位误差等真值字段，而官方模式接口不返回真值。")
+        print(f"请先跑一次演练批重建这些字段（逐字节可复现）：\n"
+              f"    .venv/bin/python T3_ga.py --practice 20 --seed 0\n"
+              f"再运行本脚本。注意演练批会覆盖该目录里现有的官方产物。")
+        return 2
+
     print("生成图表：")
     fig_episode_clear(train, fig_dir, data_dir)
     fig_localization_error(train, fig_dir, data_dir)

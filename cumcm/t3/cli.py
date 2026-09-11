@@ -21,7 +21,7 @@ from cumcm.common.practice_arena import PracticeArena
 from cumcm.common.sim_client import (API_LOG_NAME, BASE_URL, ROBOT_ID, ApiLog,
                                      Simulator)
 from cumcm.common.sim_client import api_log as _api_log_raw
-from cumcm.t3.config import (CHOSEN_RING_RADIUS, CLEAR_RADIUS, COVER_RADIUS, INLINE_DETOUR, INLINE_TRY_RADIUS, K_CLEAR_MAX, RESULTS_DIR, SEED, TRAJ_DIR)
+from cumcm.t3.config import (BEARING_ERROR_DEG, CHOSEN_RING_RADIUS, CLEAR_RADIUS, COVER_RADIUS, INLINE_DETOUR, INLINE_TRY_RADIUS, K_CLEAR_MAX, RESULTS_DIR, SEED, TRAJ_DIR)
 from cumcm.t3.covering import (CoverSolveResult, optimal_ring_radius, print_cover_report, solve_covering_circles)
 from cumcm.common.scanfigure import STEP_DIR_NAME, reset_dir
 from cumcm.t3.plotting import save_scan_figures, save_trajectory, truth_points
@@ -145,7 +145,11 @@ def run_practice(args: argparse.Namespace, res: CoverSolveResult, save_dir: Path
                                   for r in rows))
     print("=" * 78)
     paths = (save_plan(res, save_dir)
-             + save_survey(save_dir, rows, observations, res.to_json()))
+             + save_survey(save_dir, rows, observations, res.to_json(),
+                           {"mode": "practice", "problem_no": 3,
+                            "robot_id": args.robot_id, "seed0": args.seed,
+                            "episodes": args.practice,
+                            "bearing_error_deg": BEARING_ERROR_DEG}))
     print("结果已保存：" + "，".join(str(p) for p in paths))
     if api_log is not None:
         api_log.report()
@@ -156,7 +160,7 @@ def run_official(args: argparse.Namespace, res: CoverSolveResult, save_dir: Path
     """官方评测接口模式：连 127.0.0.1 上已开放接口的模拟器，跑完整一局。
 
     与演练的两处差别：① **拿不到干扰源真值**，故定位误差等需要真值的指标留空（覆盖核对也
-    无从做）；② 结果默认写到 <RESULTS_DIR>/official/，不覆盖演练批数据。
+    无从做）；② 结果与演练写同一目录（<RESULTS_DIR>），不按模式分家。
     策略代码与参数完全一致，因此演练里验证过的行为在正式模式同样成立。
 
     接口调用全程落盘到 <save-dir>/api_calls.jsonl（--api-log 改路径、传空串关闭）：官方模式
@@ -182,19 +186,24 @@ def run_official(args: argparse.Namespace, res: CoverSolveResult, save_dir: Path
             reset_dir(save_dir / args.traj_dir)          # 只保留本次运行的图
             reset_dir(save_dir / STEP_DIR_NAME)
             files = save_trajectory(
-                save_dir, "ep01_official", dog.actions, dog.plan,
+                save_dir, "ep01", dog.actions, dog.plan,
                 dog.survey_order_used, (),
                 title=f"官方模式：清除 {stats['cleared']} 个、里程 {stats['travel_m']:.0f} m、"
                       f"虚拟时间 {stats['virtual_time_s']:.0f} s（无真值可比）",
                 traj_dir=args.traj_dir)
-            scans = save_scan_figures(save_dir, "ep01_official", dog.scan_steps,
+            scans = save_scan_figures(save_dir, "ep01", dog.scan_steps,
                                       dog.plan, dog.survey_order_used, (),
                                       traj_dir=args.traj_dir)
             print("总轨迹图：" + "，".join(str(f) for f in files))
             print(f"逐步扫描结果图：{len(scans)} 张 → {save_dir / STEP_DIR_NAME}/")
         paths = (save_plan(res, save_dir)
                  + save_survey(save_dir, [row], observation_rows(1, dog.plan, dog.meas),
-                               res.to_json()))
+                               res.to_json(),
+                               {"mode": "official", "problem_no": 3,
+                                "base_url": args.base_url, "robot_id": args.robot_id,
+                                "episodes": 1,
+                                "bearing_error_deg": BEARING_ERROR_DEG,
+                                "note": "官方模式接口不返回真值，故真值相关字段为 null"}))
         print("结果已保存：" + "，".join(str(p) for p in paths))
         if api_log is not None:
             api_log.report()
@@ -235,9 +244,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--seed", type=int, default=SEED,
                    help="演练第 1 局的种子（场景布局与示向度噪声都由它确定，可复现）")
     p.add_argument("--save-dir", default=None,
-                   help=f"结果输出目录（演练/仅求解缺省 {RESULTS_DIR}/，"
-                        f"官方模式缺省 {RESULTS_DIR}/official/，以免覆盖演练批数据）")
-    p.add_argument("--log", default=None, help="过程日志文件（逐站扫描的文字过程，追加写入）")
+                   help=f"结果输出目录（缺省 {RESULTS_DIR}/，不按演练/官方分家："
+                        f"一个目录 = 最新一次运行）")
+    p.add_argument("--log", default=None, help="过程日志文件（逐站扫描的文字过程，每局重写，只留最新一局）")
     p.add_argument("--k-clear-max", type=int, default=K_CLEAR_MAX,
                    help=f"试清未中后最多再补清几个点（用 K 个半径 20 m 的圆覆盖定位区域；"
                         f"缺省 {K_CLEAR_MAX}，只在能盖满区域时才用，盖不满则转入补测）")
@@ -269,8 +278,11 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     relax_console_encoding()
     args = build_parser().parse_args(argv)
     official = not args.practice and not args.plan_only
-    if args.save_dir is None:               # 官方模式另起目录，避免覆盖演练批数据
-        args.save_dir = str(Path(RESULTS_DIR) / "official") if official else RESULTS_DIR
+    # 官方模式与演练写同一目录：一个结果目录 = 最新一次运行，不按模式分家。
+    # 代价是官方跑一局就会覆盖该目录里的演练批产物，故"先跑演练批 → 验证/出图"是一个
+    # 固定次序（演练批可由 --practice N --seed M 逐字节复现，重跑一次即可）。
+    if args.save_dir is None:
+        args.save_dir = RESULTS_DIR
     save_dir = Path(args.save_dir)
 
     print("=" * 78)

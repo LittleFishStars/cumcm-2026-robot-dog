@@ -132,12 +132,12 @@
       {
         "check": "[t3_ga] 存在可审计的训练结果与接口日志",
         "pass": true,
-        "detail": "20 局 / 3149 次调用"
+        "detail": "1 局 / 166 次调用"
       },
       {
         "check": "[t3_ga] 所有动作坐标都在半径 1800 m 圆域内",
         "pass": true,
-        "detail": "0 次越界，最远 1799.0 m"
+        "detail": "0 次越界，最远 1700.9 m"
       },
       {
         "check": "[t3_ga] 坐标分量未超协议上限 2e6",
@@ -146,33 +146,33 @@
       },
       {
         "check": "[t3_ga] 每次成功清除都落在该源 20 m 清除半径内",
-        "pass": true,
-        "detail": "越界 0 次"
+        "pass": null,
+        "detail": "跳过：官方产物无真值"
       },
       {
         "check": "[t3_ga] 成功清除未误伤同名范围内其他源",
-        "pass": true,
-        "detail": "0 次"
+        "pass": null,
+        "detail": "跳过：官方产物无真值"
       },
       {
         "check": "[t3_ga] 虚拟时钟可独立复算（与模拟器报告值一致到 1e-6 s）",
         "pass": true,
-        "detail": "最大差 0.00e+00 s（3109 次）"
+        "detail": "最大差 0.00e+00 s（164 次）"
       },
       {
         "check": "[t3_ga] 每局恰有一次 /enter 与 /exit",
         "pass": true,
-        "detail": "enter=20 exit=20 局数=20"
+        "detail": "enter=1 exit=1 局数=1"
       },
       {
         "check": "[t3_ga] 测向次数与逐局统计一致",
         "pass": true,
-        "detail": "2816 vs 2816"
+        "detail": "153 vs 153"
       },
       {
         "check": "[t3_ga] 清除动作次数与逐局统计一致",
         "pass": true,
-        "detail": "293 vs 293"
+        "detail": "11 vs 11"
       },
       {
         "check": "[t3_ga] 所有接口调用均被接受（无 rejected / 异常）",
@@ -181,68 +181,68 @@
       },
       {
         "check": "[t3_ga] 全部干扰源被清除",
-        "pass": true,
-        "detail": "256/256（100.0%）"
+        "pass": null,
+        "detail": "跳过：官方产物无真值"
       },
       {
         "check": "[t3_ga] 逐局定位平均误差 < 20 m（清除半径）",
-        "pass": true,
-        "detail": "最差局 9.22 m"
+        "pass": null,
+        "detail": "跳过：官方产物无真值"
       },
       {
         "check": "[t3_ga] 逐局最坏定位误差 < 30 m",
-        "pass": true,
-        "detail": "最坏 19.74 m"
+        "pass": null,
+        "detail": "跳过：官方产物无真值"
       },
       {
         "check": "[t3_ga] 虚拟总时间在题目 100 h 虚拟限时内",
         "pass": true,
-        "detail": "最长局 6383.4 s"
+        "detail": "最长局 3210.0 s"
       },
       {
         "check": "[t3_ga] 每次定位都有 GA 训练记录且收敛到最后一代",
         "pass": true,
-        "detail": "361 次定位（提前收敛 268 次）"
+        "detail": "14 次定位（提前收敛 10 次）"
       },
       {
         "check": "[t3_ga] 每次路线规划都有 GA 训练记录（跑满代数）",
         "pass": true,
-        "detail": "374 次规划"
+        "detail": "17 次规划"
       },
       {
         "check": "[t3_ga] 收敛曲线非空",
         "pass": true,
-        "detail": "26700 个记录点"
+        "detail": "1202 个记录点"
       },
       {
         "check": "[t3_ga] 轨迹目录只保留最新一局（恰好 1 图 + 1 表）",
         "pass": true,
-        "detail": "1 张图 / 1 份表（共跑 20 局）→ results/t3_ga/trajectory"
+        "detail": "1 张图 / 1 份表（共跑 1 局）→ results/t3_ga/trajectory"
       },
       {
         "check": "[t3_ga] 逐步扫描结果图齐全（起点扫描 + 各巡视站/路点各一张）",
         "pass": true,
-        "detail": "9 张 → results/t3_ga/scan：ep20_seed19_s00_起点全频道扫描.png, ep20_seed19_s01_覆盖路点_4.png, ep20_seed19_s02_覆盖路点_7.png, ep20_seed19_s03_覆盖路点_1.png…"
+        "detail": "9 张 → results/t3_ga/scan：ep01_s00_起点全频道扫描.png, ep01_s01_覆盖路点_4.png, ep01_s02_覆盖路点_8.png, ep01_s03_覆盖路点_2.png…"
       },
       {
         "check": "[t3_ga] 轨迹图与扫描图均为有效且尺寸合理的 PNG",
         "pass": true,
-        "detail": "10 张，尺寸 (912, 1025)~(1472, 1248)"
+        "detail": "10 张，尺寸 (912, 1024)~(1472, 1248)"
       },
       {
         "check": "[t3_ga] 保留局的轨迹与接口日志逐点一致（坐标与动作类型）",
         "pass": true,
-        "detail": "核对 163 个动作点"
+        "detail": "核对 164 个动作点"
       },
       {
         "check": "[t3_ga] 轨迹点全部在作业圆域内",
         "pass": true,
-        "detail": "163 个点全在域内"
+        "detail": "164 个点全在域内"
       },
       {
         "check": "[t3_ga] 扫描图与轨迹图属于同一局（清旧图有效）",
         "pass": true,
-        "detail": "保留局 ep20，文件 ep20_seed19.png, ep20_seed19_s00_起点全频道扫描.png, ep20_seed19_s01_覆盖路点_4.png…"
+        "detail": "保留局 ep01，文件 ep01.png, ep01_s00_起点全频道扫描.png, ep01_s01_覆盖路点_4.png…"
       },
       {
         "check": "[holdout] 存在可审计的训练结果与接口日志",
@@ -468,37 +468,33 @@
     "e_max_radius_m": 1799.0,
     "e_vt_max_diff_s": 0.0,
     "e_calls_t3_ga": {
-      "enter": 20,
-      "measure": 2816,
-      "clear": 293,
-      "exit": 20
+      "enter": 1,
+      "measure": 153,
+      "clear": 11,
+      "exit": 1
     },
     "e_rejected": 0,
     "e_cleared_t3_ga": {
-      "cleared": 256,
-      "total": 256,
-      "ratio": 1.0
+      "cleared": 10,
+      "total": null,
+      "ratio": null
     },
-    "e_loc_err_mean_m_t3_ga": 7.6239232972944775,
-    "e_loc_err_worst_episode_m_t3_ga": 9.222966162431696,
-    "e_loc_err_worst_m_t3_ga": 19.736160886047216,
-    "e_clear_ratio_t3_ga": 1.0,
     "e_virtual_time_s_t3_ga": {
-      "min": 3521.806294,
-      "max": 6383.403202,
-      "mean": 4220.18094705,
-      "median": 3836.7424355
+      "min": 3209.99813,
+      "max": 3209.99813,
+      "mean": 3209.99813,
+      "median": 3209.99813
     },
     "e_ga_runs_t3_ga": {
-      "localize": 361,
-      "route": 374
+      "localize": 14,
+      "route": 17
     },
     "e_traj_png_t3_ga": {
       "files": 1,
       "scan_files": 9,
       "dir": "results/t3_ga/trajectory",
-      "points_checked": 163,
-      "kept_episode": 20
+      "points_checked": 164,
+      "kept_episode": 1
     },
     "e_calls_holdout": {
       "enter": 10,
@@ -538,9 +534,10 @@
       "episodes.csv": true
     },
     "f_figures_pdf": 10,
-    "elapsed_s": 109.3
+    "elapsed_s": 313.1
   },
   "failed": 0,
-  "elapsed_s": 109.3,
-  "generated_at": "2026-09-11 20:21:57"
+  "skipped": 5,
+  "elapsed_s": 313.1,
+  "generated_at": "2026-09-11 20:57:19"
 }

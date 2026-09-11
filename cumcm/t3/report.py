@@ -129,12 +129,18 @@ def summarize(rows: Sequence[dict]) -> Dict[str, Any]:
 
 
 def save_survey(save_dir: Path, rows: List[dict], observations: List[dict],
-                plan_json: Dict[str, Any]) -> List[Path]:
-    """巡视扫描结果落盘：逐局统计 JSON + 逐条观测 CSV。"""
+                plan_json: Dict[str, Any], meta: Optional[dict] = None) -> List[Path]:
+    """巡视扫描结果落盘：逐局统计 JSON + 逐条观测 CSV。
+
+    `meta` 说明这次运行的来源（mode 取 practice / official，另含地址、队号、局数等）。
+    结果目录已不按模式分家，故**目录名与文件名都不再透露模式信息**，来源只能靠这份元数据
+    交代；官方产物没有真值（接口不返回），`mode` 是事后判断"这批数字为何缺真值字段"的唯一线索。
+    """
     save_dir.mkdir(parents=True, exist_ok=True)
     json_path = save_dir / SURVEY_JSON
     json_path.write_text(json.dumps({
         "stage": "覆盖圆求解 + 依次到圆心巡视扫描 + 就近试清（未命中按文献准则补测缩小后再清）",
+        "meta": meta or {},
         "cover_plan": plan_json,
         "clear_radius_m": CLEAR_RADIUS,
         "receive_radius_m": [COVER_RADIUS, RECEIVE_MAX],

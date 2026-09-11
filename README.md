@@ -18,10 +18,10 @@ cumcm/
              strategy / plotting / training / cli
   analysis/  验证与出图：validate（六组独立验证）、figures（论文图表）
 jammers-py/  本地演练场（复刻模拟器；data/behavior-logs/ 会随每次演练累积日志，可随时清空）
-results/     运行产物，按两套方案分成两棵子树：
-  t3/        确定性方案（T3.py）：覆盖圆方案、巡视统计、逐条观测、10 局轨迹
-  t3_ga/      GA 对照方案（T3_ga.py）：GA 训练记录、逐局统计、接口日志、验证结果、
-             20 局轨迹，以及 holdout/（泛化批）与 official/（官方模式实测留档）
+results/     运行产物，按两套方案分成两棵子树（**不按运行模式分家**：一个目录 = 最新一次运行）：
+  t3/        确定性方案（T3.py）：覆盖圆方案、巡视汇总、逐条观测、接口日志、总轨迹图、逐步扫描图
+  t3_ga/     GA 对照方案（T3_ga.py）：GA 训练记录、逐局统计、接口日志、验证结果、
+             轨迹与扫描图，以及 holdout/（独立 seed 泛化批）
 figures/     论文用图表 PDF 与背后的数据 CSV
 reports/     方案说明与结果报告
 References/  参考文献（PDF）
@@ -46,7 +46,7 @@ uv sync                              # 或 pip install -e .
 ```
 
 `T3.py` 与 `T3_ga.py` 的命令行一致（都不加参数即连官方模拟器），三种模式共用同一次覆盖圆求解
-与同一份策略代码，差别只在"场景从哪来"与"结果写哪去"：官方模式缺省写 `results/t3/official/`
+与同一份策略代码，差别只在"场景从哪来"：官方模式与演练**写同一目录**（`results/t3/`）
 且**拿不到真值**（逐次请求/响应落盘到 `api_calls.jsonl`，这是唯一的证据链）；`--practice` 用
 jammers-py 自动拉起、**自带真值**可核对覆盖保证，写 `results/t3/`。
 

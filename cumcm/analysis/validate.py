@@ -91,6 +91,7 @@ class Report:
         self.groups: Dict[str, List[dict]] = {}
         self.metrics: Dict[str, Any] = {}
         self.failed = 0
+        self.skipped = 0
 
     def check(self, group: str, name: str, ok: bool, detail: str = "") -> bool:
         self.groups.setdefault(group, []).append(
@@ -101,12 +102,26 @@ class Report:
         print(f"    {mark} {name}" + (f"：{detail}" if detail else ""))
         return bool(ok)
 
+    def skip(self, group: str, name: str, detail: str = "") -> None:
+        """记录一项**因输入不适用而跳过**的检查（`pass` 为 None，不计入失败，也不冒充通过）。
+
+        为什么要单独一类：结果目录现在"一个目录 = 最新一次运行"，官方模式下真值不可见
+        （接口不返回），逐局清除率与定位误差这类**需要真值**的检查便无从判定。此前这种
+        情形会让 `max([])` 直接抛 ValueError 把整轮验证打断；用 True 蒙混过去更糟 —— 那
+        会把"没数据"伪装成"检查通过"。只有明确的第三态才既诚实又不会中断验证。
+        """
+        self.groups.setdefault(group, []).append(
+            {"check": name, "pass": None, "detail": f"跳过：{detail}"})
+        self.skipped += 1
+        print(f"    – {name}：跳过（{detail}）")
+
     def metric(self, name: str, value: Any) -> None:
         self.metrics[name] = value
 
     def summary(self) -> str:
         total = sum(len(v) for v in self.groups.values())
-        return f"共 {total} 项检查，失败 {self.failed} 项"
+        extra = f"，跳过 {self.skipped} 项" if self.skipped else ""
+        return f"共 {total} 项检查，失败 {self.failed} 项{extra}"
 
 
 def _localize_session(seed: int) -> T.GeneticLocalizer:
@@ -509,6 +524,11 @@ def group_e_one(rep: Report, res_dir: Path) -> None:
         return
     tag = res_dir.name
     train = json.loads(train_p.read_text(encoding="utf-8"))
+    # 结果目录不再按模式分家，故可能装的是**官方产物**（接口不返回真值，n_sources 为 None）。
+    # 这类目录里"清除率/定位误差"无从判定，下面显式跳过而不是判失败、也不用 True 蒙混。
+    has_truth = any((ep.get("n_sources") or 0) > 0 for ep in train["episodes"])
+    if not has_truth:
+        print(f"    说明：本目录为官方产物（无真值），真值相关检查将跳过")
     calls = [json.loads(l) for l in calls_p.read_text(encoding="utf-8").splitlines() if l.strip()]
     rep.check("E", f"[{tag}] 存在可审计的训练结果与接口日志", True,
               f"{len(train['episodes'])} 局 / {len(calls)} 次调用")
@@ -529,8 +549,11 @@ def group_e_one(rep: Report, res_dir: Path) -> None:
     # E3 清除落点：成功清除必须落在真值 20 m 内，且不误清其他源
     truth = {ep["episode"]: {t["channel"]: (t["x"], t["y"]) for t in ep.get("truth") or []}
              for ep in train["episodes"]}
+    if not has_truth:
+        rep.skip("E", f"[{tag}] 每次成功清除都落在该源 20 m 清除半径内", "官方产物无真值")
+        rep.skip("E", f"[{tag}] 成功清除未误伤同名范围内其他源", "官方产物无真值")
     far, wrong = [], []
-    for r in calls:
+    for r in (calls if has_truth else []):
         if r["call"] != "/clear" or (r.get("response") or {}).get("clear_result") != "success":
             continue
         ch, ep = r["channel"], r["episode"]
@@ -543,9 +566,10 @@ def group_e_one(rep: Report, res_dir: Path) -> None:
         for other_ch, (ox, oy) in truth.get(ep, {}).items():
             if other_ch != ch and math.hypot(r["x"] - ox, r["y"] - oy) <= CLEAR_RADIUS:
                 wrong.append((ep, ch, other_ch))
-    rep.check("E", f"[{tag}] 每次成功清除都落在该源 20 m 清除半径内", not far,
-              f"越界 {len(far)} 次" + (f"，最远 {max(far):.2f} m" if far else ""))
-    rep.check("E", f"[{tag}] 成功清除未误伤同名范围内其他源", not wrong, f"{len(wrong)} 次")
+    if has_truth:
+        rep.check("E", f"[{tag}] 每次成功清除都落在该源 20 m 清除半径内", not far,
+                  f"越界 {len(far)} 次" + (f"，最远 {max(far):.2f} m" if far else ""))
+        rep.check("E", f"[{tag}] 成功清除未误伤同名范围内其他源", not wrong, f"{len(wrong)} 次")
 
     # E4 虚拟时钟独立复算
     by_ep: Dict[int, List[dict]] = {}
@@ -585,24 +609,32 @@ def group_e_one(rep: Report, res_dir: Path) -> None:
               f"{len(rej)} 次被拒" + (f"，例：{rej[0]['request_id']}" if rej else ""))
     rep.metric("e_rejected", len(rej))
 
-    # E7 清除完成度与定位精度
+    # E7 清除完成度与定位精度（需要真值）
     eps = train["episodes"]
+    if not has_truth:
+        for nm in ("全部干扰源被清除",
+                   "逐局定位平均误差 < 20 m（清除半径）",
+                   "逐局最坏定位误差 < 30 m"):
+            rep.skip("E", f"[{tag}] {nm}", "官方产物无真值")
+        rep.metric(f"e_cleared_{tag}", {"cleared": sum(ep["cleared"] for ep in eps),
+                                        "total": None, "ratio": None})
     cleared = sum(ep["cleared"] for ep in eps)
     total = sum(ep["n_sources"] or 0 for ep in eps)
     ratio = cleared / total if total else float("nan")
     errs = [ep["localize_err_mean_m"] for ep in eps if ep["localize_err_mean_m"] is not None]
     maxs = [ep["localize_err_max_m"] for ep in eps if ep["localize_err_max_m"] is not None]
-    rep.check("E", f"[{tag}] 全部干扰源被清除", cleared == total,
-              f"{cleared}/{total}（{ratio * 100:.1f}%）")
-    rep.check("E", f"[{tag}] 逐局定位平均误差 < 20 m（清除半径）",
-              max(errs) < CLEAR_RADIUS, f"最差局 {max(errs):.2f} m")
-    rep.check("E", f"[{tag}] 逐局最坏定位误差 < 30 m", max(maxs) < 30.0,
-              f"最坏 {max(maxs):.2f} m")
-    rep.metric(f"e_cleared_{tag}", {"cleared": cleared, "total": total, "ratio": ratio})
-    rep.metric(f"e_loc_err_mean_m_{tag}", float(np.mean(errs)))
-    rep.metric(f"e_loc_err_worst_episode_m_{tag}", float(max(errs)))
-    rep.metric(f"e_loc_err_worst_m_{tag}", float(max(maxs)))
-    rep.metric(f"e_clear_ratio_{tag}", ratio)
+    if has_truth:
+        rep.check("E", f"[{tag}] 全部干扰源被清除", cleared == total,
+                  f"{cleared}/{total}（{ratio * 100:.1f}%）")
+        rep.check("E", f"[{tag}] 逐局定位平均误差 < 20 m（清除半径）",
+                  max(errs) < CLEAR_RADIUS, f"最差局 {max(errs):.2f} m")
+        rep.check("E", f"[{tag}] 逐局最坏定位误差 < 30 m", max(maxs) < 30.0,
+                  f"最坏 {max(maxs):.2f} m")
+        rep.metric(f"e_cleared_{tag}", {"cleared": cleared, "total": total, "ratio": ratio})
+        rep.metric(f"e_loc_err_mean_m_{tag}", float(np.mean(errs)))
+        rep.metric(f"e_loc_err_worst_episode_m_{tag}", float(max(errs)))
+        rep.metric(f"e_loc_err_worst_m_{tag}", float(max(maxs)))
+        rep.metric(f"e_clear_ratio_{tag}", ratio)
 
     # E8 现实用时：每局墙钟必须远小于 20 分钟现实限时
     vt = [ep["virtual_time_s"] for ep in eps]
@@ -803,7 +835,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps({"groups": rep.groups, "metrics": rep.metrics,
-                               "failed": rep.failed, "elapsed_s": round(elapsed, 1),
+                               "failed": rep.failed, "skipped": rep.skipped,
+                               "elapsed_s": round(elapsed, 1),
                                "generated_at": time.strftime("%Y-%m-%d %H:%M:%S")},
                               ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"验证结果已保存：{out}")

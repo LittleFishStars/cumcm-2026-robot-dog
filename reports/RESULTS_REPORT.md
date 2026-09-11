@@ -223,7 +223,7 @@ results/
     ├── holdout/               独立 seed 批（seed 100–109）同名产物
     │   ├── …                  （4 个汇总文件 + api_calls.jsonl 1676 行）
     │   └── trajectory/        10 对
-    └── official/              官方模式实测留档（无真值，故定位误差字段为空）
+    └── （顶层即官方实测留档：两族不再分 official/ 子目录，official 与演练写同一目录）
 figures/
 ├── fig_t3_*.pdf           10 张论文用图（矢量）
 └── data/*.csv             每张图背后的数据

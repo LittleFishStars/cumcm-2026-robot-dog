@@ -57,10 +57,10 @@ def run_official(args: argparse.Namespace) -> int:
     """官方评测平台的正式流程：连 127.0.0.1 上已开放接口的模拟器，跑完一局。
 
     与演练的关键差别：**拿不到干扰源真值**，因此定位误差等需要真值的指标留空；
-    结果默认写到 <RESULTS_DIR>/official/，不覆盖演练训练批的数据。
+    结果写 <RESULTS_DIR>（与演练同一目录）：一个结果目录 = 最新一次运行，不按模式分家。
     """
     if args.save_dir is None:
-        args.save_dir = str(Path(RESULTS_DIR) / "official")
+        args.save_dir = RESULTS_DIR
     sim = Simulator(robot_id=args.robot_id, base_url=args.base_url, timeout=args.timeout)
     print(f"连接模拟器 {args.base_url}（robot_id={args.robot_id}）")
     with _api_log(args, not args.quiet) as api_log:
@@ -176,9 +176,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--seed", type=int, default=0,
                    help="随机种子（演练第 1 局的场景布局、示向度噪声与 GA 都由它确定）")
     p.add_argument("--save-dir", default=None,
-                   help=f"结果输出目录（演练缺省 {RESULTS_DIR}/，官方测试缺省 "
-                        f"{RESULTS_DIR}/official/；写入 GA 训练记录与逐局统计）")
-    p.add_argument("--log", default=None, help="过程日志文件（阶段/清除等文字过程，追加写入）")
+                   help=f"结果输出目录（缺省 {RESULTS_DIR}/，不按演练/官方分家；"
+                        f"写入 GA 训练记录与逐局统计）")
+    p.add_argument("--log", default=None, help="过程日志文件（阶段/清除等文字过程，每局重写，只留最新一局）")
     p.add_argument("--api-log", default=None,
                    help=f"接口调用日志（逐条记录 /enter /measure /clear /exit 的请求与"
                         f"原始响应；缺省 <save-dir>/{API_LOG_NAME}，传空字符串则关闭）")

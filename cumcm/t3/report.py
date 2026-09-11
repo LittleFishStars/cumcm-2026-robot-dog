@@ -114,6 +114,17 @@ def summarize(rows: Sequence[dict]) -> Dict[str, Any]:
         "localize_err_max_m": round(float(np.max(errs)), 3) if errs else None,
         "n_within_clear_radius": sum(1 for e in errs if e <= CLEAR_RADIUS),
         "methods": methods,
+        # 布局旋转：每局按起始扫描听到的源把覆盖圆环转到"源最密集的 60° 扇区"，
+        # 故旋转角逐局不同（它是策略输出，不是设计参数）。未旋转（--no-rotate）时恒为 0。
+        "rotation_deg_mean": round(float(np.mean([r.get("rotation_deg", 0.0)
+                                                  for r in rows])), 3),
+        "rotation_deg_min": round(float(np.min([r.get("rotation_deg", 0.0)
+                                                for r in rows])), 3),
+        "rotation_deg_max": round(float(np.max([r.get("rotation_deg", 0.0)
+                                                for r in rows])), 3),
+        "n_episodes_rotated": sum(1 for r in rows if abs(r.get("rotation_deg", 0.0)) > 1e-9),
+        "n_face_scanned_mean": round(float(np.mean([r.get("n_face_scanned", 0)
+                                                    for r in rows])), 2),
     }
 
 
@@ -158,6 +169,7 @@ def episode_row(ep: int, seed: int, truth: Optional[Sequence[dict]], dog: RobotD
         "n_cleared_after_probe": check.get("n_cleared_after_probe"),
         **stats,
         "waypoint_stats": dog.waypoint_stats,
+        "plan_centers": dog.plan.centers,          # 本局实际圆心（旋转后的位置）
         "truth_check": check,
         "bearings_per_channel": {str(c): len(v) for c, v in sorted(dog.obs.items())},
         "cleared_channels": sorted(dog.cleared),

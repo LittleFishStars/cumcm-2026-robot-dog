@@ -2,6 +2,7 @@
   "region_radius_m": 1800.0,
   "cover_radius_m": 1000.0,
   "ring_radius_m": 1200.0,
+  "rotation_deg": 0.0,
   "ring_radius_chosen": true,
   "ring_radius_max_margin_m": 1558.846,
   "n_circles": 7,

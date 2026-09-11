@@ -38,7 +38,10 @@ uv sync                              # 或 pip install -e .
 .venv/bin/python T3_ga.py --practice 3
 .venv/bin/python T3_validate.py      # 六组独立验证
 .venv/bin/python T3_figures.py       # 生成论文图表
+.venv/bin/python -m cumcm.t3.covering   # 覆盖圆方案自检（旋转不破坏覆盖保证 / 密集扇区选向）
 ```
+
+`T3.py` 的 `--no-rotate` 可关掉"起始扫描后把覆盖圆环转到源最密集方向"这一步，用于对照实验。
 
 分层规则见 `cumcm/__init__.py`：依赖只能向下（common ← t1/t3/t3ga ← analysis），
 严禁下层反向导入上层。

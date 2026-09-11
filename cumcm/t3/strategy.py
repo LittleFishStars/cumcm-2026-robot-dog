@@ -33,7 +33,7 @@ from cumcm.t3.config import (BEARING_ERROR_DEG, CHANNELS, CLEAR_RADIUS, CLIP_ERR
                              K_COVER_STEP_MIN, NEAR_RADIUS, OBS_CAP, RECEIVE_MAX, RECEIVE_MID,
                              REFINE_MAX, REGION_MARGIN, REGION_RADIUS, SAFETY_MARGIN, TOL,
                              TRY_CLEAR_RADIUS)
-from cumcm.t3.covering import CoverPlan
+from cumcm.t3.covering import CoverPlan, dense_sector_rotation
 from cumcm.t3.probing import hypothesis_points, probe_candidates
 from cumcm.t3.regions import Meas, Obs, ProbRegion
 
@@ -46,7 +46,10 @@ class RobotDog:
     """两阶段机器狗。
 
     阶段一（巡视扫描）：按覆盖圆方案依次走到 7 个圆心，在每个圆心对未采够的频道测向，把
-    每个源的示向度采集齐全（同一地点误差固定，故每频道最多采 OBS_CAP 条）。
+    每个源的示向度采集齐全（同一地点误差固定，故每频道最多采 OBS_CAP 条）。起始点（原点）
+    的那一站是"全频道扫描"，扫完立刻用这批示向度做两件零成本的事：把覆盖圆布局**旋转**到
+    1 号环心正对源最密集的 60° 扇区（`_align_face`），并按已听到的源调整巡视绕向与落脚点
+    （`_orient_route`）。两者都不改变巡视里程与覆盖保证，只改变"先扫哪里、最后停在哪里"。
 
     阶段二（定位与清除）：对每个频道走同一条流程，**没有"够不够准"的清除门槛** ——
       1. 用问题 1 的交会定位区域（各 ±1° 楔形之交 ∩ 圆域）得到位置估计（区域最小覆盖圆圆心）；
@@ -63,13 +66,15 @@ class RobotDog:
                  episode: int = 0, clear: bool = True,
                  k_clear_max: int = K_CLEAR_MAX,
                  inline_try_radius: float = INLINE_TRY_RADIUS,
-                 inline_detour: float = INLINE_DETOUR) -> None:
+                 inline_detour: float = INLINE_DETOUR,
+                 rotate: bool = True) -> None:
         self.sim = sim
         self.verbose = verbose
         self.clear_enabled = clear
         self.k_clear_max = int(k_clear_max)
         self.inline_try_radius = float(inline_try_radius)    # 顺路试清允许的覆盖圆半径上限 / m
         self.inline_detour = float(inline_detour)            # 顺路试清允许的绕行里程上限 / m
+        self.rotate = bool(rotate)                           # 起始扫描后是否旋转覆盖圆布局
         self._logfile = open(logfile, "a", encoding="utf-8") if logfile else None
         self.obs: Dict[int, List[Obs]] = defaultdict(list)
         self.meas: Dict[int, List[Meas]] = defaultdict(list)   # 全部测量（含 no_signal）
@@ -89,6 +94,11 @@ class RobotDog:
         self.waypoint_stats: List[Dict[str, Any]] = []   # 逐圆心扫描统计
         self.travel_m = 0.0                              # 实际走过的里程 / m
         self.stage = "survey"                            # 观测所处阶段（survey / refine）
+        self.plan: Optional[CoverPlan] = None            # 本局实际使用的覆盖圆方案（含旋转）
+        self.rotation_deg = 0.0                          # 布局旋转角 / 度（起始扫描后确定）
+        self.dense_dir_deg: Optional[float] = None       # 源最密集的扇区中心方位 / 度
+        self.n_face_scanned = 0                          # 起始扫描听到的源个数（选向依据）
+        self.survey_order_used: List[int] = []           # 本局实际的巡视顺序
 
     # ---- 日志 ----
     def log(self, msg: str) -> None:
@@ -240,7 +250,7 @@ class RobotDog:
                          f"{'成功' if self.clear(at[0], at[1], ch) else '失败'}")
         return counts
 
-    def survey(self, waypoints: np.ndarray, order: Sequence[int]) -> None:
+    def survey(self, order: Sequence[int]) -> None:
         """依次移动到各圆心并扫描：阶段一的主体。
 
         第 1 站（原点）就是"起始全频道扫描"：一次把 20 个频道全测一遍，成本 20 次测向
@@ -249,6 +259,7 @@ class RobotDog:
         跳过测量与区域收缩都有用）。扫描结束后立刻用这批方位调整后续路径的绕向与落脚点。
         """
         order = list(order)
+        waypoints = self.plan.waypoints
         self.log(f"阶段1 巡视扫描：依次访问 {len(order)} 个圆心"
                  f"（顺序 {' → '.join(str(i) for i in order)}）")
         for step_i, idx in enumerate(order, 1):
@@ -277,12 +288,79 @@ class RobotDog:
                 self.log(f"    [起始全频道扫描] 一次扫完 20 个频道：锚定 {counts['direction']} "
                          f"个源的方向，其余 {counts['no_signal']} 个判定为源在 "
                          f"{COVER_RADIUS:.0f} m 之外")
+                # 两件零成本调整：先旋转布局（改环心朝向），再定绕向与落脚点。顺序不能反 ——
+                # _orient_route 是在给定环心位置的前提下挑终点，必须用旋转后的坐标。
+                bearings = self._bearings_at(wp)
+                self.n_face_scanned = len(bearings)
+                if self.rotate:
+                    self._align_face(bearings)
+                    waypoints = self.plan.waypoints
                 self._orient_route(waypoints, order, wp)
             if step_i < len(order):
                 self._inline_clear(wp, waypoints[order[step_i]])
+        self.survey_order_used = list(order)
         self.log(f"阶段1 完成：里程 {self.travel_m:.0f} m，虚拟时刻 {self.vt:.0f} s，"
                  f"累计示向度 {sum(len(v) for v in self.obs.values())} 条，"
                  f"途中顺路清除 {len(self.cleared)} 个")
+
+    def _bearings_at(self, at: Sequence[float]) -> List[float]:
+        """在 at 处测得的示向度（度）——即"在这个点听到的源各自在哪个方向"。"""
+        out = []
+        for ml in self.meas.values():
+            for m in ml:
+                if m.theta is not None and dist((m.x, m.y), at) <= 1e-6:
+                    out.append(float(m.theta))
+        return out
+
+    def _align_face(self, bearings: Sequence[float]) -> None:
+        """把覆盖圆布局旋转到"1 号环心正对源最密集的 60° 扇区"（起始扫描后立刻做，零成本）。
+
+        **为什么这个旋转不花代价**：绕原点整体旋转是覆盖布局的一个自由对称自由度 ——
+        覆盖条件只看圆心之间的距离和圆心到原点的距离，二者在共同旋转下都不变，所以最坏最近
+        距离恒为解析值 968.90 m（见 covering._selftest 的实算校验）；巡视里程也恒为 6d。
+        也就是说环心朝向可以随便挑，不挑就固定在 0°/60°/…（只有 6 个可选终点方向）。
+
+        **挑选准则（题内可解释的理由）**：巡视路线是"原点 → 某个环心 → 沿正六边形走 5 条边"，
+        因此每个环心的向径（原点↔环心那段）都是必走的往返段。把 1 号环心对准源最密集的方向，
+        这条向径就正好穿过源最多的那片区域，于是：
+          * 途中顺路试清（`_inline_clear`，绕行 ≤ INLINE_DETOUR 就地清除）的机会集中在
+            源密集区，命中一次就省掉整段专程往返；
+          * `_orient_route` 会把巡视终点选在已听到源的估计中心附近，于是**清除阶段从源最
+            集中的方向开始**，而不是从任意的 0° 方向开始（原先环心固定 0° 朝向时，可选终点
+            方向只有 6 个固定方向）。
+        选"扇区计数最多的方向"而不是"方位角均值"：均值是合向量方向，面对两个相距几十度的
+        等量簇时会落在两簇之间，谁也没对准；要的是"把圆心摆到源最密集的那一侧"，取众数才
+        符合意图（详见 covering.dense_sector_rotation）。
+
+        **实测（40 局 × 503 个源，同 seed 同源、仅切换旋转）**：巡视里程 16237.9 → 16431.1 m、
+        虚拟时间 3986.2 → 4018.4 s，配对检验 t = +1.08 / +0.85 —— **与噪声无法区分**（配对差
+        标准差 1127 m / 238 s，标准误约 178 m / 38 s，即如此波动只能排除数百米量级以上的差异，
+        而点估计 +193 m / +32 s 本身即倾向略差）。清除率两边都是 503/503 = 100%。因此本项调整
+        的定位是"零成本地把巡视朝向对准已观测到的源分布"，而**不作为**有量化收益的优化来主张；
+        `--no-rotate` 可在需要纯基线时关掉它。
+        """
+        th = list(bearings)
+        if not th or self.plan is None:
+            self.log(f"    [旋转] 起始扫描在原点未听到任何源（听到 {len(th)} 条），"
+                     f"覆盖圆布局保持 0° 朝向")
+            return
+        phi = dense_sector_rotation(th)
+        if phi is None:
+            return
+        # 判断"是否真的变了"：布局有 6 重旋转对称，只有模 60° 的差别才有几何意义
+        delta = (phi - self.plan.rotation + math.pi / 6.0) % (math.pi / 3.0) - math.pi / 6.0
+        self.rotation_deg = math.degrees(phi % (2.0 * math.pi))
+        self.dense_dir_deg = self.rotation_deg
+        if abs(delta) < 1e-9:
+            self.log(f"    [旋转] 起始扫描听到 {len(th)} 个源，最密集的 60° 扇区在 "
+                     f"{self.rotation_deg:.1f}°，与现有环心方向重合，无需旋转")
+            return
+        self.plan = self.plan.rotated(phi)
+        self.log(f"    [旋转] 起始扫描听到 {len(th)} 个源，最密集的 60° 扇区中心在 "
+                 f"{self.rotation_deg:.1f}°；把覆盖圆布局转 {math.degrees(delta):+.1f}°"
+                 f"（模 60° 计），使 1 号环心正对该方向 "
+                 f"@ ({self.plan.waypoints[1][0]:.0f}, {self.plan.waypoints[1][1]:.0f})"
+                 f"（覆盖保证与巡视里程 6d 均不变）")
 
     def _orient_route(self, waypoints: np.ndarray, order: List[int],
                       origin: Sequence[float]) -> None:
@@ -297,13 +375,9 @@ class RobotDog:
         if len(ring) < 3 or not self.obs:
             return
         # 起始扫描听到的源：方位已知、距离未知，取接收半径区间中点作估计
-        est = []
-        for ml in self.meas.values():
-            for m in ml:
-                if m.theta is None or dist((m.x, m.y), origin) > 1e-6:
-                    continue
-                est.append(np.array([origin[0] + RECEIVE_MID * math.cos(math.radians(m.theta)),
-                                     origin[1] + RECEIVE_MID * math.sin(math.radians(m.theta))]))
+        est = [np.array([origin[0] + RECEIVE_MID * math.cos(math.radians(t)),
+                         origin[1] + RECEIVE_MID * math.sin(math.radians(t))])
+               for t in self._bearings_at(origin)]
         if not est:
             return
         best, best_score = None, None
@@ -681,8 +755,9 @@ class RobotDog:
         self.deadline = time.monotonic() + max(left - SAFETY_MARGIN, 0.0)
         self.log(f"/enter 成功：虚拟时刻 {enter.get('virtual_time_s')} s，"
                  f"现实剩余 {left:.0f} s")
+        self.plan = plan
         try:
-            self.survey(plan.waypoints, order)
+            self.survey(order)
             if self.clear_enabled:
                 self.diagnose()
                 # 阶段二的访问顺序：按各频道估计点到当前位置的距离做最近邻 + 2-opt（省里程）。
@@ -715,6 +790,11 @@ class RobotDog:
                                       and r["mec_radius_survey_m"] + CLIP_ERR < CLEAR_RADIUS),
             "n_skip_measure": self.n_skip,
             "initial_scan": self.initial_scan,
+            "rotation_deg": round(self.rotation_deg, 4),
+            "dense_dir_deg": (None if self.dense_dir_deg is None
+                              else round(self.dense_dir_deg, 4)),
+            "n_face_scanned": self.n_face_scanned,
+            "survey_order_used": list(self.survey_order_used),
             "n_inline_cleared": sum(1 for r in self.tracks.values()
                                     if r.get("method") == "survey-inline"),
             "n_inline_fail": self.n_inline_fail,

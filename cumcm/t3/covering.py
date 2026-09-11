@@ -18,7 +18,7 @@
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from functools import lru_cache
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
@@ -27,7 +27,8 @@ import numpy as np
 from cumcm.common.routing import nearest_order
 from cumcm.common.routing import open_path_length as path_length
 from cumcm.t3.config import (BOUNDARY_SAMPLES, CHOSEN_RING_RADIUS, COARSE_BOUNDARY,
-                             COARSE_STEP, COVER_RADIUS, GRID_STEP, REGION_RADIUS, TOL)
+                             COARSE_STEP, COVER_RADIUS, GRID_STEP,
+                             REGION_RADIUS, TOL)
 
 
 @dataclass(frozen=True, eq=False)
@@ -41,19 +42,31 @@ class CoverPlan:
     region_radius: float            # 目标圆域半径 / m
     cover_radius: float             # 覆盖圆半径（= 有效接收半径下界）/ m
     ring_radius: float              # 六边形环上圆心到原点的距离 d / m
+    rotation: float = 0.0           # 环的旋转角 / rad（见 hex_layout；0 = 环心在 0°/60°/…）
     waypoints: np.ndarray = field(init=False, repr=False)
 
     def __post_init__(self) -> None:
-        object.__setattr__(self, "waypoints", hex_layout(self.ring_radius))
+        object.__setattr__(self, "waypoints",
+                           hex_layout(self.ring_radius, self.rotation))
+
+    def rotated(self, rotation: float) -> "CoverPlan":
+        """返回把环旋转到给定角度的新方案（中心圆恒在原点，故不动）。"""
+        return replace(self, rotation=float(rotation))
 
     @property
     def centers(self) -> List[Tuple[float, float]]:
         return [(float(x), float(y)) for x, y in self.waypoints]
 
 
-def hex_layout(ring_radius: float, n_ring: int = 6) -> np.ndarray:
-    """正六边形布局的圆心：第 0 个在原点，其余 n_ring 个在半径 ring_radius 的环上。"""
-    ang = np.arange(n_ring) * (2.0 * math.pi / n_ring)
+def hex_layout(ring_radius: float, rotation: float = 0.0,
+               n_ring: int = 6) -> np.ndarray:
+    """正六边形布局的圆心：第 0 个在原点，其余 n_ring 个在半径 ring_radius 的环上。
+
+    `rotation` 把整个环绕原点转一个角度（正六边形有 6 重旋转对称，故只有模 2π/n_ring 有区别）。
+    中心圆恒在原点，所以旋转不改变覆盖保证，也不改变巡视里程 6d —— 但它决定"环心朝向哪里"，
+    从而决定巡视路线扫过哪一片区域、最后停在哪个方向（见 strategy._align_face）。
+    """
+    ang = rotation + np.arange(n_ring) * (2.0 * math.pi / n_ring)
     ring = np.stack((ring_radius * np.cos(ang), ring_radius * np.sin(ang)), axis=1)
     return np.vstack([[0.0, 0.0], ring])
 
@@ -90,6 +103,57 @@ def analytic_worst(ring_radius: float, region_radius: float = REGION_RADIUS) -> 
         return math.sqrt(max(rho * rho + ring_radius * ring_radius
                              - math.sqrt(3.0) * rho * ring_radius, 0.0))
     return max(ring_radius / math.sqrt(3.0), g(region_radius))
+
+
+SECTOR_HALF_DEG = 30.0          # 扇区半宽 / 度（正六边形相邻环心隔 60°，各管一半）
+def _sector_score(bearings_rad: np.ndarray, phi: float) -> Tuple[int, float]:
+    """以 phi 为扇区中心的评分：(装入的源个数, 这些源的 ΣcosΔθ)。
+
+    个数是主指标（"哪一片源最多"），ΣcosΔθ 只在个数相同时破平（片内的源越居中越好）。
+    """
+    d = (bearings_rad - phi + math.pi) % (2.0 * math.pi) - math.pi
+    inside = np.abs(d) <= math.radians(SECTOR_HALF_DEG)
+    cnt = int(inside.sum())
+    return cnt, (float(np.cos(d[inside]).sum()) if cnt else 0.0)
+
+
+def dense_sector_rotation(bearings: Sequence[float],
+                          step_deg: float = 1.0) -> Optional[float]:
+    """选一个旋转角，使某个环心正对"听到的源最多"的 60° 扇区。
+
+    6 个环心彼此相隔 60°，故"环心能对准哪些方向"只由旋转角模 60° 决定。于是把圆周切成 360/60
+    个候选 60° 扇区（1° 一格，等效地把整个圆周扫一遍），取装入源最多的那一片的中心方向 θ*，
+    返回 θ* 本身（落在 [0, 2π)，不做模 60° 归约）作为旋转角 —— 这样 1 号环心正好落在 θ* 上，日志与结果图可以直接读成"1 号环心
+    的方位角"。模 60° 归约在几何上等价，但不利于阅读，故不做。
+
+    为什么按"个数最多"而不是"方位角均值"：均值是合向量方向，面对两个相距几十度的等量簇时
+    会落在两簇之间（谁也没对准）；本题要的是"把圆心摆到源密集的那一侧"，取众数才符合意图。
+    同分时用扇区内 ΣcosΔθ 破平，再尝试用片内源的质量中心做一次亚度精修（只在个数不减少时采纳）。
+
+    入参是示向度序列（度）。一个源都没听到时返回 None（无从判断，保持 0°）。
+    """
+    if not len(bearings):
+        return None
+    beta = np.asarray([math.radians(float(b)) for b in bearings], dtype=float)
+    # 候选：把整个圆周按 1° 扫一遍（每个候选都是"某个环心正对的方向"）。严格大于才替换，
+    # 故同分时取角度最小的那个，结果确定。
+    best = None
+    for k in range(int(round(360.0 / step_deg))):
+        phi = k * math.radians(step_deg)
+        score = _sector_score(beta, phi)
+        if best is None or score > best[0]:
+            best = (score, phi)
+    score0, phi0 = best
+    # 亚度精修：把扇区中心挪到片内源的质量中心（片内跨度 ≤ 60°，圆均值无歧义）。
+    # 只在"装入个数不减少"时采纳，避免挪动窗口反而漏掉边缘的源。
+    d = (beta - phi0 + math.pi) % (2.0 * math.pi) - math.pi
+    inside = np.abs(d) <= math.radians(SECTOR_HALF_DEG)
+    if inside.any():
+        phi1 = phi0 + math.atan2(float(np.sin(d[inside]).mean()),
+                                 float(np.cos(d[inside]).mean()))
+        if _sector_score(beta, phi1) > score0:
+            phi0 = phi1
+    return float(phi0 % (2.0 * math.pi))
 
 
 @lru_cache(maxsize=8)
@@ -194,6 +258,7 @@ class CoverSolveResult:
             "region_radius_m": plan.region_radius,
             "cover_radius_m": plan.cover_radius,
             "ring_radius_m": round(plan.ring_radius, 3),
+            "rotation_deg": round(math.degrees(plan.rotation), 4),
             "ring_radius_chosen": abs(plan.ring_radius - CHOSEN_RING_RADIUS) < 1e-9,
             "ring_radius_max_margin_m": round(optimal_ring_radius(), 3),
             "n_circles": len(plan.waypoints),
@@ -393,6 +458,61 @@ def print_cover_report(res: CoverSolveResult) -> None:
     print("=" * 78)
     seq = " → ".join(str(i) for i in res.survey_order)
     print(f"顺序：{seq}")
+    print("说明：以上是设计基准（环心在 0°/60°/…）。7 个圆心绕原点整体旋转时，覆盖条件只依赖"
+          "圆心间距与圆心\n      到原点的距离，二者均不变，故最坏最近距离与巡视里程 6d 都不变"
+          "（见 python -m cumcm.t3.covering 的实算自检）。\n      实际作业在起始全频道扫描之后"
+          "把环转到“1 号环心正对源最密集的 60° 扇区”，使巡视的往返向径穿过源密集区、\n      "
+          "巡视终点落在该方向（于是清除阶段从源最集中处开始）；逐局旋转角记录在 t3_survey.json。")
     print(f"总里程 = {res.survey_length:.1f} m，纯移动时间 = {res.survey_length / 5.0:.1f} s"
           f"（速度 5 m/s）")
     print("=" * 78)
+
+
+# ----------------------------------------------------------------------------
+# 自检：`python -m cumcm.t3.covering`
+# ----------------------------------------------------------------------------
+def _selftest() -> int:
+    """两项自检：旋转不破坏覆盖保证；密集扇区选向符合预期。
+
+    旋转是"整个 7 圆布局绕原点转一个角"，而覆盖条件只取决于圆心之间的距离与它们到原点的
+    距离，两者在共同旋转下都不变，所以保证**理论上**恒定。但"理论上不变"和"实现上确实不变"
+    是两回事（例如只转了采样点没转圆心就会静默出错），故这里实算校验。
+    """
+    import numpy as np
+    d = CHOSEN_RING_RADIUS
+    pts = np.vstack([region_samples(GRID_STEP, BOUNDARY_SAMPLES), worst_candidates(d)])
+    ana = analytic_worst(d)
+    worst_seen, worst_at = 0.0, 0.0
+    rng = np.random.default_rng(2026)
+    for rot in np.concatenate([np.arange(0.0, 60.0, 1.0), rng.uniform(0.0, 360.0, 40)]):
+        plan = CoverPlan(REGION_RADIUS, COVER_RADIUS, d, float(math.radians(rot)))
+        w = float(nearest_distances(pts, plan.waypoints).max())
+        if w > worst_seen:
+            worst_seen, worst_at = w, rot
+    ok1 = worst_seen <= COVER_RADIUS + 1e-9 and abs(worst_seen - ana) < 1e-6
+    print(f"[1] 旋转下的覆盖保证：{len(np.arange(0.0, 60.0, 1.0)) + 40} 个角度实算，"
+          f"最坏最近距离最大 {worst_seen:.6f} m（出现在 {worst_at:.1f}°），"
+          f"解析值 {ana:.6f} m，覆盖半径 {COVER_RADIUS:.0f} m → "
+          f"{'✓ 与解析一致且未破坏保证' if ok1 else '✗ 不一致'}")
+
+    cases = [([95.0, 100.0, 105.0, 200.0, 300.0], 100.0),
+             ([130.0, 131.0, 10.0], 130.5),
+             ([59.0, 59.0, 59.0], 59.0),
+             ([350.0, 350.0, 170.0], 350.0)]
+    ok2 = True
+    for bearings, want in cases:
+        got = math.degrees(dense_sector_rotation(bearings))
+        good = min(abs(got - want), abs(got - want - 360.0), abs(got - want + 360.0)) < 1.5
+        ok2 &= good
+        print(f"[2] 密集扇区选向 {str(bearings)[:34]:36s} → {got:7.2f}°（期望 ≈{want}°）"
+              f"{'✓' if good else '✗'}")
+    ok2 &= dense_sector_rotation([]) is None
+    print(f"    空输入（未听到任何源）→ {dense_sector_rotation([])}（应为 None）"
+          f"{'✓' if dense_sector_rotation([]) is None else '✗'}")
+    ok = ok1 and ok2
+    print("\n自检结果：" + ("全部通过 ✓" if ok else "存在失败 ✗"))
+    return 0 if ok else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(_selftest())

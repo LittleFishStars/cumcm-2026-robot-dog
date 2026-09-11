@@ -72,17 +72,20 @@ def run_practice(args: argparse.Namespace, res: CoverSolveResult, save_dir: Path
                            verbose=not args.quiet, logfile=args.log, episode=ep + 1,
                            clear=clear, k_clear_max=args.k_clear_max,
                            inline_try_radius=args.inline_try_radius,
-                           inline_detour=args.inline_detour)
+                           inline_detour=args.inline_detour,
+                           rotate=not args.no_rotate)
             stats = dog.run(res.plan, res.survey_order)
             arena.finish_episode()
-            check = truth_check(truth, res.plan, dog.obs, dog.cleared, dog.tracks)
+            # 用 dog.plan / dog.survey_order_used：布局在起始扫描后按源密集方向旋转过，
+            # 这一局真正的圆心位置与巡视顺序才是核对、落表、出图应依据的几何。
+            check = truth_check(truth, dog.plan, dog.obs, dog.cleared, dog.tracks)
             rows.append(episode_row(ep + 1, seed, truth, dog, stats, check))
-            observations.extend(observation_rows(ep + 1, res.plan, dog.meas))
+            observations.extend(observation_rows(ep + 1, dog.plan, dog.meas))
             show(stats, check, len(truth))
             if not args.no_plot:                    # 出图在 /exit 之后，不占现实时间预算
                 name = f"ep{ep + 1:02d}_seed{seed}"
                 files = save_trajectory(
-                    save_dir, name, dog.actions, res.plan, res.survey_order,
+                    save_dir, name, dog.actions, dog.plan, dog.survey_order_used,
                     truth_points(truth),
                     title=f"第 {ep + 1} 局（seed={seed}）：清除 {stats['cleared']}/{len(truth)}、"
                           f"里程 {stats['travel_m']:.0f} m、虚拟时间 {stats['virtual_time_s']:.0f} s",
@@ -106,6 +109,9 @@ def run_practice(args: argparse.Namespace, res: CoverSolveResult, save_dir: Path
               f"{sum(r['n_precise_at_survey'] for r in rows)}/{sum(r['n_sources'] for r in rows)} 个")
         print("逐局：" + "  ".join(f"seed{r['seed']}={r['cleared']}/{r['n_sources']}"
                                   for r in rows))
+        print(f"  布局旋转：平均 {np.mean([r['rotation_deg'] for r in rows]):.1f}°"
+              f"（起始扫描平均听到 {np.mean([r['n_face_scanned'] for r in rows]):.1f} 个源，"
+              f"旋转后 1 号环心正对源最密集的扇区）")
     else:
         print(f"汇总（{len(rows)} 局，仅巡视扫描）：平均里程 "
               f"{np.mean([r['travel_m'] for r in rows]):.0f} m，平均虚拟时间 "
@@ -132,23 +138,26 @@ def run_official(args: argparse.Namespace, res: CoverSolveResult, save_dir: Path
     dog = RobotDog(sim, verbose=not args.quiet, logfile=args.log, episode=1,
                    clear=not args.survey_only, k_clear_max=args.k_clear_max,
                    inline_try_radius=args.inline_try_radius,
-                   inline_detour=args.inline_detour)
+                   inline_detour=args.inline_detour,
+                   rotate=not args.no_rotate)
     stats = dog.run(res.plan, res.survey_order)
     print(f"完成：清除 {stats['cleared']} 个，巡视 {stats['waypoints_visited']} 个圆心，"
           f"里程 {stats['travel_m']:.0f} m，虚拟时间 {stats['virtual_time_s']:.0f} s，"
           f"测向 {stats['n_measure']} 次（补测 {stats['n_probe']} 次），"
           f"听到 {stats['channels_heard']} 个频道（{stats['n_bearings']} 条示向度）")
     row = episode_row(1, args.seed, None, dog, stats,
-                      truth_check(None, res.plan, dog.obs, dog.cleared, dog.tracks))
+                      truth_check(None, dog.plan, dog.obs, dog.cleared, dog.tracks))
     if not args.no_plot:
         files = save_trajectory(
-            save_dir, f"ep01_seed{args.seed}", dog.actions, res.plan, res.survey_order, (),
+            save_dir, f"ep01_seed{args.seed}", dog.actions, dog.plan,
+            dog.survey_order_used, (),
             title=f"官方模式：清除 {stats['cleared']} 个、里程 {stats['travel_m']:.0f} m、"
                   f"虚拟时间 {stats['virtual_time_s']:.0f} s（无真值可比）",
             traj_dir=args.traj_dir)
         print("轨迹图：" + "，".join(str(f) for f in files))
     paths = (save_plan(res, save_dir)
-             + save_survey(save_dir, [row], observation_rows(1, res.plan, dog.meas), res.to_json()))
+             + save_survey(save_dir, [row], observation_rows(1, dog.plan, dog.meas),
+                           res.to_json()))
     print("结果已保存：" + "，".join(str(p) for p in paths))
     return 0
 
@@ -191,6 +200,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--traj-dir", default=TRAJ_DIR,
                    help=f"轨迹图输出子目录（相对 --save-dir；缺省 {TRAJ_DIR}，"
                         f"与 T3_ga.py 的 trajectory/ 分开以免互相覆盖）")
+    p.add_argument("--no-rotate", action="store_true",
+                   help="不做起始扫描后的布局旋转（保持环心在 0°/60°/…，用于对照实验）")
     p.add_argument("--no-plot", action="store_true",
                    help=f"不出逐局轨迹图（缺省每局在 <save-dir>/{TRAJ_DIR}/ 生成同名 png + csv）")
     p.add_argument("--quiet", action="store_true", help="只输出汇总，不打印过程")

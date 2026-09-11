@@ -87,6 +87,8 @@ class RobotDog:
         self.inline_exclude_r = float(inline_exclude_r)      # 顺路清除排除的区域圆心半径 / m
         self.inline_probe_diam = float(inline_probe_diam) # 顺路清除时顺手补测的直径阈值 / m
         self.n_inline_probe = 0                         # 顺路清除时顺手补测的次数
+        self._probed_inline: set = set()               # 本局已被顺路补测过的频道（去重：同一频道
+                                                       # 只补测一次，避免在同一位置反复测收敛不动）
         self.rotate = bool(rotate)                           # 起始扫描后是否旋转覆盖圆布局
         # 过程日志用 "w"：每局开头重写，于是整份日志只描述**最新一局**。
         # 原先用 "a" 追加，跨局、跨运行无限累积，几轮演练后文件里混着几百局的内容难以查阅。
@@ -566,31 +568,32 @@ class RobotDog:
         return math.hypot(est[0], est[1]) < self.inline_exclude_r
 
     def _probe_coarse_at(self) -> int:
-        """清除动作后在当前位置顺手补测"已扫到但区域直径还大"的频道。
+        """清除动作后在当前位置顺手补测一个"已扫到但区域直径还大"的频道。
 
-        机器狗刚 clear 完一个点、正停在估计点附近 —— 这是补测的零里程时机。目标：**每次清除
-        动作后，把当前所有**已经扫到（ch 在 self.obs 里有示向度）、还没清除、可能源集合直径
-        > inline_probe_diam 的频道**一次性全部**原地补测一条示向度。判据是动态的：补测几条后
-        区域收敛、直径掉到阈值以下就自然退出补测集；不设"每频道只补一次"的硬去重（用户明确：
-        每次都补全部的）——清除点位置各不相同，得到的示向度不同，反复补测持续收紧粗估计。
-        原地 measure（传当前位置 ⇒ 移动 0，只花切换 + 5 s 测向/个）。
+        机器狗刚 clear 完一个点、正停在估计点附近 —— 这是补测的零里程时机。目标频道：已经扫到
+        （ch 在 self.obs 里有示向度）、还没清除、可能源集合直径 > inline_probe_diam（还没收敛到
+        可直接清除的量级）；挑其中直径**最大**的一个原地 measure（传当前位置 ⇒ 移动 0，只花
+        切换 + 5 s 测向）。补测让粗估计快速收敛，后续顺路/阶段二清除时更可能命中（白跑变命中）。
 
-        返回补测次数（可能 > 1）。
+        返回补测次数（0 或 1）。
         """
         if self.inline_probe_diam <= 0:
             return 0
-        cands = [ch for ch in sorted(self.obs)
-                 if ch not in self.cleared
-                 and self.diameter(ch) > self.inline_probe_diam]
-        if not cands:
+        best, best_d = None, self.inline_probe_diam
+        for ch in sorted(self.obs):
+            if ch in self.cleared or ch in self._probed_inline:
+                continue
+            d = self.diameter(ch)                    # 区域为空/退化时返回 0，天然排除
+            if d > best_d:
+                best, best_d = ch, d
+        if best is None:
             return 0
-        for target in cands:
-            self.measure(float(self.pos[0]), float(self.pos[1]), target)
-            self.n_inline_probe += 1
-        self.log(f"    [顺路补测] 在清除点把当前 {len(cands)} 个直径 > "
-                 f"{self.inline_probe_diam:.0f} m 的频道全部补测"
-                 f"（频道{'、'.join(str(c) for c in cands)}，直径最大 {self.diameter(cands[0]):.0f} m 起）")
-        return len(cands)
+        self.measure(float(self.pos[0]), float(self.pos[1]), best)   # 原地测向，不走动
+        self.n_inline_probe += 1
+        self._probed_inline.add(best)                # 同一频道本局只补测一次
+        self.log(f"    [顺路补测] 在清除点顺手测频道{best}（区域直径 {best_d:.0f} m > 阈值"
+                 f" {self.inline_probe_diam:.0f} m），原地补一条示向度")
+        return 1
 
     def _inline_clear(self, at: Sequence[float], next_wp: Sequence[float]) -> int:
         """巡视途中顺路清除：把「本站与圆心的连线 → 下一站与圆心的连线」之间的点顺路清掉。

@@ -39,7 +39,7 @@ $$\text{measure\_result}\in\{\texttt{no\_signal},\ \texttt{near},\ \texttt{direc
 | `ga_convergence.csv` | 逐代最优/均值/标准差（8782 行） |
 | `episodes.csv` | 逐局汇总表 |
 | `api_calls.jsonl` | 逐次 `/enter` `/measure` `/clear` `/exit` 的请求与原始响应 |
-| `validation.json` | 71 项验证检查的结论与指标 |
+| `validation.json` | 76 项验证检查的结论与指标 |
 | `holdout/` | 独立 seed 批（seed 100–109）的全部同名产物 |
 
 ## 3. 问题三结果
@@ -148,7 +148,9 @@ $$\max_{P\in \text{圆域}}\ \min_{W\in \mathcal{W}} \|P-W\| \le 962\ \text{m} <
 
 ## 5. 约束与一致性校验
 
-`T3_validate.py` 用 71 项检查覆盖算法正确性、覆盖保证、最优性、敏感性、记录一致性与可复现性，**全部通过**（`results/t3_ga/validation.json`）。
+`T3_validate.py` 用 76 项检查覆盖算法正确性、覆盖保证、最优性、敏感性、记录一致性与可复现性，
+**全部通过**（`results/t3_ga/validation.json`）。其中 5 项因当前结果目录装的是官方产物而**跳过**
+（官方接口不返回真值，清除落点与定位误差无从判定）；跑一遍演练批即可全部执行，见第 7 节说明。
 
 ### 5.1 算法层
 
@@ -161,6 +163,7 @@ $$\max_{P\in \text{圆域}}\ \min_{W\in \mathcal{W}} \|P-W\| \le 962\ \text{m} <
 | σ 与实际误差方向一致 | 4.66 m → 8.03 m → 34.57 m（同向放大） |
 | σ 保守性（2σ 覆盖率） | 100% |
 | 5/6/7 点路线 GA vs 穷举最优 | 偏差 0.000%（36 例） |
+| 大规模（12~20 点）GA vs 最近邻构造 | 平均改进 **6.68%** |
 | 2-opt 精修单调性（20 例） | 从不变长 |
 
 **σ 标定发现并修复了一个真实缺陷。** 原先的位置协方差用 $A=\mathbf{I}+\sum w_i n_i n_i^{\mathsf T}$ 计算，多出的单位阵（相当于 1 m² 的先验）使 σ 恒等于 1.4 m、完全不随几何变化，`GEOM_SIGMA` 补测判据因此形同虚设；改为纯 Fisher 信息累积后 σ 恢复信息量，并用 200 组实验把阈值从 15 m 校准到 40 m（该阈值以上约占 8%，其真实误差中位数 12.7 m 而其余仅 4.9 m，正好挑出会失败的交会）。
@@ -198,37 +201,51 @@ $$\max_{P\in \text{圆域}}\ \min_{W\in \mathcal{W}} \|P-W\| \le 962\ \text{m} <
 | 需要多视角交会才能消掉沿视线方向的偏移 | 8 路点巡视天然形成多视角；病态几何补测垂直视角 | 平均定位误差 6.6 m，远小于 20 m 清除半径 |
 | 定位是连续域上的一致（残差）拟合问题 | 实数编码 GA + 射线残差 RMS 适应度 | 无噪情形精确恢复（1.5e-12 m） |
 | 巡视/清除顺序本质是开放路径 TSP | 排列编码 GA（OX + 2-opt） | 7 点规模达穷举最优；清除顺序改进最大 28.2% |
-| 覆盖-定位-清除是分阶段递进结构 | 四阶段流水线，阶段 2/3/4 各自独立可验证 | 71 项检查分阶段全部通过 |
+| 覆盖-定位-清除是分阶段递进结构 | 四阶段流水线，阶段 2/3/4 各自独立可验证 | 76 项检查分阶段全部通过 |
 
 ## 7. 结果文件清单
 
+> **先读这一条**：结果目录**不按运行模式分家** —— 一个目录 = 最新一次运行。当前仓库里
+> `results/t3/` 与 `results/t3_ga/` 顶层装的是**官方模式单局**（`meta.mode = official`），
+> 所以这两个目录的 `episodes.csv` 只有 1 行，且**没有真值**（官方接口不返回），清除落点与
+> 定位误差字段为空。本文正文里的多局数字（20 局、3149 次调用、逐局误差表）来自**演练批**，
+> 一条命令即可在原目录重建、并与本文数字逐项一致：
+> `.venv/bin/python T3_ga.py --practice 20 --seed 0`（T3.py 侧同理 `--practice 10`）。
+> 重建会覆盖官方留档 —— 两者只能留一个，这是"不分模式"的必然结果。
+
 ```
 results/
-├── t3/                        确定性方案（T3.py）
+├── t3/                        确定性方案（T3.py）—— 当前为官方单局（meta.mode = official）
 │   ├── t3_cover_plan.json     覆盖圆方案（最少 7 圆、一般 7 点最优摆放、最坏距离、文献对照）
-│   ├── t3_cover_circles.csv   7 个圆心坐标
-│   ├── t3_survey.json         10 局巡视扫描 + 清除统计
-│   ├── t3_observations.csv    1199 条逐次测量（含 no_signal）
-│   ├── trajectory/            最新一局的总轨迹图 + 同名轨迹表
-│   └── scan/                  最新一局的逐步扫描结果图（起点扫描 + 各巡视站）
-└── t3_ga/                      GA 对照方案（T3_ga.py）
-    ├── ga_training.json       GA 训练记录 + 逐局统计（含真值）
-    ├── ga_convergence.csv     逐代收敛曲线
-    ├── episodes.csv           逐局汇总表
-    ├── api_calls.jsonl        逐次接口调用
-    ├── trajectory/            最新一局的总轨迹图 + 同名轨迹表
-    ├── scan/                  最新一局的逐步扫描结果图
-    ├── validation.json        71 项验证检查（主批 + holdout 一起审计）
-    ├── trajectory/            每局轨迹图 + 同名轨迹表（主批 20 对）
-    ├── holdout/               独立 seed 批（seed 100–109）同名产物
-    │   ├── …                  （4 个汇总文件 + api_calls.jsonl 1676 行）
-    │   └── trajectory/        10 对
-    └── （顶层即官方实测留档：两族不再分 official/ 子目录，official 与演练写同一目录）
+│   ├── t3_cover_circles.csv   7 个圆心坐标（7 行）
+│   ├── t3_survey.json         本局巡视扫描 + 清除统计（含 meta 说明来源；官方单局无真值）
+│   ├── t3_observations.csv    125 条逐次测量（含 no_signal）
+│   ├── api_calls.jsonl        138 次接口调用（官方模式下唯一的证据链）
+│   ├── trajectory/            本局总轨迹图 + 同名轨迹表（1 对）
+│   └── scan/                  本局逐步扫描结果图（8 张：起点全频道扫描 + 7 个巡视圆心）
+└── t3_ga/                     GA 对照方案（T3_ga.py）—— 顶层为官方单局
+    ├── ga_training.json       GA 训练记录 + 逐局统计（含 meta；官方单局无真值）
+    ├── ga_convergence.csv     逐代收敛曲线（1202 行）
+    ├── episodes.csv           逐局汇总表（官方单局 1 行）
+    ├── api_calls.jsonl        166 次接口调用
+    ├── validation.json        76 项验证检查（主批 + holdout 一起审计；5 项因无真值跳过）
+    ├── trajectory/            本局总轨迹图 + 同名轨迹表（1 对）
+    ├── scan/                  本局逐步扫描结果图（9 张：起点全频道扫描 + 8 个覆盖路点）
+    └── holdout/               独立 seed 演练批（seed 100–109，仍是演练、**带真值**）
+        ├── ga_training.json   （10 局，157 KB）
+        ├── ga_convergence.csv （13074 行）
+        ├── episodes.csv       （10 行）
+        ├── api_calls.jsonl    （1551 行）
+        ├── trajectory/        （1 对，只保留最新一局）
+        └── scan/              （9 张，只保留最新一局）
 figures/
 ├── fig_t3_*.pdf           10 张论文用图（矢量）
 └── data/*.csv             每张图背后的数据
 ```
 
+> `trajectory/` 与 `scan/` 每个目录**只保留最新一局**（每局开始时清空重写），故其中文件数
+> 与 `episodes.csv` 的局数无关；想复现某一局的图，用对应 seed 重跑那一局即可。
+>
 > 两棵子树**刻意分开**：早期两套方案的轨迹图都写 `results/trajectory/epNN_seedMM.png`，
 > 同名同目录，实测一次性覆盖掉对方 10 个已提交文件。现在各自有独立的 `trajectory/`，
 > 不会再撞。`--save-dir` 可覆盖默认位置。
@@ -242,7 +259,7 @@ cd /home/ylxc/Files/数学建模/CUMCM
 .venv/bin/python T3_ga.py --practice 20 --seed 0            # 主训练批
 .venv/bin/python T3_ga.py --practice 10 --seed 100 --save-dir results/t3_ga/holdout
 
-# 2) 验证（六组 71 项检查，约 2 分钟；F 组会自己开一局演练）
+# 2) 验证（六组 76 项检查，约 2 分钟；F 组会自己开一局演练）
 .venv/bin/python T3_validate.py --results results/t3_ga results/t3_ga/holdout
 
 # 3) 生成论文图表

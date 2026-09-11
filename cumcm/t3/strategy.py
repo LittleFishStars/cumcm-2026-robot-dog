@@ -26,8 +26,8 @@ from functools import partial
 
 from cumcm.common.geometry import dist
 from cumcm.common.geometry import clamp_to_region as _clamp_to_region
-from cumcm.common.routing import (dist_matrix, exact_open_by_end,
-                                  exact_open_order, nearest_order, two_opt_greedy)
+from cumcm.common.routing import (dist_matrix, exact_open_by_end, exact_open_order,
+                                  nearest_order)
 from cumcm.common.sim_client import RecordedSim
 from cumcm.t3.config import (BEARING_ERROR_DEG, CHANNELS, CLEAR_RADIUS, CLIP_ERR, CLIP_SIDES,
                              COVER_RADIUS, HOMING_CAP, HOMING_MAX, HOMING_STEP,

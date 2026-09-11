@@ -24,8 +24,8 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 import numpy as np
 
 from cumcm.common.plotting import (C_COVER, C_DIR, C_FRAME, C_HIT, C_NEAR, C_NOSIG,
-                                   C_PATH, C_SRC, C_TRY, font_context, save_png,
-                                   setup_mpl_env)
+                                   C_PATH, C_SRC, C_TRY, font_context, hint_plot_once,
+                                   save_png, setup_mpl_env, slug)
 from cumcm.common.scanfigure import STEP_DIR_NAME, ScanStep, draw_scan_step
 from cumcm.t3.config import (CLEAR_RADIUS, COVER_RADIUS, RECEIVE_MAX, REGION_RADIUS,
                              TRAJ_DIR, TRAJ_DPI)
@@ -174,7 +174,6 @@ def draw_trajectory(out_path: Path, actions: Sequence[Dict[str, Any]],
 def save_scan_figures(save_dir: Path, name: str, steps: Sequence[Dict[str, Any]],
                       plan: CoverPlan, order: Sequence[int] = (),
                       sources: Sequence[Dict[str, Any]] = (),
-                      traj_dir: str = TRAJ_DIR,
                       step_dir: str = STEP_DIR_NAME) -> List[Path]:
     """把一局内**每一步扫描**各画一张结果图，落在 <save-dir>/<step_dir>/ 下。
 
@@ -196,7 +195,7 @@ def save_scan_figures(save_dir: Path, name: str, steps: Sequence[Dict[str, Any]]
             if wp_i is not None and wp_i not in visited:
                 visited.append(wp_i)
         # 文件名只用 ASCII 与安全字符，避免不同文件系统下的编码问题
-        safe = _slug(str(raw.get("label", f"step{k}")))
+        safe = slug(str(raw.get("label", f"step{k}")))
         out = out_dir / f"{Path(name).name}_s{k:02d}_{safe}.png"
         try:
             draw_scan_step(out, ScanStep(
@@ -219,7 +218,7 @@ def save_scan_figures(save_dir: Path, name: str, steps: Sequence[Dict[str, Any]]
                 title=f"第 {k} 步扫描 / 共 {len(steps)} 步：{raw.get('label', '')}")
             paths.append(out)
         except ImportError:
-            _hint_no_matplotlib()
+            _no_plot_hint()
             return paths
     return paths
 
@@ -232,20 +231,6 @@ def _waypoint_of_label(label: str, order: Sequence[int], step_i: int) -> Optiona
     if 1 <= step_i <= len(order):
         return int(order[step_i - 1])
     return None
-
-
-def _slug(text: str) -> str:
-    """把标签压成安全文件名片段（保留中文与字母数字，其余换下划线）。"""
-    keep = [c if (c.isalnum() or c in "._-") else "_" for c in text]
-    return re.sub(r"_+", "_", "".join(keep)).strip("_") or "step"
-
-
-def _hint_no_matplotlib() -> None:
-    """缺 matplotlib 的提示只打印一次，避免每步刷屏。"""
-    global _PLOT_HINTED
-    if not _PLOT_HINTED:
-        _PLOT_HINTED = True
-        print("提示：未安装 matplotlib，已跳过图（pip install matplotlib 后可自动生成）")
 
 
 def save_trajectory(save_dir: Path, name: str, actions: Sequence[Dict[str, Any]],
@@ -275,8 +260,12 @@ def save_trajectory(save_dir: Path, name: str, actions: Sequence[Dict[str, Any]]
         paths.insert(0, draw_trajectory(out_dir / f"{name}.png", actions, plan, order,
                                         sources, title))
     except ImportError:
-        _hint_no_matplotlib()
+        _no_plot_hint()
     return paths
 
 
-_PLOT_HINTED = False           # 缺 matplotlib 的提示只打印一次，避免每局刷屏
+
+def _no_plot_hint() -> None:
+    """说明"这一局的图没生成"以及怎么才能生成（只打印一次，避免每局刷屏）。"""
+    hint_plot_once("提示：未安装 matplotlib，已跳过出图。装上即可自动生成：\n"
+                   "      .venv/bin/pip install matplotlib")

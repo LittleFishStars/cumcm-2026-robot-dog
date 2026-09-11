@@ -15,7 +15,8 @@ from typing import List, Optional, Sequence, Tuple
 
 import numpy as np
 
-from cumcm.common.plotting import (C_FRAME, C_HIT, C_PATH, C_SRC, font_context, setup_mpl_env)
+from cumcm.common.plotting import (C_FRAME, C_HIT, C_PATH, C_SRC, font_context,
+                                   hint_plot_once, setup_mpl_env, slug)
 from cumcm.common.scanfigure import STEP_DIR_NAME, ScanStep, draw_scan_step
 from cumcm.t3ga.config import (CLEAR_RADIUS, COVER_RADIUS, MAX_RECEPTION,
                                REGION_RADIUS)
@@ -29,8 +30,6 @@ _C_PLOT_FRAME = C_FRAME
 
 TRAJ_DIR_NAME = "trajectory"        # 每局轨迹图落在 <save-dir>/trajectory/ 下
 TRAJ_DPI = 160.0                    # 位图分辨率
-
-_PLOT_HINTED = False                # 缺 matplotlib 的提示只打印一次，避免每局刷屏
 # 中文字体候选：本族沿用原有顺序（优先 Windows 自带字体）。注意**顺序会影响渲染结果** ——
 # 本机装了微软雅黑，若改用 common.plotting 的默认链（Noto 优先）会换字体、图也变样，故
 # 这里显式指定，保持 GA 版图与历史产物逐字节一致。
@@ -136,25 +135,19 @@ def save_trajectory_plot(save_dir: str, name: str, track: Sequence[Sequence[floa
     同时写一份同名 .csv（`step,x,y,kind`），使图上的动作点可被逐条核对——否则
     图片只是一张无法验证的图。CSV 与 PNG 同目录同名，一一对应。
     """
-    global _PLOT_HINTED
     out = Path(save_dir) / TRAJ_DIR_NAME / f"{name}.png"
     try:
         out.parent.mkdir(parents=True, exist_ok=True)
         _write_track_csv(out.with_suffix(".csv"), track, marks)
     except OSError as exc:
-        if not _PLOT_HINTED:
-            _PLOT_HINTED = True
-            print(f"提示：轨迹表写入失败（{type(exc).__name__}: {exc}）")
+        hint_plot_once(f"提示：轨迹表写入失败（{type(exc).__name__}: {exc}）")
     try:
         return draw_trajectory(out, track, sources, hits, marks, title)
     except ImportError:
-        if not _PLOT_HINTED:
-            _PLOT_HINTED = True
-            print("提示：未安装 matplotlib，已跳过轨迹图（pip install matplotlib 后可自动生成）")
+        hint_plot_once("提示：未安装 matplotlib，已跳过出图。装上即可自动生成：\n"
+                       "      .venv/bin/pip install matplotlib")
     except Exception as exc:        # 字体/磁盘/权限等问题都不该影响测试结论
-        if not _PLOT_HINTED:
-            _PLOT_HINTED = True
-            print(f"提示：轨迹图生成失败，已跳过（{type(exc).__name__}: {exc}）")
+        hint_plot_once(f"提示：轨迹图生成失败，已跳过（{type(exc).__name__}: {exc}）")
     return None
 
 
@@ -185,15 +178,12 @@ def save_scan_figures(save_dir: str, name: str, steps: Sequence[dict],
     是固定 7 个半径 1000 m 的圆），且本族估计形态是"点 + 位置 1σ"而非多边形区域 ——
     故图上画 σ 圆。这些差异由调用方通过参数表达，绘制本身复用 cumcm.common.scanfigure。
     """
-    global _PLOT_HINTED
     out_dir = Path(save_dir) / step_dir
     paths: List[Path] = []
     try:
         out_dir.mkdir(parents=True, exist_ok=True)
     except OSError as exc:
-        if not _PLOT_HINTED:
-            _PLOT_HINTED = True
-            print(f"提示：扫描图目录创建失败（{type(exc).__name__}: {exc}）")
+        hint_plot_once(f"提示：扫描图目录创建失败（{type(exc).__name__}: {exc}）")
         return paths
     # 路点布局用**本族真正的覆盖路点集**（贪心集合覆盖的产物，COVER_RADIUS = 920 m 的保证
     # 就来自它）；起点扫描的位置不属于该集合，故它只作为"本步扫描点"出现，不画成路点。
@@ -204,7 +194,7 @@ def save_scan_figures(save_dir: str, name: str, steps: Sequence[dict],
                 if int(s_.get("index", 0)) > 0]
         visited = [i for i, w in enumerate(wp)
                    if any(math.hypot(w[0] - sx, w[1] - sy) <= 1.0 for sx, sy in seen)]
-        safe = _slug(str(raw.get("label", f"step{k}")))
+        safe = slug(str(raw.get("label", f"step{k}")))
         out = out_dir / f"{name}_s{k:02d}_{safe}.png"
         try:
             draw_scan_step(out, ScanStep(
@@ -229,22 +219,13 @@ def save_scan_figures(save_dir: str, name: str, steps: Sequence[dict],
                 fonts=TRAJ_FONTS)
             paths.append(out)
         except ImportError:
-            if not _PLOT_HINTED:
-                _PLOT_HINTED = True
-                print("提示：未安装 matplotlib，已跳过扫描图（pip install matplotlib 后可自动生成）")
+            hint_plot_once("提示：未安装 matplotlib，已跳过出图。装上即可自动生成：\n"
+                           "      .venv/bin/pip install matplotlib")
             return paths
         except Exception as exc:        # 字体/磁盘等问题都不该影响测试结论
-            if not _PLOT_HINTED:
-                _PLOT_HINTED = True
-                print(f"提示：扫描图生成失败，已跳过（{type(exc).__name__}: {exc}）")
+            hint_plot_once(f"提示：扫描图生成失败，已跳过（{type(exc).__name__}: {exc}）")
             return paths
     return paths
-
-
-def _slug(text: str) -> str:
-    """把标签压成安全文件名片段（保留中文与字母数字，其余换下划线）。"""
-    keep = [c if (c.isalnum() or c in "._-") else "_" for c in text]
-    return re.sub(r"_+", "_", "".join(keep)).strip("_") or "step"
 
 
 def sources_of(truth: Optional[Sequence[dict]]) -> List[Tuple[float, float, int]]:

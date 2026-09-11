@@ -19,3 +19,11 @@ logs/*.jsonl
 # 模拟器运行痕迹（每次演练自动重建，非源码/交付物）
 jammers-py/data/behavior-logs/
 jammers-py/data/practice-statistics-queue.sqlite3
+
+# 本地演练场（复刻模拟器，仅用于 --practice 时自动拉起；上游产物，非本仓库代码）
+# 交付与复现都不需要它：官方模式连真机，--plan-only 连不到模拟器也能跑
+jammers-py/
+
+# 参考文献 PDF（53 M，撰写论文时本地查阅用；体积不适合入库）
+# README 与 reports/ 里引用的结论都写了出处，不依赖这些 PDF 文件本身
+References/

@@ -61,8 +61,9 @@ CLEAR_RADIUS = 20.0             # 清除半径 / m（光学精确定位要求 �
 NEAR_RADIUS = 5.0               # 近距阈值 / m（≤ 5 m 可跳过测向直接清除）
 CLIP_SIDES = 256                # 定位区域求交时目标圆域的内接多边形边数
 CLIP_ERR = REGION_RADIUS * (1.0 - math.cos(math.pi / CLIP_SIDES))   # 内接多边形与真圆的偏差 / m
-DIAM_PRECISE = 2.0 * CLEAR_RADIUS   # 仅供报告参考：凸区域下与"最小覆盖圆半径 < 20 m"等价
-                                    # （只用来决定"要不要继续补测"，不作清除门槛，见 RobotDog 说明）
+# 精确定位判据用"最小覆盖圆半径 < CLEAR_RADIUS"而不是"区域直径 < 2*CLEAR_RADIUS"：区域被
+# 圆域与圆盘约束裁剪后不再是凸集，直径本身无法再衡量"能不能一步清除"。二者只在凸区域下等价，
+# 故不设直径常量，相关论证见 cumcm/t3/regions.py 与 RobotDog._precise。
 PROBE_RADII = (150.0, 300.0, 450.0, 600.0, 800.0)   # 补测候选点到假设源位置的距离 / m
 PROBE_ANGLES = 24               # 补测候选点的方位角格数（15° 一格）
 PROBE_TRY = 3                   # 每轮补测最多试几个候选点（收不到信号就换下一个）

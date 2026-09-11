@@ -13,5 +13,5 @@
     cli.py         运行编排与命令行入口
 """
 
-__all__ = ["config", "localize", "routing_ga", "covering", "strategy", "plotting",
-           "training", "cli"]
+__all__ = ["config", "localize", "ga_ops", "routing_ga", "covering", "strategy",
+           "plotting", "training", "cli"]

@@ -80,8 +80,7 @@ def feasible_ring_interval(region_radius: float = REGION_RADIUS,
     return lo, hi
 
 
-def analytic_worst(ring_radius: float, region_radius: float = REGION_RADIUS,
-                   cover_radius: float = COVER_RADIUS) -> float:
+def analytic_worst(ring_radius: float, region_radius: float = REGION_RADIUS) -> float:
     """最坏最近距离的解析值 D(d) = max(d/√3, g₂)（推导见模块文档）。
 
     d/√3 是内圈（只有中心圆能覆盖到）的最坏距离；g₂ 是圆域边界上、与某环心夹角 30° 的点

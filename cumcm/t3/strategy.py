@@ -427,7 +427,7 @@ class RobotDog:
         for _ in range(REFINE_MAX):
             if self._precise(channel) or self._out_of_time():
                 break
-            hyps = hypothesis_points(self.region(channel), self.obs[channel], self.pos)
+            hyps = hypothesis_points(self.region(channel), self.obs[channel])
             if not hyps:
                 break
             cands = probe_candidates(self.obs[channel], hyps, self.pos)

@@ -64,11 +64,6 @@ class TriangulationRegion:
             region.add_node(x, y, theta)
         return region
 
-    @property
-    def nodes(self):
-        """已加入的检测点列表 [(x, y, theta), ...]。"""
-        return list(self._nodes)
-
     # ---------- 定位区域与几何量 ----------
 
     @property

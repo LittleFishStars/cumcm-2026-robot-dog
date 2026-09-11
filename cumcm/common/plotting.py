@@ -42,8 +42,6 @@ C_MEAS = "#c8871b"          # 测向 / 次色
 C_WARN = "#c0392b"          # 阈值警告
 C_GRAY = "#6b7280"          # 次要文字
 
-_MPL_READY = False
-
 
 def setup_mpl_env() -> None:
     """把 matplotlib 的配置目录指到固定可写位置（幂等，可反复调用）。"""
@@ -73,13 +71,3 @@ def save_png(fig: Any, path: Path, dpi: float = 160.0, **kwargs: Any) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(path, dpi=dpi, metadata={"Software": None}, **kwargs)
     return path
-
-
-def apply_fonts(plt: Any, size: Optional[float] = None,
-                extra: Optional[Sequence[str]] = None) -> None:
-    """给已导入的 pyplot 设置中文字体（供 T3_figures.py 这类脚本式出图使用）。"""
-    setup_mpl_env()
-    plt.rcParams["font.sans-serif"] = list(extra or TRAJ_FONTS)
-    plt.rcParams["axes.unicode_minus"] = False
-    if size is not None:
-        plt.rcParams["font.size"] = size

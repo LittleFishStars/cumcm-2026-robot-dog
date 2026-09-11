@@ -26,6 +26,7 @@ import itertools
 import json
 import math
 import re
+import shutil
 import struct
 import subprocess
 import sys
@@ -50,7 +51,7 @@ from simulator import bearingnoise                                     # noqa: E
 DEFAULT_OUT = Path("results") / "validation.json"
 SPEED_UM_PER_S = 5_000_000      # 机器狗移动速度 5 m/s（微米/秒），用于虚拟时钟复算
 CLEAR_RADIUS = 20.0             # 清除半径 / m
-
+TMP_VERIFY_DIR = ".tmp_verify"  # F 组两次演练的暂存目录（跑完即删）
 
 
 class _T3GA:
@@ -406,7 +407,7 @@ def _sens_route(pop: int, gens: int, trials: int = 6) -> float:
     return float(np.mean(excess))
 
 
-def group_d(rep: Report, rng: np.random.Generator) -> None:
+def group_d(rep: Report) -> None:
     print("\n[D] 参数敏感性")
 
     # D1 定位 GA：种群规模 / 代数
@@ -686,9 +687,12 @@ def group_e_one(rep: Report, res_dir: Path) -> None:
 # ---------------------------------------------------------------------------
 # F 可复现性
 # ---------------------------------------------------------------------------
-def group_f(rep: Report, res_dir: Path) -> None:
+def group_f(rep: Report) -> None:
     print("\n[F] 可复现性")
-    tmp = Path(".tmp_verify")
+    # 暂存目录：跑两次同 seed 的演练比对逐字节一致性。**必须自己清干净** —— 原先跑完
+    # 就把 .tmp_verify/run1、run2 留在仓库里，每次都出现在 git 未跟踪列表里。
+    tmp = Path(TMP_VERIFY_DIR)
+    shutil.rmtree(tmp, ignore_errors=True)
     runs = []
     for i in (1, 2):
         out = tmp / f"run{i}"
@@ -697,6 +701,7 @@ def group_f(rep: Report, res_dir: Path) -> None:
                            capture_output=True, text=True, timeout=900)
         if p.returncode != 0:
             rep.check("F", f"重复运行第 {i} 次成功", False, p.stderr[-200:])
+            shutil.rmtree(tmp, ignore_errors=True)
             return
         runs.append(out)
     same = {}
@@ -731,6 +736,8 @@ def group_f(rep: Report, res_dir: Path) -> None:
                   f"{len(pdfs)} 个 PDF" + (f"，含时间戳：{stamped}" if stamped else "，均无时间戳"))
         rep.metric("f_figures_pdf", len(pdfs))
 
+    shutil.rmtree(tmp, ignore_errors=True)      # 暂存目录用完即删，不留残渣
+
 
 # ---------------------------------------------------------------------------
 # 入口
@@ -756,9 +763,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     t0 = time.time()
     rng = np.random.default_rng(2026)
     runners = {"A": lambda: group_a(rep, rng), "B": lambda: group_b(rep, rng),
-               "C": lambda: group_c(rep, rng), "D": lambda: group_d(rep, rng),
+               "C": lambda: group_c(rep, rng), "D": lambda: group_d(rep),
                "E": lambda: group_e(rep, [Path(p) for p in args.results]),
-               "F": lambda: group_f(rep, Path(args.results[0]))}
+               "F": lambda: group_f(rep)}
     for g in groups:
         if g in runners:
             runners[g]()

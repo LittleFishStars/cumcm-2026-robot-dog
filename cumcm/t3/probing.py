@@ -53,8 +53,7 @@ def fisher_sigma(p: Sequence[float], bearings: Sequence[Sequence[float]]) -> flo
     return math.sqrt((J[0, 0] + J[1, 1]) / det)     # tr(J⁻¹) = (J₁₁ + J₀₀)/det
 
 
-def hypothesis_points(region, obs_list: Sequence[Obs],
-                      start: Sequence[float] = (0.0, 0.0)) -> List[Tuple[float, float]]:
+def hypothesis_points(region, obs_list: Sequence[Obs]) -> List[Tuple[float, float]]:
     """补测选点用的"假设源位置"集合。
 
     区域已知时统一取"最小覆盖圆圆心 + 最远点采样出的若干顶点"（单条射线也适用：叠加 no_signal

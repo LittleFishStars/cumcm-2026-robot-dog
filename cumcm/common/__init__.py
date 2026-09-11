@@ -15,4 +15,4 @@ clamp_to_region 在 T3.py 与 T3_ga.py 中完全重复），抽取后各题共�
 """
 
 __all__ = ["geometry", "routing", "sim_client", "practice_arena", "plotting",
-           "records", "paths"]
+           "records", "paths", "console"]

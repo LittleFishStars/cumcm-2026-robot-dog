@@ -17,11 +17,16 @@ cumcm/
   t3ga/      问题三 GA 对照方案：config / localize / routing_ga / ga_ops / covering /
              strategy / plotting / training / cli
   analysis/  验证与出图：validate（六组独立验证）、figures（论文图表）
-jammers-py/  本地演练场（模拟器）
-results/     运行产物（训练结果、接口日志、轨迹、验证结果）
+jammers-py/  本地演练场（复刻模拟器；data/behavior-logs/ 会随每次演练累积日志，可随时清空）
+results/     运行产物（训练结果、接口日志、轨迹、验证结果；official/ 是文档引用的官方模式实测样例）
 figures/     论文用图表 PDF 与背后的数据 CSV
-report/      论文与说明文档
+reports/     方案说明与结果报告
+References/  参考文献（PDF）
+Problem/     赛题材料（已在 .gitignore 中，不入库）
 ```
+
+> `results/` 与 `figures/` 是**求解产物**：删掉后重跑命令即可原样重建（同 seed 逐字节一致）。
+> `jammers-py/` 与 `References/` 不是代码依赖，只在本地演练/撰写论文时需要。
 
 ## 依赖与运行
 

@@ -627,17 +627,26 @@ def group_e_one(rep: Report, res_dir: Path) -> None:
               f"{len(curves) - 1} 个记录点")
     rep.metric(f"e_ga_runs_{tag}", {"localize": len(loc), "route": len(route)})
 
-    # E10 轨迹图与轨迹表：每局一对，且轨迹必须与接口日志逐条对应
+    # E10 图形产物。**语义已改为"只保留最新一局"**：图形目录每局开头清空重写，于是
+    # trajectory/ 恰好 1 图 + 1 表、scan/ 恰好 N 张（N = 该局扫描步数，含起点扫描）。
+    # 这样设计是为了让目录里只有当前这一轮的图（原先 10~20 局各留一张，很难分辨哪张是
+    # 新的）；代价是只剩最新一局可核对，故下面的对账改为针对该局做**全量**核对。
     traj_dir = res_dir / T.TRAJ_DIR_NAME
+    scan_dir = res_dir / "scan"
     pngs = sorted(traj_dir.glob("*.png")) if traj_dir.is_dir() else []
     csvs = sorted(traj_dir.glob("*.csv")) if traj_dir.is_dir() else []
-    rep.check("E", f"[{tag}] 每局各有一张轨迹图与一份轨迹表",
-              len(pngs) == len(eps) and len(csvs) == len(eps),
-              f"{len(pngs)} 张图 / {len(csvs)} 份表 / {len(eps)} 局 → {traj_dir}")
+    scans = sorted(scan_dir.glob("*.png")) if scan_dir.is_dir() else []
+    rep.check("E", f"[{tag}] 轨迹目录只保留最新一局（恰好 1 图 + 1 表）",
+              len(pngs) == 1 and len(csvs) == 1,
+              f"{len(pngs)} 张图 / {len(csvs)} 份表（共跑 {len(eps)} 局）→ {traj_dir}")
+    rep.check("E", f"[{tag}] 逐步扫描结果图齐全（起点扫描 + 各巡视站/路点各一张）",
+              len(scans) >= 2,
+              f"{len(scans)} 张 → {scan_dir}"
+              + (f"：{', '.join(p.name for p in scans[:4])}…" if scans else ""))
 
     # 图必须是真实渲染出来的（PNG 头 + 尺寸），避免"生成了空图"却判为通过
     sizes, bad_png = [], []
-    for f in pngs:
+    for f in pngs + scans:
         with f.open("rb") as fh:
             head = fh.read(24)
         if head[:8] != b"\x89PNG\r\n\x1a\n":
@@ -647,11 +656,12 @@ def group_e_one(rep: Report, res_dir: Path) -> None:
         sizes.append((w, h))
         if min(w, h) < 300:
             bad_png.append(f"{f.name}({w}x{h})")
-    rep.check("E", f"[{tag}] 轨迹图均为有效且尺寸合理的 PNG", not bad_png,
-              f"{len(pngs)} 张，尺寸 {min(sizes) if sizes else '-'}~{max(sizes) if sizes else '-'}"
+    rep.check("E", f"[{tag}] 轨迹图与扫描图均为有效且尺寸合理的 PNG", not bad_png,
+              f"{len(pngs) + len(scans)} 张，尺寸 "
+              f"{min(sizes) if sizes else '-'}~{max(sizes) if sizes else '-'}"
               + (f"，异常 {bad_png}" if bad_png else ""))
 
-    # 轨迹表逐条对账：图上每个动作点都必须对应日志里的一次 /measure 或 /clear，
+    # 轨迹表逐条对账：保留那一局的每个动作点都必须对应日志里的一次 /measure 或 /clear，
     # 且坐标完全一致（图与日志同源，任一不符说明记录链路有问题）。
     per_ep_actions: Dict[int, List[Tuple[float, float, str]]] = {}
     for r in calls:
@@ -659,6 +669,7 @@ def group_e_one(rep: Report, res_dir: Path) -> None:
             per_ep_actions.setdefault(r["episode"], []).append(
                 (float(r["x"]), float(r["y"]), r["call"].strip("/")))
     mismatched, checked, radius_bad = [], 0, []
+    latest_ep = None
     for csv_p in csvs:
         # 轨迹表文件名形如 ep01_seed0 / ep01，取 ep 后的数字即局号（与逐局表的 episode 对齐）
         m = re.match(r"ep(\d+)", csv_p.stem)
@@ -666,7 +677,8 @@ def group_e_one(rep: Report, res_dir: Path) -> None:
         if not m:
             mismatched.append(f"{csv_p.name}: 文件名无法解析局号")
             continue
-        want = per_ep_actions.get(int(m.group(1)), [])
+        latest_ep = int(m.group(1))
+        want = per_ep_actions.get(latest_ep, [])
         if len(got) - 1 != len(want):
             mismatched.append(f"{csv_p.name}: 表 {len(got) - 1} 点 vs 日志 {len(want)} 次")
             continue
@@ -678,12 +690,19 @@ def group_e_one(rep: Report, res_dir: Path) -> None:
             checked += 1
             if math.hypot(float(row["x"]), float(row["y"])) > T.REGION_RADIUS + 1e-6:
                 radius_bad.append(f"{csv_p.name} 第 {i} 点")
-    rep.check("E", f"[{tag}] 轨迹与接口日志逐点一致（坐标与动作类型）", not mismatched,
+    rep.check("E", f"[{tag}] 保留局的轨迹与接口日志逐点一致（坐标与动作类型）", not mismatched,
               f"核对 {checked} 个动作点" + (f"，不符：{mismatched[:3]}" if mismatched else ""))
     rep.check("E", f"[{tag}] 轨迹点全部在作业圆域内", not radius_bad,
               f"{len(radius_bad)} 个越界点" if radius_bad else f"{checked} 个点全在域内")
-    rep.metric(f"e_traj_png_{tag}", {"files": len(pngs), "dir": str(traj_dir),
-                                     "points_checked": checked})
+    # 扫描图与轨迹图必须属于同一局，否则说明"清旧图"没清干净
+    if latest_ep is not None and scans:
+        tag_ep = f"ep{latest_ep:02d}"
+        rep.check("E", f"[{tag}] 扫描图与轨迹图属于同一局（清旧图有效）",
+                  all(p.name.startswith(tag_ep) for p in pngs + scans),
+                  f"保留局 {tag_ep}，文件 {', '.join(p.name for p in (pngs + scans)[:3])}…")
+    rep.metric(f"e_traj_png_{tag}", {"files": len(pngs), "scan_files": len(scans),
+                                     "dir": str(traj_dir), "points_checked": checked,
+                                     "kept_episode": latest_ep})
 
 
 # ---------------------------------------------------------------------------

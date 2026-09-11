@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import csv
 import math
+import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
@@ -25,7 +26,9 @@ import numpy as np
 from cumcm.common.plotting import (C_COVER, C_DIR, C_FRAME, C_HIT, C_NEAR, C_NOSIG,
                                    C_PATH, C_SRC, C_TRY, font_context, save_png,
                                    setup_mpl_env)
-from cumcm.t3.config import CLEAR_RADIUS, COVER_RADIUS, REGION_RADIUS, TRAJ_DIR, TRAJ_DPI
+from cumcm.common.scanfigure import STEP_DIR_NAME, ScanStep, draw_scan_step
+from cumcm.t3.config import (CLEAR_RADIUS, COVER_RADIUS, RECEIVE_MAX, REGION_RADIUS,
+                             TRAJ_DIR, TRAJ_DPI)
 from cumcm.t3.covering import CoverPlan
 
 
@@ -168,6 +171,83 @@ def draw_trajectory(out_path: Path, actions: Sequence[Dict[str, Any]],
     return out_path
 
 
+def save_scan_figures(save_dir: Path, name: str, steps: Sequence[Dict[str, Any]],
+                      plan: CoverPlan, order: Sequence[int] = (),
+                      sources: Sequence[Dict[str, Any]] = (),
+                      traj_dir: str = TRAJ_DIR,
+                      step_dir: str = STEP_DIR_NAME) -> List[Path]:
+    """把一局内**每一步扫描**各画一张结果图，落在 <save-dir>/<step_dir>/ 下。
+
+    文件名形如 `ep01_s00_起点全频道扫描.png`、`ep01_s03_巡视站3.png`：局号 + 步序，排序后
+    与执行顺序一致，便于按时间顺次翻阅"信息是怎么一步步积累起来的"。
+    与轨迹图一样在 /exit 之后调用，不占现实时间预算；缺 matplotlib 只提示一次并跳过。
+    """
+    out_dir = save_dir / step_dir
+    out_dir.mkdir(parents=True, exist_ok=True)
+    wp = [tuple(map(float, c)) for c in plan.waypoints]
+    # 各站"已访问"集合：到第 i 步时，计划顺序里前 i 个站已走过（起点扫描不含任何站）
+    visited: List[int] = []
+    paths: List[Path] = []
+    for k, raw in enumerate(steps):
+        idx = int(raw.get("index", k))
+        if idx > 0:                                  # 第 idx 个巡视站访问完，加进已访问集合
+            # 标签里带了圆心号（六边形族下"第 1 站"可能就是原点站），故从标签里取圆心编号
+            wp_i = _waypoint_of_label(str(raw.get("label", "")), order, idx)
+            if wp_i is not None and wp_i not in visited:
+                visited.append(wp_i)
+        # 文件名只用 ASCII 与安全字符，避免不同文件系统下的编码问题
+        safe = _slug(str(raw.get("label", f"step{k}")))
+        out = out_dir / f"{Path(name).name}_s{k:02d}_{safe}.png"
+        try:
+            draw_scan_step(out, ScanStep(
+                index=idx, label=str(raw.get("label", "")),
+                x=float(raw["x"]), y=float(raw["y"]),
+                n_channels=int(raw.get("n_channels", 0)),
+                counts=dict(raw.get("counts", {})),
+                virtual_time_s=float(raw.get("virtual_time_s", 0.0)),
+                travel_m=float(raw.get("travel_m", 0.0)),
+                measures=list(raw.get("measures", [])),
+                clears=list(raw.get("clears", [])),
+                path=[tuple(map(float, p)) for p in raw.get("path", [])],
+                cleared=list(raw.get("cleared", [])),
+                regions=raw.get("regions") or None,
+                estimates=raw.get("estimates") or None,
+            ), cover_centers=wp, visit_order=list(order), visited=list(visited),
+                cover_radius=COVER_RADIUS, region_radius=REGION_RADIUS,
+                gen_radius=REGION_RADIUS - 30.0, ray_len=RECEIVE_MAX,
+                sources=sources, clear_radius=CLEAR_RADIUS,
+                title=f"第 {k} 步扫描 / 共 {len(steps)} 步：{raw.get('label', '')}")
+            paths.append(out)
+        except ImportError:
+            _hint_no_matplotlib()
+            return paths
+    return paths
+
+
+def _waypoint_of_label(label: str, order: Sequence[int], step_i: int) -> Optional[int]:
+    """从步骤标签里取出圆心编号（标签形如 "巡视站 3（圆心 5）"）。取不到时按顺序退推。"""
+    m = re.search(r"圆心\s*(\d+)", label)
+    if m:
+        return int(m.group(1))
+    if 1 <= step_i <= len(order):
+        return int(order[step_i - 1])
+    return None
+
+
+def _slug(text: str) -> str:
+    """把标签压成安全文件名片段（保留中文与字母数字，其余换下划线）。"""
+    keep = [c if (c.isalnum() or c in "._-") else "_" for c in text]
+    return re.sub(r"_+", "_", "".join(keep)).strip("_") or "step"
+
+
+def _hint_no_matplotlib() -> None:
+    """缺 matplotlib 的提示只打印一次，避免每步刷屏。"""
+    global _PLOT_HINTED
+    if not _PLOT_HINTED:
+        _PLOT_HINTED = True
+        print("提示：未安装 matplotlib，已跳过图（pip install matplotlib 后可自动生成）")
+
+
 def save_trajectory(save_dir: Path, name: str, actions: Sequence[Dict[str, Any]],
                     plan: CoverPlan, order: Sequence[int] = (),
                     sources: Sequence[Dict[str, Any]] = (),
@@ -195,10 +275,7 @@ def save_trajectory(save_dir: Path, name: str, actions: Sequence[Dict[str, Any]]
         paths.insert(0, draw_trajectory(out_dir / f"{name}.png", actions, plan, order,
                                         sources, title))
     except ImportError:
-        global _PLOT_HINTED
-        if not _PLOT_HINTED:
-            _PLOT_HINTED = True
-            print("提示：未安装 matplotlib，已跳过轨迹图（pip install matplotlib 后可自动生成）")
+        _hint_no_matplotlib()
     return paths
 
 

@@ -20,7 +20,9 @@ from cumcm.common.sim_client import api_log as _api_log_raw
 from cumcm.t3ga.config import (
 API_LOG_NAME, RESULTS_DIR)
 from cumcm.t3ga.covering import covering_waypoints
-from cumcm.t3ga.plotting import TRAJ_DIR_NAME, save_trajectory_plot, sources_of
+from cumcm.common.scanfigure import STEP_DIR_NAME, reset_dir
+from cumcm.t3ga.plotting import (TRAJ_DIR_NAME, save_scan_figures,
+                                save_trajectory_plot, sources_of)
 from cumcm.t3ga.strategy import RobotDog
 from cumcm.t3ga.training import (episode_row, ga_meta, print_ga_summary,
                                  save_training_results)
@@ -41,8 +43,12 @@ def _save_and_report(args: argparse.Namespace, episodes: List[dict], ga_runs: Li
     paths = save_training_results(Path(args.save_dir), episodes, ga_runs, meta)
     print("训练结果已保存：" + "，".join(str(p) for p in paths))
     if traj_paths:
+        # 目录每局清空重写，故实际只剩最新一局那张 —— 报"共 N 张"会与目录内容不符
         where = Path(args.save_dir) / TRAJ_DIR_NAME
-        print(f"轨迹图已保存：{where}/ 共 {len(traj_paths)} 张（机器狗行驶轨迹，逐局一张）")
+        print(f"总轨迹图：{where}/ 只保留最新一局（{Path(traj_paths[-1]).name}）")
+        scan_dir = Path(args.save_dir) / STEP_DIR_NAME
+        n_scan = len(list(scan_dir.glob("*.png"))) if scan_dir.is_dir() else 0
+        print(f"逐步扫描结果图：{scan_dir}/ 共 {n_scan} 张（同为最新一局）")
     if api_log is not None:
         api_log.report()
 
@@ -67,10 +73,17 @@ def run_official(args: argparse.Namespace) -> int:
         row = episode_row(1, args.seed, None, dog, stats)
         meta = {"mode": "official", "base_url": args.base_url, "robot_id": args.robot_id,
                 "seed": args.seed, **ga_meta()}
-        traj = (None if args.no_plot else
-                save_trajectory_plot(args.save_dir, "ep01", dog.track, (), dog.hits, dog.marks,
-                                     title=f"官方测试 · 清除 {stats['cleared']} 个 · "
-                                           f"虚拟时间 {stats['total_time_s']:.0f} s"))
+        traj = None
+        if not args.no_plot:
+            reset_dir(Path(args.save_dir) / TRAJ_DIR_NAME)     # 只保留本次运行的图
+            reset_dir(Path(args.save_dir) / STEP_DIR_NAME)
+            traj = save_trajectory_plot(args.save_dir, "ep01", dog.track, (), dog.hits,
+                                        dog.marks,
+                                        title=f"官方测试 · 清除 {stats['cleared']} 个 · "
+                                              f"虚拟时间 {stats['total_time_s']:.0f} s")
+            scans = save_scan_figures(args.save_dir, "ep01", dog.scan_steps, ())
+            print(f"逐步扫描结果图：{len(scans)} 张 → "
+                  f"{Path(args.save_dir) / STEP_DIR_NAME}/")
         _save_and_report(args, [row], dog.ga_runs, meta, api_log,
                          [traj] if traj else [])
     return 0
@@ -114,17 +127,27 @@ def run_practice(args: argparse.Namespace) -> int:
             print(f"本局：清除 {r['cleared']}/{r['n_sources']}（{r['clear_ratio']:.3f}），"
                   f"虚拟总时间 {r['virtual_time_s']:.1f} s，平均 {avg_txt}，"
                   f"测向 {r['n_measure']} 次，{err_txt}")
-            # 轨迹图在 /exit 之后画，不占用现实时间预算
-            traj = (None if args.no_plot else
-                    save_trajectory_plot(args.save_dir, f"ep{ep + 1:02d}_seed{seed}",
-                                         dog.track, sources_of(truth), dog.hits, dog.marks,
-                                         title=f"第 {ep + 1} 局 · seed {seed} · "
-                                               f"清除 {r['cleared']}/{r['n_sources']} · "
-                                               f"虚拟时间 {r['virtual_time_s']:.0f} s"))
+            # 图在 /exit 之后画，不占用现实时间预算
+            traj = None
+            if not args.no_plot:
+                # 每一局先清掉上一局的图：图形目录只保留最新一局，避免新旧图混在一起
+                # （文件名带局号，肉眼很难分辨哪张属于这一轮）。结果表不受影响。
+                reset_dir(Path(args.save_dir) / TRAJ_DIR_NAME)
+                reset_dir(Path(args.save_dir) / STEP_DIR_NAME)
+                nm = f"ep{ep + 1:02d}_seed{seed}"
+                traj = save_trajectory_plot(args.save_dir, nm, dog.track, sources_of(truth),
+                                            dog.hits, dog.marks,
+                                            title=f"第 {ep + 1} 局 · seed {seed} · "
+                                                  f"清除 {r['cleared']}/{r['n_sources']} · "
+                                                  f"虚拟时间 {r['virtual_time_s']:.0f} s")
+                scans = save_scan_figures(args.save_dir, nm, dog.scan_steps,
+                                          sources_of(truth))
+                print(f"  总轨迹图 {traj}" if traj else "  总轨迹图 生成失败")
+                print(f"  逐步扫描结果图：{len(scans)} 张 → "
+                      f"{Path(args.save_dir) / STEP_DIR_NAME}/"
+                      + ("（已清掉上一局的图，只保留本局）" if ep else ""))
             if traj:
-                traj_paths.append(traj)
-                if not args.quiet:
-                    print(f"  轨迹图 {traj}")
+                traj_paths.append(traj)      # 仅用于汇总提示"最新一局"的图名
     print("\n" + "=" * 74)
     avgs = [r["avg_time_s"] for r in rows if r["avg_time_s"]]
     print(f"汇总（{len(rows)} 局）：平均清除比例 {np.mean([r['clear_ratio'] for r in rows]):.4f}，"

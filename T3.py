@@ -38,10 +38,24 @@
 | 演练 | `--practice N` | jammers-py（自动拉起） | 可见，可核对覆盖保证 | `results/t3/` |
 | 仅求解 | `--plan-only` | 无 | — | `results/t3/` |
 
-官方模式默认另写 `results/t3/official/`，以免覆盖演练批数据（--save-dir 可改）。轨迹图落在
-结果目录下的 `trajectory/`（--no-plot 关闭，--traj-dir 改目录）；接口调用全程落盘到
-`<save-dir>/api_calls.jsonl`（--api-log 改路径、传空串关闭）—— 官方模式拿不到真值，这份
-逐次请求/响应的记录就是唯一的证据链。GA 对照方案的结果树在 `results/t3_ga/`，两者互相独立。
+官方模式默认另写 `results/t3/official/`，以免覆盖演练批数据（--save-dir 可改）。
+接口调用全程落盘到 `<save-dir>/api_calls.jsonl`（--api-log 改路径、传空串关闭）—— 官方模式
+拿不到真值，这份逐次请求/响应的记录就是唯一的证据链。GA 对照方案的结果树在
+`results/t3_ga/`，两者互相独立。
+
+**图与日志只保留最新一局**（每局开头清空重写，避免新旧混在一起难以分辨）：
+
+| 产物 | 内容 |
+|---|---|
+| `<save-dir>/trajectory/epNN_seedM.png` + `.csv` | 该局的**总轨迹图**（整局行驶路径 + 全部动作点）与同名轨迹表 |
+| `<save-dir>/scan/epNN_seedM_s00_起点全频道扫描.png` | 第 0 步：出发点全频道扫描的结果图 |
+| `<save-dir>/scan/epNN_seedM_sNN_…png` | 其后每一步巡视扫描各一张（该步测向点、示向度射线、当时的可能源区域与已清除数） |
+| `<save-dir>/api_calls.jsonl` | 该局逐次接口调用（含原始响应） |
+| `--log FILE` | 该局的过程日志（缺省不写文件，只打终端） |
+
+逐步扫描图的价值在于：整局的轨迹图信息密度太高（上百次测向挤在一张 3600 m 见方的图上），
+而策略的全部信息都来自这一步步扫描 —— 每步单独出图才能看清"哪一步听到了什么、区域收缩到
+什么程度"。所有图都在 `/exit` 之后生成，不占用现实时间预算（--no-plot 关闭出图）。
 
 官方模式运行环境见 `reports/OFFICIAL_PLATFORM_GUIDE.md`（模拟器只监听 127.0.0.1，须同机运行）。
 """

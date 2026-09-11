@@ -44,7 +44,9 @@ class RobotDog:
         # 传入 api_log 时套一层记录代理：4 个接口的每一次调用都会落盘
         self.sim = sim if api_log is None else RecordedSim(sim, api_log, episode)
         self.verbose = verbose
-        self._logfile = open(logfile, "a", encoding="utf-8") if logfile else None
+        # 过程日志用 "w"：每局开头重写，于是整份日志只描述**最新一局**（原先 "a" 追加，
+        # 跨局、跨运行无限累积，几轮演练后文件里混着几百局的内容难以查阅）。
+        self._logfile = open(logfile, "w", encoding="utf-8") if logfile else None
         self.obs: Dict[int, List[Obs]] = defaultdict(list)
         self.cleared: set = set()
         self.pos = np.zeros(2)
@@ -64,6 +66,11 @@ class RobotDog:
         self.track: List[Tuple[float, float]] = [(0.0, 0.0)]
         self.marks: List[Tuple[float, float, str]] = []   # 动作点及其类型（measure/clear）
         self.hits: List[Tuple[float, float]] = []   # 成功清除的落点
+        # 逐步扫描记录：一步 = 机器狗停在某处把当前该测的频道测一遍（起点全频道扫描 + 滚动
+        # 重规划里每到一个覆盖路点）。仅登记、不在此处绘图 —— 绘图统一在 /exit 之后做，
+        # 不占用现实时间预算。
+        self.scan_steps: List[Dict[str, Any]] = []
+        self._cur_step: Optional[Dict[str, Any]] = None
 
     # ---- 日志 ----
     def log(self, msg: str) -> None:
@@ -89,8 +96,13 @@ class RobotDog:
         self.track.append((x, y))
         self.marks.append((x, y, "measure"))
         self.n_measure += 1
-        if r.get("measure_result") == "direction":
+        outcome = r.get("measure_result", "no_signal")
+        if outcome == "direction":
             self.obs[channel].append(Obs(channel, x, y, float(r["svd_deg"])))
+        if self._cur_step is not None:
+            self._cur_step["measures"].append(
+                {"channel": int(channel), "outcome": outcome,
+                 "theta": float(r["svd_deg"]) if outcome == "direction" else None})
         return r
 
     def clear(self, x: float, y: float, channel: int) -> bool:
@@ -107,6 +119,8 @@ class RobotDog:
         if ok:
             self.cleared.add(channel)
             self.hits.append((x, y))
+        if self._cur_step is not None:
+            self._cur_step["clears"].append({"channel": int(channel), "success": bool(ok)})
         return ok
 
     def _out_of_time(self) -> bool:
@@ -116,7 +130,17 @@ class RobotDog:
         """路线 GA 规划从当前位置出发访问 pts 的顺序；返回（访问顺序, 总里程 m）。
 
         顺带记录本次训练（进化）过程；里程在这里一次算好，供调用方直接使用。
+
+        **恰有一个目标（或没有）时不存在"路线"问题**：直接从当前位置过去即可，故跳过 GA、
+        也不登记训练记录。两个原因：一是 `route_ga` 对 n ≤ 1 会提前返回、不写进化记录，
+        原先在此处无条件读 `record[0]` 会 IndexError（滚动重规划里"只剩最后一个路点且没有
+        待清源"时正好命中，实测跑到第 7 局才触发）；二是若为它补记一条 generations=0 的
+        记录，会破坏"每次路线规划都跑满代数"这条可核验性（见 T3_validate 的 E9）。
         """
+        pts = np.asarray(pts, dtype=float)
+        if len(pts) <= 1:
+            order = list(range(len(pts)))
+            return order, _path_len(order, _dist_matrix(pts, self.pos))
         seed = int(self._rng.integers(1 << 31))
         record: List[List[float]] = []
         order = route_ga(pts, self.pos, seed=seed, record=record)
@@ -130,8 +154,46 @@ class RobotDog:
         })
         return order, length
 
-    def _sweep(self, channels: Sequence[int], at: Sequence[float]) -> Dict[str, int]:
-        """在 at 处逐频道测向（按频道号升序以减少切换）；近距则就地清除。"""
+    def _begin_scan_step(self, index: int, label: str, at: Sequence[float],
+                         n_channels: int) -> None:
+        """开始记录一步扫描（见 `scan_steps`）。动作由 measure/clear 自动挂到当前步上。"""
+        self._cur_step = {
+            "index": int(index), "label": label,
+            "x": float(at[0]), "y": float(at[1]), "n_channels": int(n_channels),
+            "counts": {}, "measures": [], "clears": [],
+            "virtual_time_s": round(self.vt, 3), "travel_m": round(self._travel_m(), 2),
+        }
+
+    def _end_scan_step(self, counts: Dict[str, int]) -> None:
+        """收尾一步扫描：填统计与状态快照，然后登记（供收尾统一出图）。"""
+        step = self._cur_step
+        self._cur_step = None
+        if step is None:
+            return
+        step["counts"] = dict(counts)
+        step["virtual_time_s"] = round(self.vt, 3)
+        step["travel_m"] = round(self._travel_m(), 2)
+        step["cleared"] = sorted(self.cleared)
+        step["path"] = [(0.0, 0.0)] + [(float(t[0]), float(t[1])) for t in self.track]
+        # GA 的估计形态是"点 + 位置 1σ"（不是多边形），故快照 σ 圆；官方模式下同样可用
+        step["estimates"] = {ch: (e.x, e.y, e.sigma)
+                             for ch, e in sorted(self.final_est.items())
+                             if ch not in self.cleared}
+        self.scan_steps.append(step)
+
+    def _travel_m(self) -> float:
+        """累计行驶里程（沿 track 逐段累加；track[0] 是起点 (0,0)）。"""
+        pts = np.asarray(self.track, dtype=float)
+        return float(np.sum(np.hypot(np.diff(pts[:, 0]), np.diff(pts[:, 1])))) if len(pts) > 1 else 0.0
+
+    def _sweep(self, channels: Sequence[int], at: Sequence[float],
+               label: Optional[str] = None, index: int = 0) -> Dict[str, int]:
+        """在 at 处逐频道测向（按频道号升序以减少切换）；近距则就地清除。
+
+        传入 `label` 时把这一步登记进 `scan_steps`（收尾逐步骤出"扫描结果图"）。
+        """
+        if label is not None:
+            self._begin_scan_step(index, label, at, len(channels))
         counts = {"direction": 0, "near": 0, "no_signal": 0}
         for ch in sorted(channels):
             if self._out_of_time():
@@ -140,6 +202,8 @@ class RobotDog:
             counts[res] = counts.get(res, 0) + 1
             if res == "near" and self.clear(at[0], at[1], ch):
                 self.log(f"    [near] 频道{ch} 距离过近，就地清除成功")
+        if label is not None:
+            self._end_scan_step(counts)
         return counts
 
     def _probe(self, channel: int, candidates: Sequence[Sequence[float]]) -> bool:
@@ -190,7 +254,7 @@ class RobotDog:
     def _initial_scan(self) -> None:
         self.log(f"阶段1：起点完整扫描全部 {len(CHANNELS)} 个频道 @ "
                  f"({self.pos[0]:.0f}, {self.pos[1]:.0f})")
-        counts = self._sweep(CHANNELS, self.pos)
+        counts = self._sweep(CHANNELS, self.pos, label="起点全频道扫描", index=0)
         self.log(f"  有示向度 {counts['direction']} 个 {sorted(self.obs)}，"
                  f"近距清除 {counts['near']} 个，无信号 {counts['no_signal']} 个")
 
@@ -230,7 +294,8 @@ class RobotDog:
         """
         waypoints = covering_waypoints()
         visited = [False] * len(waypoints)
-        attempted: set = set()          # 已在滚动中试清过（无论成败）的频道，收尾再处理
+        attempted: set = set()
+        n_step = 1                      # 步骤编号（0 已被起点全频道扫描占用）          # 已在滚动中试清过（无论成败）的频道，收尾再处理
         self.log(f"阶段2：滚动重规划，{len(waypoints)} 个覆盖路点（覆盖半径 "
                  f"{COVER_RADIUS:.0f} m，插入门 σ≤{RHO_GATE:.0f} m）")
         while not self._out_of_time():
@@ -258,7 +323,9 @@ class RobotDog:
                 wp = waypoints[idx]
                 self.log(f"  滚动：下一站路点 {idx} @ ({wp[0]:.0f}, {wp[1]:.0f})"
                          f"（剩余 {len(pending) - 1} 个路点，待清源 {len(gated)} 个）")
-                self._sweep(self._active_channels(), wp)
+                self._sweep(self._active_channels(), wp,
+                            label=f"覆盖路点 #{idx + 1}", index=n_step)
+                n_step += 1
         self.log(f"阶段2 完成：虚拟时刻 {self.vt:.0f} s，已清除 {len(self.cleared)} 个，"
                  f"滚动中试清 {len(attempted)} 个源")
 
@@ -335,6 +402,12 @@ class RobotDog:
 
         示向度误差是"同一地点固定"的系统误差，仅靠多视角交会存在沿射线方向的偏移；
         靠近后直接沿最新示向度走一步（16 m 步长的横向误差约 0.3 m）即可稳定进入清除半径。
+
+        **逼近中每次更新都要回写 `final_est`**：滚动重规划传入的 `est` 是局部字典 `gated`，
+        不回写的话 `final_est` 会永远停在最早那次（示向度很少的）粗糙解，逐局定位误差是被
+        记录下来的那个陈旧值而不是实际达到的精度 —— 实测最坏由 19.7 m 虚高到 68.9 m，
+        而同一局每个清除点其实都落在源 20 m 内。分段式路径下 `est` 就是 `final_est`，
+        同步写是幂等的，故这一改动对旧路径无影响。
         """
         for _ in range(HOMING_MAX):
             e = est.get(channel)
@@ -354,6 +427,7 @@ class RobotDog:
                 nx, ny = clamp_to_region(e.x + HOMING_STEP * math.cos(th),
                                          e.y + HOMING_STEP * math.sin(th))
                 est[channel] = Estimate(nx, ny, e.sigma)
+                self.final_est[channel] = est[channel]    # 见下
                 continue
             # no_signal：定位偏了，用新示向度重新定位；仍不行则补测视角
             ne = self._estimate(channel)
@@ -363,6 +437,7 @@ class RobotDog:
                 ne = self._estimate(channel)
             if ne is not None:
                 est[channel] = ne
+                self.final_est[channel] = ne
         self.log(f"    [警告] 频道{channel} 逼近 {HOMING_MAX} 次仍未能清除")
 
     def _clear_all(self, est: Dict[int, Estimate]) -> None:

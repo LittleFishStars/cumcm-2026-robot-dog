@@ -81,7 +81,9 @@ class RobotDog:
         self.inline_try_radius = float(inline_try_radius)    # 顺路试清允许的覆盖圆半径上限 / m
         self.inline_detour = float(inline_detour)            # 顺路试清允许的绕行里程上限 / m
         self.rotate = bool(rotate)                           # 起始扫描后是否旋转覆盖圆布局
-        self._logfile = open(logfile, "a", encoding="utf-8") if logfile else None
+        # 过程日志用 "w"：每局开头重写，于是整份日志只描述**最新一局**。
+        # 原先用 "a" 追加，跨局、跨运行无限累积，几轮演练后文件里混着几百局的内容难以查阅。
+        self._logfile = open(logfile, "w", encoding="utf-8") if logfile else None
         self.obs: Dict[int, List[Obs]] = defaultdict(list)
         self.meas: Dict[int, List[Meas]] = defaultdict(list)   # 全部测量（含 no_signal）
         self.n_skip = 0                                        # 判定必无信号而跳过的测量次数
@@ -105,6 +107,10 @@ class RobotDog:
         self.dense_dir_deg: Optional[float] = None       # 源最密集的扇区中心方位 / 度
         self.n_face_scanned = 0                          # 起始扫描听到的源个数（选向依据）
         self.survey_order_used: List[int] = []           # 本局实际的巡视顺序
+        # 逐步扫描记录：一步 = 机器狗停在某处把当前该测的频道测一遍（起点全频道扫描 + 各巡视
+        # 站）。仅登记、不在此处绘图 —— 绘图统一在 /exit 之后做，不占用现实时间预算。
+        self.scan_steps: List[Dict[str, Any]] = []
+        self._cur_step: Optional[Dict[str, Any]] = None
 
     # ---- 日志 ----
     def log(self, msg: str) -> None:
@@ -138,6 +144,10 @@ class RobotDog:
         if outcome == "direction":
             self.obs[channel].append(Obs(channel, x, y, m.theta, self.stage))
         self._note("measure", x, y, channel, outcome=outcome, theta=m.theta)
+        if self._cur_step is not None:
+            self._cur_step["measures"].append({"channel": int(channel), "outcome": outcome,
+                                              "theta": None if m.theta is None
+                                              else float(m.theta)})
         return r
 
     def _provable_no_signal(self, channel: int, at: Sequence[float]) -> bool:
@@ -165,6 +175,8 @@ class RobotDog:
             self.cleared.add(channel)
             self.tracks.setdefault(channel, {})["clear_point"] = [x, y]
         self._note("clear", x, y, channel, outcome="success" if ok else "no_target_in_range")
+        if self._cur_step is not None:
+            self._cur_step["clears"].append({"channel": int(channel), "success": bool(ok)})
         return ok
 
     def _note(self, kind: str, x: float, y: float, channel: int,
@@ -180,6 +192,34 @@ class RobotDog:
             "outcome": outcome, "theta": theta,
             "virtual_time_s": round(self.vt, 3), "travel_m": round(self.travel_m, 2),
         })
+
+    def _begin_scan_step(self, index: int, label: str, at: Sequence[float],
+                         n_channels: int) -> None:
+        """开始记录一步扫描（见 `scan_steps`）。动作由 measure/clear 自动挂到当前步上。"""
+        self._cur_step = {
+            "index": int(index), "label": label,
+            "x": float(at[0]), "y": float(at[1]), "n_channels": int(n_channels),
+            "counts": {}, "measures": [], "clears": [],
+            "virtual_time_s": round(self.vt, 3), "travel_m": round(self.travel_m, 2),
+        }
+
+    def _end_scan_step(self, counts: Dict[str, int]) -> None:
+        """收尾一步扫描：填统计与本步结束时的状态快照，然后登记（供收尾统一出图）。"""
+        step = self._cur_step
+        self._cur_step = None
+        if step is None:
+            return
+        step["counts"] = dict(counts)
+        step["virtual_time_s"] = round(self.vt, 3)
+        step["travel_m"] = round(self.travel_m, 2)
+        step["cleared"] = sorted(self.cleared)
+        # 到本步为止的行驶路径（含起点），给出"路线走到哪了"的空间上下文
+        step["path"] = [(0.0, 0.0)] + [(a["x"], a["y"]) for a in self.actions]
+        # 本步结束时的可能源区域轮廓（T3 的估计形态就是多边形，故不另算 σ 圆）
+        # 顶点不足 3 个的多边形画不出来，跳过即可（画图是辅助手段，不影响任何决策）
+        step["regions"] = {ch: verts for ch, reg in sorted(self.regions.items())
+                           if len(verts := list(reg.vertices)) >= 3}
+        self.scan_steps.append(step)
 
     def _out_of_time(self) -> bool:
         return time.monotonic() > self.deadline
@@ -239,8 +279,14 @@ class RobotDog:
                 and len(self.obs.get(c, ())) < OBS_CAP
                 and not self._precise(c)]
 
-    def _sweep(self, channels: Sequence[int], at: Sequence[float]) -> Dict[str, int]:
-        """在 at 处按频道号升序逐频道测向（升序可省频道切换时间）；near 就地清除。"""
+    def _sweep(self, channels: Sequence[int], at: Sequence[float],
+               label: Optional[str] = None, index: int = 0) -> Dict[str, int]:
+        """在 at 处按频道号升序逐频道测向（升序可省频道切换时间）；near 就地清除。
+
+        传入 `label` 时把这一步登记进 `scan_steps`（收尾逐步骤出"扫描结果图"）。
+        """
+        if label is not None:
+            self._begin_scan_step(index, label, at, len(channels))
         counts = {"direction": 0, "near": 0, "no_signal": 0, "skip": 0}
         for ch in sorted(channels):
             if self._out_of_time():
@@ -254,6 +300,8 @@ class RobotDog:
             if res == "near":
                 self.log(f"    [near] 频道{ch}：源在 5 m 内，就地清除"
                          f"{'成功' if self.clear(at[0], at[1], ch) else '失败'}")
+        if label is not None:
+            self._end_scan_step(counts)
         return counts
 
     def survey(self, order: Sequence[int]) -> None:
@@ -285,7 +333,7 @@ class RobotDog:
         if home:
             self.log(f"阶段1 起始全频道扫描：在出发点 (0.0, 0.0) 扫描 {len(home)} 个频道"
                      f"（里程 0 m）")
-            counts0 = self._sweep(home, origin)
+            counts0 = self._sweep(home, origin, label="起点全频道扫描", index=0)
             self.initial_scan = dict(counts0, n_channels=len(home))
             self.log(f"    有示向度 {counts0['direction']}、无信号 {counts0['no_signal']}、"
                      f"近距清除 {counts0['near']}、判定必无信号而跳过 {counts0['skip']}")
@@ -313,7 +361,8 @@ class RobotDog:
                 break
             self.log(f"  第 {step_i} 站：圆心 {idx} @ ({wp[0]:.1f}, {wp[1]:.1f})，"
                      f"扫描 {len(active)} 个频道")
-            counts = self._sweep(active, wp)
+            counts = self._sweep(active, wp, label=f"巡视站 {step_i}（圆心 {idx}）",
+                                 index=step_i)
             self.waypoint_stats.append({
                 "waypoint": int(idx), "x": float(wp[0]), "y": float(wp[1]),
                 "n_channels": len(active), **counts,
@@ -323,7 +372,8 @@ class RobotDog:
                      f"近距清除 {counts['near']}、判定必无信号而跳过 {counts['skip']}，"
                      f"累计里程 {self.travel_m:.0f} m，虚拟时刻 {self.vt:.0f} s")
             if getattr(self, "_orient_after_first_scan", False):
-                # 出发点不是巡视站之外的站：首次扫描发生在本站，定向决策也在这里做
+                # 出发点不是巡视站之外的站（六边形族）：首次扫描发生在本站，定向决策也在这里做。
+                # 该步已按"巡视站"登记，标签沿用即可。
                 self._orient_after_first_scan = False
                 bearings = self._bearings_at(wp)
                 self.n_face_scanned = len(bearings)

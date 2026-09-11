@@ -206,12 +206,15 @@ results/
 │   ├── t3_cover_circles.csv   7 个圆心坐标
 │   ├── t3_survey.json         10 局巡视扫描 + 清除统计
 │   ├── t3_observations.csv    1199 条逐次测量（含 no_signal）
-│   └── trajectory/            每局轨迹图 + 同名轨迹表（10 对）
+│   ├── trajectory/            最新一局的总轨迹图 + 同名轨迹表
+│   └── scan/                  最新一局的逐步扫描结果图（起点扫描 + 各巡视站）
 └── t3_ga/                      GA 对照方案（T3_ga.py）
     ├── ga_training.json       GA 训练记录 + 逐局统计（含真值）
     ├── ga_convergence.csv     逐代收敛曲线
     ├── episodes.csv           逐局汇总表
-    ├── api_calls.jsonl        逐次接口调用（3374 行）
+    ├── api_calls.jsonl        逐次接口调用
+    ├── trajectory/            最新一局的总轨迹图 + 同名轨迹表
+    ├── scan/                  最新一局的逐步扫描结果图
     ├── validation.json        71 项验证检查（主批 + holdout 一起审计）
     ├── trajectory/            每局轨迹图 + 同名轨迹表（主批 20 对）
     ├── holdout/               独立 seed 批（seed 100–109）同名产物

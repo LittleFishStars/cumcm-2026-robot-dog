@@ -23,7 +23,8 @@ from cumcm.common.sim_client import (API_LOG_NAME, BASE_URL, ROBOT_ID, ApiLog,
 from cumcm.common.sim_client import api_log as _api_log_raw
 from cumcm.t3.config import (CHOSEN_RING_RADIUS, CLEAR_RADIUS, COVER_RADIUS, INLINE_DETOUR, INLINE_TRY_RADIUS, K_CLEAR_MAX, RESULTS_DIR, SEED, TRAJ_DIR)
 from cumcm.t3.covering import (CoverSolveResult, optimal_ring_radius, print_cover_report, solve_covering_circles)
-from cumcm.t3.plotting import save_trajectory, truth_points
+from cumcm.common.scanfigure import STEP_DIR_NAME, reset_dir
+from cumcm.t3.plotting import save_scan_figures, save_trajectory, truth_points
 from cumcm.t3.report import (episode_row, save_plan, save_survey, truth_check, observation_rows)
 from cumcm.t3.strategy import RobotDog
 
@@ -96,13 +97,22 @@ def run_practice(args: argparse.Namespace, res: CoverSolveResult, save_dir: Path
             show(stats, check, len(truth))
             if not args.no_plot:                    # 出图在 /exit 之后，不占现实时间预算
                 name = f"ep{ep + 1:02d}_seed{seed}"
+                tp = truth_points(truth)
+                # 每一局先清掉上一局的图：图形目录只保留最新一局，避免新旧图混在一起
+                # （文件名带局号，肉眼很难分辨哪张属于这一轮）。结果表（json/csv）不受影响。
+                reset_dir(save_dir / args.traj_dir)
+                reset_dir(save_dir / STEP_DIR_NAME)
                 files = save_trajectory(
-                    save_dir, name, dog.actions, dog.plan, dog.survey_order_used,
-                    truth_points(truth),
+                    save_dir, name, dog.actions, dog.plan, dog.survey_order_used, tp,
                     title=f"第 {ep + 1} 局（seed={seed}）：清除 {stats['cleared']}/{len(truth)}、"
                           f"里程 {stats['travel_m']:.0f} m、虚拟时间 {stats['virtual_time_s']:.0f} s",
                     traj_dir=args.traj_dir)
-                print("  轨迹图：" + "，".join(str(f) for f in files))
+                scans = save_scan_figures(save_dir, name, dog.scan_steps, dog.plan,
+                                          dog.survey_order_used, tp,
+                                          traj_dir=args.traj_dir)
+                print(f"  总轨迹图：" + "，".join(str(f) for f in files))
+                print(f"  逐步扫描结果图：{len(scans)} 张 → {save_dir / STEP_DIR_NAME}/"
+                      + ("（已清掉上一局的图，只保留本局）" if ep else ""))
     print("\n" + "=" * 78)
     if clear:
         print(f"汇总（{len(rows)} 局）：平均清除比例 "
@@ -169,13 +179,19 @@ def run_official(args: argparse.Namespace, res: CoverSolveResult, save_dir: Path
         row = episode_row(1, None, None, dog, stats,
                           truth_check(None, dog.plan, dog.obs, dog.cleared, dog.tracks))
         if not args.no_plot:
+            reset_dir(save_dir / args.traj_dir)          # 只保留本次运行的图
+            reset_dir(save_dir / STEP_DIR_NAME)
             files = save_trajectory(
                 save_dir, "ep01_official", dog.actions, dog.plan,
                 dog.survey_order_used, (),
                 title=f"官方模式：清除 {stats['cleared']} 个、里程 {stats['travel_m']:.0f} m、"
                       f"虚拟时间 {stats['virtual_time_s']:.0f} s（无真值可比）",
                 traj_dir=args.traj_dir)
-            print("轨迹图：" + "，".join(str(f) for f in files))
+            scans = save_scan_figures(save_dir, "ep01_official", dog.scan_steps,
+                                      dog.plan, dog.survey_order_used, (),
+                                      traj_dir=args.traj_dir)
+            print("总轨迹图：" + "，".join(str(f) for f in files))
+            print(f"逐步扫描结果图：{len(scans)} 张 → {save_dir / STEP_DIR_NAME}/")
         paths = (save_plan(res, save_dir)
                  + save_survey(save_dir, [row], observation_rows(1, dog.plan, dog.meas),
                                res.to_json()))

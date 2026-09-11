@@ -9,13 +9,17 @@ from __future__ import annotations
 
 import csv
 import math
+import re
 from pathlib import Path
 from typing import List, Optional, Sequence, Tuple
 
 import numpy as np
 
 from cumcm.common.plotting import (C_FRAME, C_HIT, C_PATH, C_SRC, font_context, setup_mpl_env)
-from cumcm.t3ga.config import CLEAR_RADIUS, REGION_RADIUS
+from cumcm.common.scanfigure import STEP_DIR_NAME, ScanStep, draw_scan_step
+from cumcm.t3ga.config import (CLEAR_RADIUS, COVER_RADIUS, MAX_RECEPTION,
+                               REGION_RADIUS)
+from cumcm.t3ga.covering import covering_waypoints
 
 # 旧名 → 统一配色（cumcm.common.plotting）。保留别名是为了让绘制函数体一字不改。
 _C_PLOT_PATH = C_PATH
@@ -167,6 +171,80 @@ def _write_track_csv(path: Path, track: Sequence[Sequence[float]],
         w.writerow([0, f"{float(track[0][0]):.3f}", f"{float(track[0][1]):.3f}", "start"])
         for i, (x, y, kind) in enumerate(marks, start=1):
             w.writerow([i, f"{float(x):.3f}", f"{float(y):.3f}", kind])
+
+
+def save_scan_figures(save_dir: str, name: str, steps: Sequence[dict],
+                      sources: Sequence[Sequence[float]] = (),
+                      step_dir: str = STEP_DIR_NAME) -> List[Path]:
+    """把一局内**每一步扫描**各画一张结果图，落在 <save-dir>/<step_dir>/ 下。
+
+    文件名形如 `ep01_s00_起点全频道扫描.png`，排序后与执行顺序一致。绘图放在 /exit 之后，
+    不占现实时间预算；缺 matplotlib 只提示一次并跳过（与轨迹图同样的容错口径）。
+
+    与确定性方案的差别：路点由贪心集合覆盖给出（8 个，半径 920 m 的覆盖保证，而确定性方案
+    是固定 7 个半径 1000 m 的圆），且本族估计形态是"点 + 位置 1σ"而非多边形区域 ——
+    故图上画 σ 圆。这些差异由调用方通过参数表达，绘制本身复用 cumcm.common.scanfigure。
+    """
+    global _PLOT_HINTED
+    out_dir = Path(save_dir) / step_dir
+    paths: List[Path] = []
+    try:
+        out_dir.mkdir(parents=True, exist_ok=True)
+    except OSError as exc:
+        if not _PLOT_HINTED:
+            _PLOT_HINTED = True
+            print(f"提示：扫描图目录创建失败（{type(exc).__name__}: {exc}）")
+        return paths
+    # 路点布局用**本族真正的覆盖路点集**（贪心集合覆盖的产物，COVER_RADIUS = 920 m 的保证
+    # 就来自它）；起点扫描的位置不属于该集合，故它只作为"本步扫描点"出现，不画成路点。
+    wp = [tuple(map(float, p)) for p in covering_waypoints()]
+    for k, raw in enumerate(steps):
+        # 到第 k 步为止已扫过的路点：按坐标匹配（容差 1 m，与图上判定当前站的容差一致）
+        seen = [(float(s_["x"]), float(s_["y"])) for s_ in steps[:k + 1]
+                if int(s_.get("index", 0)) > 0]
+        visited = [i for i, w in enumerate(wp)
+                   if any(math.hypot(w[0] - sx, w[1] - sy) <= 1.0 for sx, sy in seen)]
+        safe = _slug(str(raw.get("label", f"step{k}")))
+        out = out_dir / f"{name}_s{k:02d}_{safe}.png"
+        try:
+            draw_scan_step(out, ScanStep(
+                index=int(raw.get("index", k)), label=str(raw.get("label", "")),
+                x=float(raw["x"]), y=float(raw["y"]),
+                n_channels=int(raw.get("n_channels", 0)),
+                counts=dict(raw.get("counts", {})),
+                virtual_time_s=float(raw.get("virtual_time_s", 0.0)),
+                travel_m=float(raw.get("travel_m", 0.0)),
+                measures=list(raw.get("measures", [])),
+                clears=list(raw.get("clears", [])),
+                path=[tuple(map(float, p)) for p in raw.get("path", [])],
+                cleared=list(raw.get("cleared", [])),
+                estimates=raw.get("estimates") or None,
+            ), cover_centers=wp, visit_order=list(range(len(wp))),
+                visited=visited,
+                cover_radius=COVER_RADIUS, region_radius=REGION_RADIUS,
+                gen_radius=REGION_RADIUS - 30.0, ray_len=MAX_RECEPTION,
+                sources=[{"x": float(a), "y": float(b)} for a, b, _ in sources],
+                clear_radius=CLEAR_RADIUS,
+                title=f"第 {k} 步扫描 / 共 {len(steps)} 步：{raw.get('label', '')}",
+                fonts=TRAJ_FONTS)
+            paths.append(out)
+        except ImportError:
+            if not _PLOT_HINTED:
+                _PLOT_HINTED = True
+                print("提示：未安装 matplotlib，已跳过扫描图（pip install matplotlib 后可自动生成）")
+            return paths
+        except Exception as exc:        # 字体/磁盘等问题都不该影响测试结论
+            if not _PLOT_HINTED:
+                _PLOT_HINTED = True
+                print(f"提示：扫描图生成失败，已跳过（{type(exc).__name__}: {exc}）")
+            return paths
+    return paths
+
+
+def _slug(text: str) -> str:
+    """把标签压成安全文件名片段（保留中文与字母数字，其余换下划线）。"""
+    keep = [c if (c.isalnum() or c in "._-") else "_" for c in text]
+    return re.sub(r"_+", "_", "".join(keep)).strip("_") or "step"
 
 
 def sources_of(truth: Optional[Sequence[dict]]) -> List[Tuple[float, float, int]]:

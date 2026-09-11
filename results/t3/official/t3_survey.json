@@ -209,27 +209,27 @@
   "summary": {
     "episodes": 1,
     "n_sources": 0,
-    "n_cleared": 16,
+    "n_cleared": 10,
     "clear_ratio": null,
-    "avg_time_s": 241.484,
-    "virtual_time_s_mean": 3863.751,
-    "travel_m_mean": 15488.8,
-    "n_measure_mean": 113.0,
-    "n_probe_mean": 2.0,
-    "n_precise_at_survey": 2,
-    "n_skip_measure": 14,
-    "n_inline_cleared": 7,
+    "avg_time_s": 341.882,
+    "virtual_time_s_mean": 3418.824,
+    "travel_m_mean": 13084.1,
+    "n_measure_mean": 125.0,
+    "n_probe_mean": 0.0,
+    "n_precise_at_survey": 4,
+    "n_skip_measure": 4,
+    "n_inline_cleared": 3,
     "n_inline_fail": 1,
-    "n_refined": 2,
+    "n_refined": 0,
     "localize_err_mean_m": null,
     "localize_err_max_m": null,
     "n_within_clear_radius": 0,
     "methods": {},
-    "rotation_deg_mean": 60.667,
-    "rotation_deg_min": 60.667,
-    "rotation_deg_max": 60.667,
+    "rotation_deg_mean": 228.576,
+    "rotation_deg_min": 228.576,
+    "rotation_deg_max": 228.576,
     "n_episodes_rotated": 1,
-    "n_face_scanned_mean": 8.0
+    "n_face_scanned_mean": 5.0
   },
   "episodes": [
     {
@@ -242,26 +242,26 @@
       "n_within_clear_radius": 0,
       "n_cleared_after_probe": 0,
       "waypoints_visited": 7,
-      "travel_m": 15488.753296335928,
-      "virtual_time_s": 3863.750645,
-      "n_measure": 113,
-      "n_clear": 19,
-      "channels_heard": 16,
-      "n_bearings": 40,
-      "cleared": 16,
-      "avg_time_s": 241.4844153125,
-      "n_precise_at_survey": 2,
-      "n_skip_measure": 14,
+      "travel_m": 13084.118803588564,
+      "virtual_time_s": 3418.823753,
+      "n_measure": 125,
+      "n_clear": 11,
+      "channels_heard": 10,
+      "n_bearings": 23,
+      "cleared": 10,
+      "avg_time_s": 341.88237530000004,
+      "n_precise_at_survey": 4,
+      "n_skip_measure": 4,
       "initial_scan": {
-        "direction": 8,
+        "direction": 5,
         "near": 0,
-        "no_signal": 12,
+        "no_signal": 15,
         "skip": 0,
         "n_channels": 20
       },
-      "rotation_deg": 60.6668,
-      "dense_dir_deg": 107.0604,
-      "n_face_scanned": 8,
+      "rotation_deg": 228.5764,
+      "dense_dir_deg": 274.97,
+      "n_face_scanned": 5,
       "survey_order_used": [
         0,
         6,
@@ -271,135 +271,47 @@
         2,
         5
       ],
-      "n_inline_cleared": 7,
+      "n_inline_cleared": 3,
       "n_inline_fail": 1,
-      "n_refined": 2,
-      "n_probe": 2,
+      "n_refined": 0,
+      "n_probe": 0,
       "tracks": {
-        "2": {
+        "10": {
           "clear_point": [
-            -753.2013583932641,
-            -263.477549385719
+            1131.7302700257824,
+            597.4798571560956
           ],
           "method": "survey-inline"
         },
-        "9": {
+        "8": {
           "clear_point": [
-            -642.1602932110919,
-            -175.41482698502773
+            -11.823054893629683,
+            819.0230088933123
           ],
           "method": "survey-inline"
         },
-        "14": {
+        "17": {
           "clear_point": [
-            238.19190427116285,
-            -765.5081829287137
+            -909.8995940246939,
+            683.9501417122626
           ],
           "method": "survey-inline"
-        },
-        "16": {
-          "clear_point": [
-            797.2601429728306,
-            506.7960184636293
-          ],
-          "method": "survey-inline"
-        },
-        "1": {
-          "clear_point": [
-            -420.06719078490227,
-            971.2423836536298
-          ],
-          "method": "survey-inline"
-        },
-        "12": {
-          "clear_point": [
-            -380.2968500276748,
-            1186.524867158151
-          ],
-          "method": "survey-inline"
-        },
-        "18": {
-          "clear_point": [
-            35.0902362531573,
-            1009.2180470674863
-          ],
-          "method": "survey-inline"
-        },
-        "3": {
-          "n_obs_survey": 3,
-          "n_no_signal_survey": 1,
-          "diameter_survey_m": 87.365,
-          "mec_radius_survey_m": 43.683,
-          "bounded_survey": true,
-          "n_probe": 1,
-          "clear_point": [
-            1188.1929689756828,
-            502.3984833179624
-          ],
-          "clear_radius_m": 18.191,
-          "diameter_final_m": 36.383,
-          "precise_final": true,
-          "mec_radius_m": 18.191,
-          "bounded_final": true,
-          "n_obs_total": 4,
-          "method": "try-refined",
-          "cleared": true
         },
         "4": {
           "n_obs_survey": 2,
-          "n_no_signal_survey": 2,
-          "diameter_survey_m": 69.756,
-          "mec_radius_survey_m": 34.878,
+          "n_no_signal_survey": 0,
+          "diameter_survey_m": 36.648,
+          "mec_radius_survey_m": 18.324,
           "bounded_survey": true,
           "n_probe": 0,
           "clear_point": [
-            1398.7643618548464,
-            926.5116452565751
+            240.5400842961016,
+            -529.3773681944845
           ],
-          "clear_radius_m": 34.878,
-          "diameter_final_m": 69.756,
-          "precise_final": false,
-          "mec_radius_m": 34.878,
-          "bounded_final": true,
-          "n_obs_total": 2,
-          "method": "try",
-          "cleared": true
-        },
-        "5": {
-          "n_obs_survey": 2,
-          "n_no_signal_survey": 2,
-          "diameter_survey_m": 45.331,
-          "mec_radius_survey_m": 22.666,
-          "bounded_survey": true,
-          "n_probe": 0,
-          "clear_point": [
-            321.5087004739565,
-            -1448.3195050138897
-          ],
-          "clear_radius_m": 22.666,
-          "diameter_final_m": 45.331,
-          "precise_final": false,
-          "mec_radius_m": 22.666,
-          "bounded_final": true,
-          "n_obs_total": 2,
-          "method": "try",
-          "cleared": true
-        },
-        "6": {
-          "n_obs_survey": 2,
-          "n_no_signal_survey": 2,
-          "diameter_survey_m": 38.529,
-          "mec_radius_survey_m": 19.264,
-          "bounded_survey": true,
-          "n_probe": 0,
-          "clear_point": [
-            649.1043656691161,
-            -1217.5070143599442
-          ],
-          "clear_radius_m": 19.264,
-          "diameter_final_m": 38.529,
+          "clear_radius_m": 18.324,
+          "diameter_final_m": 36.648,
           "precise_final": true,
-          "mec_radius_m": 19.264,
+          "mec_radius_m": 18.324,
           "bounded_final": true,
           "n_obs_total": 2,
           "method": "try",
@@ -407,219 +319,239 @@
         },
         "7": {
           "n_obs_survey": 2,
-          "n_no_signal_survey": 2,
-          "diameter_survey_m": 58.924,
-          "mec_radius_survey_m": 29.462,
+          "n_no_signal_survey": 3,
+          "diameter_survey_m": 44.125,
+          "mec_radius_survey_m": 22.063,
           "bounded_survey": true,
           "n_probe": 0,
           "clear_point": [
-            -437.9077437478678,
-            -1457.6160840505229
+            -624.9016868858496,
+            -1472.5540322911695
           ],
-          "clear_radius_m": 29.462,
-          "diameter_final_m": 58.924,
+          "clear_radius_m": 22.063,
+          "diameter_final_m": 44.125,
           "precise_final": false,
-          "mec_radius_m": 29.462,
+          "mec_radius_m": 22.063,
           "bounded_final": true,
           "n_obs_total": 2,
           "method": "try",
           "cleared": true
         },
-        "8": {
+        "9": {
           "n_obs_survey": 2,
           "n_no_signal_survey": 2,
-          "diameter_survey_m": 52.141,
-          "mec_radius_survey_m": 26.07,
+          "diameter_survey_m": 57.298,
+          "mec_radius_survey_m": 28.649,
           "bounded_survey": true,
           "n_probe": 0,
           "clear_point": [
-            291.0463062556034,
-            1668.1086722566479
+            581.3837922418048,
+            -1602.0094200856647
           ],
-          "clear_radius_m": 26.07,
-          "diameter_final_m": 52.141,
+          "clear_radius_m": 28.649,
+          "diameter_final_m": 57.298,
           "precise_final": false,
-          "mec_radius_m": 26.07,
+          "mec_radius_m": 28.649,
           "bounded_final": true,
           "n_obs_total": 2,
           "method": "try",
           "cleared": true
         },
-        "10": {
-          "n_obs_survey": 3,
-          "n_no_signal_survey": 2,
-          "diameter_survey_m": 84.274,
-          "mec_radius_survey_m": 42.137,
+        "11": {
+          "n_obs_survey": 2,
+          "n_no_signal_survey": 3,
+          "diameter_survey_m": 32.716,
+          "mec_radius_survey_m": 16.358,
           "bounded_survey": true,
           "n_probe": 0,
           "clear_point": [
-            1243.4233198134903,
-            -1239.2856880852778
+            -349.0402245706574,
+            1268.8584205943675
           ],
-          "clear_radius_m": 42.137,
-          "diameter_final_m": 84.274,
+          "clear_radius_m": 16.358,
+          "diameter_final_m": 32.716,
+          "precise_final": true,
+          "mec_radius_m": 16.358,
+          "bounded_final": true,
+          "n_obs_total": 2,
+          "method": "try",
+          "cleared": true
+        },
+        "14": {
+          "n_obs_survey": 2,
+          "n_no_signal_survey": 3,
+          "diameter_survey_m": 47.511,
+          "mec_radius_survey_m": 23.755,
+          "bounded_survey": true,
+          "n_probe": 0,
+          "clear_point": [
+            -462.60657779292245,
+            -1572.251597623744
+          ],
+          "clear_radius_m": 23.755,
+          "diameter_final_m": 47.511,
           "precise_final": false,
-          "mec_radius_m": 42.137,
+          "mec_radius_m": 23.755,
+          "bounded_final": true,
+          "n_obs_total": 2,
+          "method": "try",
+          "cleared": true
+        },
+        "15": {
+          "n_obs_survey": 2,
+          "n_no_signal_survey": 0,
+          "diameter_survey_m": 35.443,
+          "mec_radius_survey_m": 17.722,
+          "bounded_survey": true,
+          "n_probe": 0,
+          "clear_point": [
+            -66.5544670784346,
+            -256.7090460969347
+          ],
+          "clear_radius_m": 17.722,
+          "diameter_final_m": 35.443,
+          "precise_final": true,
+          "mec_radius_m": 17.722,
+          "bounded_final": true,
+          "n_obs_total": 2,
+          "method": "try",
+          "cleared": true
+        },
+        "19": {
+          "n_obs_survey": 3,
+          "n_no_signal_survey": 1,
+          "diameter_survey_m": 24.438,
+          "mec_radius_survey_m": 12.288,
+          "bounded_survey": true,
+          "n_probe": 0,
+          "clear_point": [
+            928.6177280808156,
+            833.1945614365188
+          ],
+          "clear_radius_m": 12.288,
+          "diameter_final_m": 24.438,
+          "precise_final": true,
+          "mec_radius_m": 12.288,
           "bounded_final": true,
           "n_obs_total": 3,
           "method": "try",
-          "cleared": true
-        },
-        "13": {
-          "n_obs_survey": 2,
-          "n_no_signal_survey": 0,
-          "diameter_survey_m": 34.952,
-          "mec_radius_survey_m": 17.476,
-          "bounded_survey": true,
-          "n_probe": 0,
-          "clear_point": [
-            -308.1352484444308,
-            546.3676498512563
-          ],
-          "clear_radius_m": 17.476,
-          "diameter_final_m": 34.952,
-          "precise_final": true,
-          "mec_radius_m": 17.476,
-          "bounded_final": true,
-          "n_obs_total": 2,
-          "method": "try",
-          "cleared": true
-        },
-        "20": {
-          "n_obs_survey": 3,
-          "n_no_signal_survey": 2,
-          "diameter_survey_m": 63.978,
-          "mec_radius_survey_m": 31.989,
-          "bounded_survey": true,
-          "n_probe": 1,
-          "clear_point": [
-            1562.7166001406863,
-            327.12883839824605
-          ],
-          "clear_radius_m": 12.607,
-          "diameter_final_m": 25.214,
-          "precise_final": true,
-          "mec_radius_m": 12.607,
-          "bounded_final": true,
-          "n_obs_total": 4,
-          "method": "try-refined",
           "cleared": true
         }
       },
       "waypoint_stats": [
         {
           "waypoint": 0,
-          "x": -958.2810770074855,
-          "y": 269.4259669836296,
+          "x": 880.5924632660534,
+          "y": -464.1657978295194,
           "n_channels": 20,
-          "direction": 5,
+          "direction": 4,
           "near": 0,
-          "no_signal": 15,
+          "no_signal": 16,
           "skip": 0,
           "virtual_time_s": 438.087,
           "travel_m": 995.44
         },
         {
           "waypoint": 6,
-          "x": -812.5449606090293,
-          "y": -551.1735143604336,
-          "n_channels": 17,
-          "direction": 2,
+          "x": 909.9671177809851,
+          "y": 368.75655994290724,
+          "n_channels": 18,
+          "direction": 3,
           "near": 0,
-          "no_signal": 14,
-          "skip": 1,
-          "virtual_time_s": 769.149,
-          "travel_m": 2120.74
+          "no_signal": 15,
+          "skip": 0,
+          "virtual_time_s": 712.775,
+          "travel_m": 1828.88
         },
         {
           "waypoint": 1,
-          "x": -117.99827073878507,
-          "y": -969.3504295300623,
+          "x": 318.4155293521232,
+          "y": 923.1334669455264,
           "n_channels": 17,
-          "direction": 5,
+          "direction": 4,
           "near": 0,
-          "no_signal": 10,
-          "skip": 2,
-          "virtual_time_s": 1021.293,
-          "travel_m": 2931.46
+          "no_signal": 12,
+          "skip": 1,
+          "virtual_time_s": 1062.961,
+          "travel_m": 3059.81
         },
         {
           "waypoint": 4,
-          "x": 657.7350806899874,
-          "y": -730.1407662655852,
-          "n_channels": 16,
-          "direction": 6,
+          "x": -490.21433887408824,
+          "y": 851.7105593424334,
+          "n_channels": 15,
+          "direction": 2,
           "near": 0,
-          "no_signal": 8,
-          "skip": 2,
-          "virtual_time_s": 1276.578,
-          "travel_m": 3762.89
+          "no_signal": 12,
+          "skip": 1,
+          "virtual_time_s": 1317.115,
+          "travel_m": 3885.57
         },
         {
           "waypoint": 3,
-          "x": 988.5014855000622,
-          "y": 27.54789912952145,
-          "n_channels": 15,
-          "direction": 5,
+          "x": -972.3449980363295,
+          "y": 180.10907355269597,
+          "n_channels": 13,
+          "direction": 0,
           "near": 0,
-          "no_signal": 6,
-          "skip": 4,
-          "virtual_time_s": 1507.926,
-          "travel_m": 4589.63
+          "no_signal": 12,
+          "skip": 1,
+          "virtual_time_s": 1586.049,
+          "travel_m": 4845.24
         },
         {
           "waypoint": 2,
-          "x": 616.4604963868651,
-          "y": 756.229033087794,
-          "n_channels": 12,
-          "direction": 6,
+          "x": -761.1818811301439,
+          "y": -610.3343656796785,
+          "n_channels": 13,
+          "direction": 2,
           "near": 0,
-          "no_signal": 4,
-          "skip": 2,
-          "virtual_time_s": 1824.096,
-          "travel_m": 5830.48
+          "no_signal": 10,
+          "skip": 1,
+          "virtual_time_s": 1821.681,
+          "travel_m": 5663.41
         },
         {
           "waypoint": 5,
-          "x": -364.21670258758104,
-          "y": 1186.8246944167659,
-          "n_channels": 8,
-          "direction": 1,
+          "x": 107.55223251137726,
+          "y": -1236.7858258417416,
+          "n_channels": 13,
+          "direction": 3,
           "near": 0,
-          "no_signal": 4,
-          "skip": 3,
-          "virtual_time_s": 2302.333,
-          "travel_m": 7996.67
+          "no_signal": 10,
+          "skip": 0,
+          "virtual_time_s": 2113.891,
+          "travel_m": 6734.45
         }
       ],
       "plan_centers": [
         [
-          -958.2810770074855,
-          269.4259669836296
+          880.5924632660534,
+          -464.1657978295194
         ],
         [
-          -117.99827073878507,
-          -969.3504295300623
+          318.4155293521232,
+          923.1334669455264
         ],
         [
-          616.4604963868651,
-          756.229033087794
+          -761.1818811301439,
+          -610.3343656796785
         ],
         [
-          988.5014855000622,
-          27.54789912952145
+          -972.3449980363295,
+          180.10907355269597
         ],
         [
-          657.7350806899874,
-          -730.1407662655852
+          -490.21433887408824,
+          851.7105593424334
         ],
         [
-          -364.21670258758104,
-          1186.8246944167659
+          107.55223251137726,
+          -1236.7858258417416
         ],
         [
-          -812.5449606090293,
-          -551.1735143604336
+          909.9671177809851,
+          368.75655994290724
         ]
       ],
       "truth_check": {
@@ -634,40 +566,28 @@
         "n_cleared_after_probe": 0
       },
       "bearings_per_channel": {
-        "1": 3,
-        "2": 2,
-        "3": 4,
         "4": 2,
-        "5": 2,
-        "6": 2,
         "7": 2,
-        "8": 2,
+        "8": 3,
         "9": 2,
-        "10": 3,
-        "12": 2,
-        "13": 2,
-        "14": 3,
-        "16": 3,
-        "18": 2,
-        "20": 4
+        "10": 2,
+        "11": 2,
+        "14": 2,
+        "15": 2,
+        "17": 3,
+        "19": 3
       },
       "cleared_channels": [
-        1,
-        2,
-        3,
         4,
-        5,
-        6,
         7,
         8,
         9,
         10,
-        12,
-        13,
+        11,
         14,
-        16,
-        18,
-        20
+        15,
+        17,
+        19
       ]
     }
   ]

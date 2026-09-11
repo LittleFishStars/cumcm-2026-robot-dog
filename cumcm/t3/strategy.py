@@ -5,7 +5,7 @@
     阶段一  依次移动到 7 个覆盖圆圆心，每站扫描所有"还值得测"的频道；
             第 1 站就在原点，于是它天然是一次**起始全频道扫描**（一次拿到"哪些频道在
             1000 m 内"），并用它锚定到的方位调整巡视绕向与落脚点；每站结束还会顺路清除。
-    阶段二  诊断 -> 按估计点距离做最近邻 + 2-opt 的访问顺序 -> 逐频道四级清除：
+    阶段二  诊断 -> 按估计点距离求**精确**最短开放路径定序 -> 逐频道四级清除：
             就近试清 -> 多清几次（K 个半径 20 m 的圆盖满区域）-> 补测后清 -> 沿示向度逼近兜底。
 
 贯穿其中的两条"省时间"原则：
@@ -26,8 +26,8 @@ from functools import partial
 
 from cumcm.common.geometry import dist
 from cumcm.common.geometry import clamp_to_region as _clamp_to_region
-from cumcm.common.routing import (dist_matrix, exact_open_by_end,
-                                  exact_open_order, nearest_order, two_opt_greedy)
+from cumcm.common.routing import (dist_matrix, exact_open_by_end, exact_open_order,
+                                  nearest_order)
 from cumcm.common.sim_client import RecordedSim
 from cumcm.t3.config import (BEARING_ERROR_DEG, CHANNELS, CLEAR_RADIUS, CLIP_ERR, CLIP_SIDES,
                              COVER_RADIUS, HOMING_CAP, HOMING_MAX, HOMING_STEP,

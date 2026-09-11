@@ -18,8 +18,7 @@ import numpy as np
 from cumcm.common.console import relax_console_encoding
 from cumcm.common.paths import default_jammers_dir
 from cumcm.common.practice_arena import PracticeArena
-from cumcm.common.sim_client import (API_LOG_NAME, BASE_URL, ROBOT_ID, ApiLog,
-                                     Simulator)
+from cumcm.common.sim_client import API_LOG_NAME, BASE_URL, ROBOT_ID, Simulator
 from cumcm.common.sim_client import api_log as _api_log_raw
 from cumcm.t3.config import (BEARING_ERROR_DEG, CHOSEN_RING_RADIUS, CLEAR_RADIUS, COVER_RADIUS, INLINE_DETOUR, INLINE_TRY_RADIUS, K_CLEAR_MAX, RESULTS_DIR, SEED, TRAJ_DIR)
 from cumcm.t3.covering import (CoverSolveResult, optimal_ring_radius, print_cover_report, solve_covering_circles)
@@ -108,10 +107,12 @@ def run_practice(args: argparse.Namespace, res: CoverSolveResult, save_dir: Path
                           f"里程 {stats['travel_m']:.0f} m、虚拟时间 {stats['virtual_time_s']:.0f} s",
                     traj_dir=args.traj_dir)
                 scans = save_scan_figures(save_dir, name, dog.scan_steps, dog.plan,
-                                          dog.survey_order_used, tp,
-                                          traj_dir=args.traj_dir)
-                print(f"  总轨迹图：" + "，".join(str(f) for f in files))
-                print(f"  逐步扫描结果图：{len(scans)} 张 → {save_dir / STEP_DIR_NAME}/"
+                                          dog.survey_order_used, tp)
+                # 打印**绝对**路径：--save-dir 缺省是相对路径，在不同工作目录下运行会把图
+                # 写到别处，只报相对路径时"图在哪"很容易看岔（报 None 张更会让人以为没出图）。
+                print("  总轨迹图：" + "，".join(str(Path(f).resolve()) for f in files))
+                print(f"  逐步扫描结果图：{len(scans)} 张 → "
+                      f"{(save_dir / STEP_DIR_NAME).resolve()}/"
                       + ("（已清掉上一局的图，只保留本局）" if ep else ""))
     print("\n" + "=" * 78)
     if clear:
@@ -192,10 +193,10 @@ def run_official(args: argparse.Namespace, res: CoverSolveResult, save_dir: Path
                       f"虚拟时间 {stats['virtual_time_s']:.0f} s（无真值可比）",
                 traj_dir=args.traj_dir)
             scans = save_scan_figures(save_dir, "ep01", dog.scan_steps,
-                                      dog.plan, dog.survey_order_used, (),
-                                      traj_dir=args.traj_dir)
-            print("总轨迹图：" + "，".join(str(f) for f in files))
-            print(f"逐步扫描结果图：{len(scans)} 张 → {save_dir / STEP_DIR_NAME}/")
+                                      dog.plan, dog.survey_order_used, ())
+            print("总轨迹图：" + "，".join(str(Path(f).resolve()) for f in files))
+            print(f"逐步扫描结果图：{len(scans)} 张 → "
+                  f"{(save_dir / STEP_DIR_NAME).resolve()}/")
         paths = (save_plan(res, save_dir)
                  + save_survey(save_dir, [row], observation_rows(1, dog.plan, dog.meas),
                                res.to_json(),

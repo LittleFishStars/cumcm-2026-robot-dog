@@ -15,11 +15,13 @@
 from __future__ import annotations
 
 import os
+import re
 import tempfile
 from pathlib import Path
 from typing import Any, Optional, Sequence
 
-__all__ = ["setup_mpl_env", "font_context", "save_png", "TRAJ_FONTS",
+__all__ = ["setup_mpl_env", "font_context", "save_png", "slug", "hint_plot_once",
+           "TRAJ_FONTS",
            "C_PATH", "C_DIR", "C_NOSIG", "C_NEAR", "C_TRY", "C_HIT", "C_SRC",
            "C_COVER", "C_FRAME", "C_MEAS", "C_WARN", "C_GRAY"]
 
@@ -71,3 +73,31 @@ def save_png(fig: Any, path: Path, dpi: float = 160.0, **kwargs: Any) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(path, dpi=dpi, metadata={"Software": None}, **kwargs)
     return path
+
+
+def slug(text: str) -> str:
+    """把标签压成安全的文件名片段（保留中文与字母数字，其余换下划线）。
+
+    扫描图的名字里带中文标签（"巡视站 3（圆心 5）"），含空格与括号，直接当文件名既难看
+    也有跨文件系统的编码风险，故统一压成 `巡视站_3_圆心_5`。
+    """
+    keep = [c if (c.isalnum() or c in "._-") else "_" for c in text]
+    return re.sub(r"_+", "_", "".join(keep)).strip("_") or "step"
+
+
+# 出图失败/被跳过的提示只打印一次：逐局、逐步骤出图时同一原因会重复几十次，刷屏反而
+# 把真正重要的战报埋掉；一次说清并给出处置办法就够了。
+_PLOT_HINTED = False
+
+
+def hint_plot_once(reason: str) -> None:
+    """报告一次"图没能生成"（首次调用时打印，其后静默）。
+
+    两族绘图都走这里，保证同一个原因在任何一族里都留下**明确**的说明 —— 图不会悄悄消失，
+    用户总能看到"为什么没有图 / 怎么才能有图"。
+    """
+    global _PLOT_HINTED
+    if not _PLOT_HINTED:
+        _PLOT_HINTED = True
+        print(reason)
+

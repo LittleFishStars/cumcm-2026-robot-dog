@@ -96,6 +96,11 @@
         "detail": "最大偏差 0.000%"
       },
       {
+        "check": "大规模（12~20 点）相对最近邻初值有改进",
+        "pass": true,
+        "detail": "平均改进 6.68%"
+      },
+      {
         "check": "2-opt 精修从不使路程变长（20 例）",
         "pass": true,
         "detail": ""
@@ -414,6 +419,8 @@
     "c_gap_n5": 0.0,
     "c_gap_n6": 0.0,
     "c_gap_n7": 0.0,
+    "c_nn_gain_mean": 0.06675930683115512,
+    "c_nn_gain_worst": 0.0,
     "d_loc_pop": {
       "pop20": 4.653528809687247,
       "pop40": 4.655964411384091,
@@ -534,10 +541,10 @@
       "episodes.csv": true
     },
     "f_figures_pdf": 10,
-    "elapsed_s": 313.1
+    "elapsed_s": 104.6
   },
   "failed": 0,
   "skipped": 5,
-  "elapsed_s": 313.1,
-  "generated_at": "2026-09-11 20:57:19"
+  "elapsed_s": 104.6,
+  "generated_at": "2026-09-11 21:39:20"
 }

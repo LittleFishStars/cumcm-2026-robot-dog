@@ -367,20 +367,21 @@ def group_c(rep: Report, rng: np.random.Generator) -> None:
         n = int(rng.integers(12, 21))
         pts = rng.uniform(-1700, 1700, size=(n, 2))
         D = T._dist_matrix(pts, start)
-        # 注意：`_nearest_neighbor` 这个名字在拆分前后都**不存在**（T3_ga.py 里只有
-        # `_nearest_order(n, D)`，签名也不同），所以这里一直是走 else 分支的**死代码**，
-        # C2 那项"相对最近邻初值的改进"检查从未真正执行。此处刻意维持原样：改用它会让检查
-        # 数由 71 变 72、与已发布的 results/t3_ga/validation.json 不再一致。若要补上，把左侧换成
-        # `T._nearest_order(T._dist_matrix(pts, start), start)` 即可（详见交付说明）。
-        nn = T._path_len(T._nearest_neighbor(pts, start), D) if hasattr(T, "_nearest_neighbor") \
-            else None
+        # 这里原先写作 `T._nearest_neighbor(pts, start)` 并套了 `hasattr` 保护 —— 但那个名字
+        # 在拆分前后都**不存在**（T3_ga 里只有 `_nearest_order(n, D)`，签名也不同），故 hasattr
+        # 恒为假、`nn` 恒为 None、`gains` 恒为空，整项 C2 检查**从未执行**（是死代码）。
+        # 改用 `nearest_order_from_D(n, D)`（common.routing 的公开算子，同样以距离矩阵第 0 行为
+        # 起点）度量同一个量 —— GA 解相对最近邻构造的改进。注意不能写路由模块内部的
+        # `_nearest_order`：`_T3GA` 只按白名单暴露私有名（EXTRA 里没有它），这正是该聚合对象
+        # 想守住的边界。这项检查到此才第一次真正跑起来。
+        nn = T._path_len(T.nearest_order_from_D(n, D), D)
         got = T._path_len(T.route_ga(pts, start, seed=int(rng.integers(1 << 30))), D)
-        if nn:
-            gains.append((nn - got) / nn)
+        gains.append((nn - got) / nn)
     if gains:
         rep.check("C", "大规模（12~20 点）相对最近邻初值有改进",
                   float(np.mean(gains)) >= 0.0, f"平均改进 {np.mean(gains) * 100:.2f}%")
         rep.metric("c_nn_gain_mean", float(np.mean(gains)))
+        rep.metric("c_nn_gain_worst", float(min(gains)))
 
     # C3 2-opt 精修不劣化
     ok = True

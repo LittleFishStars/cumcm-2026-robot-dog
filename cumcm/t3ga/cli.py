@@ -44,9 +44,9 @@ def _save_and_report(args: argparse.Namespace, episodes: List[dict], ga_runs: Li
     print("训练结果已保存：" + "，".join(str(p) for p in paths))
     if traj_paths:
         # 目录每局清空重写，故实际只剩最新一局那张 —— 报"共 N 张"会与目录内容不符
-        where = Path(args.save_dir) / TRAJ_DIR_NAME
+        where = (Path(args.save_dir) / TRAJ_DIR_NAME).resolve()
         print(f"总轨迹图：{where}/ 只保留最新一局（{Path(traj_paths[-1]).name}）")
-        scan_dir = Path(args.save_dir) / STEP_DIR_NAME
+        scan_dir = (Path(args.save_dir) / STEP_DIR_NAME).resolve()
         n_scan = len(list(scan_dir.glob("*.png"))) if scan_dir.is_dir() else 0
         print(f"逐步扫描结果图：{scan_dir}/ 共 {n_scan} 张（同为最新一局）")
     if api_log is not None:
@@ -83,7 +83,7 @@ def run_official(args: argparse.Namespace) -> int:
                                               f"虚拟时间 {stats['total_time_s']:.0f} s")
             scans = save_scan_figures(args.save_dir, "ep01", dog.scan_steps, ())
             print(f"逐步扫描结果图：{len(scans)} 张 → "
-                  f"{Path(args.save_dir) / STEP_DIR_NAME}/")
+                  f"{(Path(args.save_dir) / STEP_DIR_NAME).resolve()}/")
         _save_and_report(args, [row], dog.ga_runs, meta, api_log,
                          [traj] if traj else [])
     return 0
@@ -143,9 +143,11 @@ def run_practice(args: argparse.Namespace) -> int:
                                                   f"虚拟时间 {r['virtual_time_s']:.0f} s")
                 scans = save_scan_figures(args.save_dir, nm, dog.scan_steps,
                                           sources_of(truth))
-                print(f"  总轨迹图 {traj}" if traj else "  总轨迹图 生成失败")
+                # 打印**绝对**路径（--save-dir 缺省是相对路径，换工作目录就会写到别处）
+                print(f"  总轨迹图 {Path(traj).resolve()}" if traj
+                      else "  总轨迹图 生成失败（未安装 matplotlib？见上文提示）")
                 print(f"  逐步扫描结果图：{len(scans)} 张 → "
-                      f"{Path(args.save_dir) / STEP_DIR_NAME}/"
+                      f"{(Path(args.save_dir) / STEP_DIR_NAME).resolve()}/"
                       + ("（已清掉上一局的图，只保留本局）" if ep else ""))
             if traj:
                 traj_paths.append(traj)      # 仅用于汇总提示"最新一局"的图名

@@ -30,8 +30,7 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
 
-from cumcm.common.routing import (dist_matrix, exact_open_order, nearest_order,
-                                  two_opt_first, two_opt_greedy)
+from cumcm.common.routing import dist_matrix, exact_open_order, nearest_order
 from cumcm.common.routing import open_path_length as path_length
 from cumcm.t3.config import (BOUNDARY_SAMPLES, CHOSEN_RING_RADIUS, COARSE_BOUNDARY,
                              COARSE_STEP, COVER_RADIUS, DISK_RATIO_5, DISK_RATIO_6,

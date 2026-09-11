@@ -7,7 +7,7 @@
     localize.py    遗传算法一：测向定位（实数编码）
     routing_ga.py  遗传算法二：巡视路线（排列编码，开路径 TSP）
     covering.py    贪心集合覆盖求路点
-    strategy.py    RobotDog：覆盖路点巡视 + GA 定位/补测 + 就近清除
+    strategy.py    RobotDog：滚动重规划（覆盖巡视 + GA 定位/补测 + 就地清除合并）
     plotting.py    逐局轨迹图（写到 <save-dir>/trajectory/）
     training.py    训练记录落盘（ga_training.json / ga_convergence.csv / episodes.csv）
     cli.py         运行编排与命令行入口

@@ -1,7 +1,13 @@
-"""机器狗策略（GA 对照方案）：覆盖路点巡视 + GA 定位/补测 + 就近清除。
+"""机器狗策略（GA 对照方案）：滚动重规划（覆盖巡视 + 定位/补测 + 就地清除合并为一条路线）。
 
 与确定性方案（cumcm.t3.strategy）的目标相同、路线不同，用于在论文中对照"确定性方法 vs
 启发式方法"的时间与定位精度。所有动作坐标统一由 clamp_to_region 拉回作业圆域内。
+
+**非分段式**：不再"先把所有覆盖路点巡视完、再统一定位、最后统一清除"，而是把"尚未访问的
+覆盖路点（硬约束，保证不漏源）"与"已听到且估计够准的源"放进**同一条 GA 规划路线**，每步只
+执行第一个目标并重排（滚动时域）。下一站是源就当场逼近清除，是路点就扫过并更新观测。这样
+机器狗不必把 1800 m 圆域跑两遍，越早清除越省专程往返。滚动中未能清掉的源由收尾的
+`localize_all` + `_clear_all` 兜底（补测、修病态几何、沿示向度逼近），保证 100% 清除。
 """
 
 from __future__ import annotations
@@ -17,7 +23,7 @@ import numpy as np
 from cumcm.common.geometry import ang_diff, bearing, dist
 from cumcm.common.geometry import clamp_to_region as _clamp_to_region
 from cumcm.common.sim_client import RecordedSim
-from cumcm.t3ga.config import (CHANNELS, CONVERGED_FITNESS, COORD_LIMIT, COVER_RADIUS, GEOM_SIGMA, GEOM_SIN_MIN, HOMING_MAX, HOMING_STEP, OBS_PER_SOURCE, PERP_STEPS, REGION_MARGIN, REGION_RADIUS, SAFETY_MARGIN, SEED, SINGLE_PROBES)
+from cumcm.t3ga.config import (CHANNELS, CONVERGED_FITNESS, COORD_LIMIT, COVER_RADIUS, GEOM_SIGMA, GEOM_SIN_MIN, HOMING_MAX, HOMING_STEP, OBS_PER_SOURCE, PERP_STEPS, REGION_MARGIN, REGION_RADIUS, RHO_GATE, SAFETY_MARGIN, SEED, SINGLE_PROBES)
 from cumcm.t3ga.localize import (Estimate, GeneticLocalizer, Obs, max_ray_sine, position_sigma)
 from cumcm.t3ga.covering import covering_waypoints
 from cumcm.common.routing import dist_matrix as _dist_matrix
@@ -30,7 +36,7 @@ clamp_to_region = partial(_clamp_to_region, radius=REGION_RADIUS - REGION_MARGIN
 # 机器狗策略
 # ----------------------------------------------------------------------------
 class RobotDog:
-    """覆盖观测 → GA 定位 → GA 规划路线逐个清除。"""
+    """滚动重规划：覆盖路点与已定位源共用一条 GA 路线，边巡视边定位边清除。"""
 
     def __init__(self, sim, verbose: bool = True, logfile: Optional[str] = None,
                  seed: int = SEED, episode: int = 0,
@@ -51,6 +57,9 @@ class RobotDog:
         self.episode = episode      # 局号（用于训练记录分组）
         self.ga_runs: List[Dict[str, Any]] = []     # GA 训练记录（逐次调用一条）
         self.final_est: Dict[int, Estimate] = {}    # 本局各频道的最终定位解
+        # 滚动重规划的定位缓存：以"示向度条数"为键，避免同一批观测重复跑定位 GA
+        self._est_cache: Dict[int, Optional[Estimate]] = {}
+        self._est_key: Dict[int, int] = {}
         # 轨迹记录：起始于 (0,0)，之后每次实际动作点依次追加，用于每局结束后出轨迹图
         self.track: List[Tuple[float, float]] = [(0.0, 0.0)]
         self.marks: List[Tuple[float, float, str]] = []   # 动作点及其类型（measure/clear）
@@ -159,6 +168,7 @@ class RobotDog:
             return None
         est = Estimate(float(G[0]), float(G[1]),
                        position_sigma(GeneticLocalizer.covariance(ol, G)))
+        self.final_est[channel] = est       # 滚动清除的源也要留档，供与真值比对
         first, last = record[0], record[-1]
         self.ga_runs.append({
             "episode": self.episode, "ga": "localize", "label": f"频道{channel}",
@@ -184,19 +194,73 @@ class RobotDog:
         self.log(f"  有示向度 {counts['direction']} 个 {sorted(self.obs)}，"
                  f"近距清除 {counts['near']} 个，无信号 {counts['no_signal']} 个")
 
-    # ---- 阶段 2：覆盖观测 ----
-    def _coverage_survey(self) -> None:
+    # ---- 阶段 2：滚动重规划（覆盖巡视与定位清除合并）----
+    def _active_channels(self) -> List[int]:
+        """仍需测向的频道：未清除且示向度条数未达上限（未听到的频道也在内，故不会漏源）。"""
+        return [c for c in CHANNELS if c not in self.cleared
+                and len(self.obs.get(c, ())) < OBS_PER_SOURCE]
+
+    def _localize_ready(self, exclude: set) -> Dict[int, Estimate]:
+        """对"已有 ≥2 条示向度、尚未清除且不在 exclude 里"的频道跑定位 GA。
+
+        以观测条数为缓存键：同一批观测只训练一次，避免滚动循环每步重复跑 GA 记录训练数据。
+        """
+        out: Dict[int, Estimate] = {}
+        for ch in sorted(self.obs):
+            if ch in self.cleared or ch in exclude:
+                continue
+            n = len(self.obs[ch])
+            if n < 2:
+                continue
+            if self._est_key.get(ch) != n:
+                self._est_cache[ch] = self._estimate(ch)
+                self._est_key[ch] = n
+            e = self._est_cache.get(ch)
+            if e is not None:
+                out[ch] = e
+        return out
+
+    def _rolling_survey_clear(self) -> None:
+        """把覆盖路点与已定位源放进同一条 GA 路线，每步只执行第一个目标并重排。
+
+        约束：覆盖路点是**硬任务**（必须全部访问或确认无信息），保证 1000 m 覆盖不漏源；
+        已定位源只是**可选任务**，仅当位置 1σ ≤ RHO_GATE 时才插入，防止为不可信估计白跑。
+        每步更新观测后重排，是"边测边定位边清"的关键：清掉的源立即从后续路线消失，省掉
+        巡视结束后的专程往返。未能就地清除的源留给收尾的 localize_all + _clear_all 兜底。
+        """
         waypoints = covering_waypoints()
-        route_idx, _ = self._plan_route(waypoints, "覆盖路点巡回")
-        route = waypoints[route_idx]
-        self.log(f"阶段2：覆盖观测，{len(route)} 个路点（GA 定序，覆盖半径 {COVER_RADIUS:.0f} m）")
-        for wp in route:
-            active = [c for c in CHANNELS if c not in self.cleared
-                      and len(self.obs.get(c, ())) < OBS_PER_SOURCE]
-            if not active or self._out_of_time():
+        visited = [False] * len(waypoints)
+        attempted: set = set()          # 已在滚动中试清过（无论成败）的频道，收尾再处理
+        self.log(f"阶段2：滚动重规划，{len(waypoints)} 个覆盖路点（覆盖半径 "
+                 f"{COVER_RADIUS:.0f} m，插入门 σ≤{RHO_GATE:.0f} m）")
+        while not self._out_of_time():
+            active = self._active_channels()
+            pending = [i for i in range(len(waypoints)) if not visited[i]]
+            if not pending or not active:
                 break
-            self._sweep(active, wp)
-        self.log(f"  观测结束，已探测频道 {len(self.obs)} 个")
+            gated = {ch: e for ch, e in self._localize_ready(attempted).items()
+                     if e.sigma <= RHO_GATE}
+            station_pts = waypoints[pending]
+            pts = (np.vstack((station_pts,
+                              np.array([gated[ch].point for ch in gated], dtype=float)))
+                   if gated else station_pts)
+            order, _ = self._plan_route(pts, "滚动重规划")
+            nxt = order[0]
+            if nxt >= len(pending):             # 下一站是源：就地逼近清除
+                ch = list(gated)[nxt - len(pending)]
+                attempted.add(ch)
+                self.log(f"  滚动：先清频道{ch}（估计 σ={gated[ch].sigma:.1f} m，"
+                         f"剩余路点 {len(pending)} 个、待清源 {len(gated)} 个）")
+                self._home_and_clear(ch, gated)
+            else:                               # 下一站是路点：移动并扫描
+                idx = pending[nxt]
+                visited[idx] = True
+                wp = waypoints[idx]
+                self.log(f"  滚动：下一站路点 {idx} @ ({wp[0]:.0f}, {wp[1]:.0f})"
+                         f"（剩余 {len(pending) - 1} 个路点，待清源 {len(gated)} 个）")
+                self._sweep(self._active_channels(), wp)
+        self.log(f"阶段2 完成：虚拟时刻 {self.vt:.0f} s，已清除 {len(self.cleared)} 个，"
+                 f"滚动中试清 {len(attempted)} 个源")
 
     # ---- 阶段 3：定位 ----
     def _single_candidates(self, channel: int) -> List[Tuple[float, float]]:
@@ -316,9 +380,9 @@ class RobotDog:
 
     # ---- 主流程 ----
     def run(self) -> Dict[str, Any]:
-        """跑完一局：/enter → 起点扫描 → 覆盖观测 → GA 定位 → GA 规划清除 → /exit。"""
+        """跑完一局：/enter → 起点扫描 → 滚动重规划（边巡视边定位边清）→ 兜底清除 → /exit。"""
         self.log("=" * 74)
-        self.log("策略：遗传算法（定位 GA + 路线 GA）")
+        self.log("策略：滚动重规划（定位 GA + 路线 GA，覆盖巡视与清除合并）")
         enter = self.sim.enter()
         if not enter.get("accepted"):
             raise RuntimeError(f"/enter 被拒绝：{enter}")
@@ -328,9 +392,9 @@ class RobotDog:
 
         try:
             self._initial_scan()
-            self._coverage_survey()
-            self.final_est = self.localize_all()    # 留存最终定位解，供与真值比对
-            self._clear_all(self.final_est)
+            self._rolling_survey_clear()
+            self.localize_all()                     # 兜底定位（解随 _estimate 写入 final_est）
+            self._clear_all(self.final_est)         # 兜底清除滚动中未解决的源
         finally:
             try:
                 self.sim.exit()                     # 无论成功与否都要正常退出，保住测试记录

@@ -77,11 +77,13 @@ def print_ga_summary(ga_runs: Sequence[dict]) -> None:
               f"提前收敛 {n_conv}/{len(loc)} 次（判据 适应度<{CONVERGED_FITNESS:.0e}），"
               f"否则跑满 {GA_LOC.gens} 代；最终适应度均值 {fit.mean():.3f}°，"
               f"示向度残差 RMS 均值 {rms.mean():.2f}°")
-    for r in route:
-        g0, g1 = r["initial_best_g0"], r["final_length_m"]
-        gain = (g0 - g1) / g0 * 100 if g0 else 0.0
-        print(f"路线 GA：{r['label']}（{r['n_points']} 点）{g0:.0f} m → {g1:.0f} m，"
-              f"改进 {gain:.1f}%")
+    if route:
+        gains = [(r["initial_best_g0"] - r["final_length_m"]) / r["initial_best_g0"] * 100
+                 for r in route if r["initial_best_g0"]]
+        print(f"路线 GA：{len(route)} 次滚动重规划，平均缩短 "
+              f"{np.mean(gains) if gains else 0.0:.1f}%"
+              f"（最近一次 {route[-1]['n_points']} 点 "
+              f"{route[-1]['initial_best_g0']:.0f} → {route[-1]['final_length_m']:.0f} m）")
 
 
 def ga_meta() -> Dict[str, dict]:

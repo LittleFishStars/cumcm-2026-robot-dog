@@ -118,7 +118,6 @@ INLINE_SECTOR_DEG = 2.0         # 顺路清除方位扇区：仅起点→第一�
 INLINE_RADIUS_MAX_M = REGION_RADIUS   # 顺路清除扇区的半径上界 / m（缺省=区域半径 1800 = 圆域内都算；
                                 # 曾用"两站半径最大者"（约 1 km），用户确认放宽到 1800 以便清到远源）
 INLINE_EXCLUDE_R_M = 600.0      # 排除距区域圆心（原点）该距离以内的估计点 / m（作用范围限制）
-INLINE_CLEAR_MEC_MAX_M = 60.0   # 扇区内只清"估计覆盖圆（MEC）半径 ≤ 此值"的收敛点；粗的留阶段二
 INLINE_PROBE_DIAM_M = 80.0      # 顺路清除时顺手补测的"直径大"判据 / m（区域直径 > 此值）
 
 NEAR_RADIUS = 5.0               # 近距阈值 / m（≤ 5 m 可跳过测向直接清除）

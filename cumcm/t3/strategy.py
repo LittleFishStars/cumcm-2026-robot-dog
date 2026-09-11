@@ -31,8 +31,7 @@ from cumcm.common.routing import (dist_matrix, exact_open_by_end, exact_open_ord
 from cumcm.common.sim_client import RecordedSim
 from cumcm.t3.config import (BEARING_ERROR_DEG, CHANNELS, CLEAR_RADIUS, CLIP_ERR, CLIP_SIDES,
                              COVER_RADIUS, HOMING_CAP, HOMING_MAX, HOMING_STEP,
-                             INLINE_CLEAR_MEC_MAX_M, INLINE_EXCLUDE_R_M, INLINE_PROBE_DIAM_M,
-                             INLINE_RADIUS_MAX_M, INLINE_SECTOR_DEG,
+                             INLINE_EXCLUDE_R_M, INLINE_PROBE_DIAM_M, INLINE_RADIUS_MAX_M, INLINE_SECTOR_DEG,
                              K_CLEAR_MAX,
                              K_COVER_SAMPLES,
                              K_COVER_STEP_MIN, NEAR_RADIUS, OBS_CAP, RECEIVE_MAX, RECEIVE_MID,
@@ -74,7 +73,6 @@ class RobotDog:
                  inline_sector_deg: float = INLINE_SECTOR_DEG,
                  inline_radius_max: float = INLINE_RADIUS_MAX_M,
                  inline_exclude_r: float = INLINE_EXCLUDE_R_M,
-                 inline_clear_mec_max: float = INLINE_CLEAR_MEC_MAX_M,
                  inline_probe_diam: float = INLINE_PROBE_DIAM_M,
                  rotate: bool = True,
                  api_log=None) -> None:
@@ -87,7 +85,6 @@ class RobotDog:
         self.inline_sector_deg = float(inline_sector_deg)    # 顺路清除扇形（本站为顶点）半张角 / 度
         self.inline_radius_max = float(inline_radius_max)  # 顺路清除扇区半径上界 / m
         self.inline_exclude_r = float(inline_exclude_r)      # 顺路清除排除的区域圆心半径 / m
-        self.inline_clear_mec_max = float(inline_clear_mec_max)  # 扇区内只清 MEC 半径 ≤ 此值
         self.inline_probe_diam = float(inline_probe_diam) # 顺路清除时顺手补测的直径阈值 / m
         self.n_inline_probe = 0                         # 顺路清除时顺手补测的次数
         self._probed_inline: set = set()               # 本局已被顺路补测过的频道（去重：同一频道
@@ -614,9 +611,8 @@ class RobotDog:
         清，顺路清掉省的是"从别处专程跑一趟"的里程；清点本身固定花 5 s（命中）或 3 s（未命中），
         且命中后该频道后续各站都不再测量。
 
-        **估计可信度门槛**（用户确认）：扇区内**只清"估计覆盖圆（MEC）半径 ≤ inline_clear_mec_max
-        （缺省 60 m）"的收敛点** —— 覆盖圆太大的点估计粗、跑去极易白跑，这种不顺路清，留给
-        阶段二专程处理（反正也要清，只是不顺路省里程）。
+        不设"估计可信度"门槛（原先要求估计点覆盖圆半径 ≤ 150 m 才试）：用户明确"扇区内都要清"，
+        未命中只花 3 s，门槛挡掉的都是可能白捡的命中。
         """
         if not self.clear_enabled:
             return 0
@@ -637,10 +633,7 @@ class RobotDog:
             if self._inline_excluded(est):
                 n_excluded += 1
                 continue                              # 距区域圆心太近：按需求排除
-            r_mec = float(mec[2])
-            if r_mec > self.inline_clear_mec_max:
-                continue                              # 估计覆盖圆还太大（粗）：不顺路清，留阶段二
-            picked.append((got[0], ch, est, got[1], got[2], r_mec,
+            picked.append((got[0], ch, est, got[1], got[2], float(mec[2]),
                            "arc" if arc else "sector"))
         if not picked:
             return 0

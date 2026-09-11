@@ -154,9 +154,14 @@ def save_survey(save_dir: Path, rows: List[dict], observations: List[dict],
     return [json_path, csv_path]
 
 
-def episode_row(ep: int, seed: int, truth: Optional[Sequence[dict]], dog: RobotDog,
+def episode_row(ep: int, seed: Optional[int], truth: Optional[Sequence[dict]],
+                dog: RobotDog,
                 stats: Dict[str, Any], check: Dict[str, Any]) -> Dict[str, Any]:
-    """单局汇总行：把引擎统计、真值核对与逐频道档案合成一行（供 JSON / 绘图使用）。"""
+    """单局汇总行：把引擎统计、真值核对与逐频道档案合成一行（供 JSON / 绘图使用）。
+
+    `seed` 在演练模式下是本局的随机种子；官方模式的场景由平台生成、不受我们控制，故传 None。
+    `truth` 同理：官方模式拿不到真值，传 None 后需真值的指标（定位误差等）留空。
+    """
     n_src = len(truth) if truth else stats.get("channels_heard")
     cleared = stats.get("cleared", 0)
     return {

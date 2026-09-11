@@ -1,18 +1,26 @@
 # 官方评测平台操作手册（问题三）
 
-> 适用：2026 CUMCM B 题问题三，程序 `T3_ga.py`。
+> 适用：2026 CUMCM B 题问题三，程序 `T3.py`（确定性主线）或 `T3_ga.py`（GA 对照）。
+> **两者命令行完全一致、都不加参数即连官方模拟器**，本手册的命令可原样互换。
 > 本手册只讲**在官方测试平台上怎么跑**；算法与本地演练见 `reports/RESULTS_REPORT.md`。
 
 ## 0. 一句话说明
 
 官方模拟器是 **Windows 桌面程序**（Wails + WebView2，Wine 下缺 WebView2 无法启动），
-机器狗接口**只监听 127.0.0.1**。因此：**模拟器与 `T3_ga.py` 必须在同一台 Windows 机器上运行。**
+机器狗接口**只监听 127.0.0.1**。因此：**模拟器与程序必须在同一台 Windows 机器上运行。**
 
 ```
 Windows 机器
 ├── 官方模拟器（jammers-simulator-full.exe）  监听 http://127.0.0.1:2026
-└── Python + T3_ga.py                        连 127.0.0.1:2026，跑完一局
+└── Python + T3.py（或 T3_ga.py）             连 127.0.0.1:2026，跑完一局
 ```
+
+两套方案的开法一样，**不带任何参数**就跑官方模式：
+
+| 程序 | 说明 | 官方模式结果目录 |
+| --- | --- | --- |
+| `T3.py` | 确定性主线方案（**建议正式测试用它**） | `results/t3/official/` |
+| `T3_ga.py` | GA 对照方案 | `results/t3_ga/official/` |
 
 ## 1. 一次性准备（约 5 分钟）
 
@@ -39,13 +47,15 @@ pip install numpy matplotlib
 代码按包组织，需要**整个 `cumcm/` 目录 + 顶层入口**，放进同一个目录（例如 `D:\cumcm\`）：
 
 ```
-T3_ga.py      入口（也可换成 T3.py，主线确定性策略）
+T3.py         入口（确定性主线，建议正式测试用）
+T3_ga.py      入口（GA 对照方案）
 cumcm\        求解实现（common / t1 / t3 / t3ga / analysis 五个子包）
 ```
 
-`cumcm\` 少一层都不行：`T3_ga.py` 只调用 `cumcm.t3ga.cli`，`sim_api.py` 只是
-`cumcm.common.sim_client` 的兼容垫片。**不要**只拷 `sim_api.py` 和 `T3_ga.py` 两个文件 ——
-那样会报 `ModuleNotFoundError: No module named 'cumcm'`。
+`cumcm\` 少一层都不行：`T3.py` 只调用 `cumcm.t3.cli`、`T3_ga.py` 只调用
+`cumcm.t3ga.cli`，`sim_api.py` 只是 `cumcm.common.sim_client` 的兼容垫片。
+**不要**只拷 `sim_api.py` 和某个入口文件 —— 那样会报
+`ModuleNotFoundError: No module named 'cumcm'`。
 
 不需要拷贝 `jammers-py/`（本地演练用的复刻模拟器，官方平台上用不到）、不需要 `results/`、
 `figures/`、`reports/`、`__pycache__/`。
@@ -53,8 +63,8 @@ cumcm\        求解实现（common / t1 / t3 / t3ga / analysis 五个子包）
 拷贝后自检（在 `D:\cumcm\` 下执行）：
 
 ```powershell
-python T3_ga.py --help
-python -c "import cumcm, cumcm.t3ga.cli; print(cumcm.__version__)"
+python T3.py --help
+python -c "import cumcm, cumcm.t3.cli; print(cumcm.__version__)"
 ```
 
 能看到中文参数说明、并打印版本号即表示环境正常。若要把代码压成单文件交，见 1.4。
@@ -65,7 +75,7 @@ python -c "import cumcm, cumcm.t3ga.cli; print(cumcm.__version__)"
 
 ```bash
 # 在仓库根目录执行；产物是 build/submit.pyz
-python -m zipapp . -m "cumcm.t3ga.cli:main" -o build/submit.pyz -p "/usr/bin/env python3"
+python -m zipapp . -m "cumcm.t3.cli:main" -o build/submit.pyz -p "/usr/bin/env python3"
 python build/submit.pyz --help          # 自检
 ```
 
@@ -85,7 +95,7 @@ python build/submit.pyz --help          # 自检
 ③ 选「问题3演练测试」→ 点开始 → 二次确认
 ④ 5 秒倒计时（此期间接口未开放，先别运行程序）
 ⑤ 界面提示接口已就绪
-⑥ 运行：python T3_ga.py --base-url http://127.0.0.1:2026
+⑥ 运行：python T3.py        （等价于 --base-url http://127.0.0.1:2026；T3_ga.py 同样用法）
 ⑦ 约 3 秒后程序自行结束；界面「指令与反馈」区可见完整请求/反馈
 ⑧ 记下界面显示的清除结果，与本程序输出的「清除 N 个」核对
 ```
@@ -95,11 +105,14 @@ python build/submit.pyz --help          # 自检
 ```powershell
 cd D:\cumcm
 
-# 推荐写法：以 UTF-8 输出，中文与符号显示最干净
-python -X utf8 T3_ga.py --base-url http://127.0.0.1:2026
+# 推荐写法：以 UTF-8 输出，中文与符号显示最干净。不带参数即连默认地址
+python -X utf8 T3.py
 
 # 若模拟器设置里改过端口（默认 2026）：
-python -X utf8 T3_ga.py --base-url http://127.0.0.1:8080
+python -X utf8 T3.py --base-url http://127.0.0.1:8080
+
+# 不连模拟器、只求解覆盖圆方案（可在任意机器上跑）：
+python -X utf8 T3.py --plan-only
 ```
 
 参数说明（一般都不用改）：
@@ -121,23 +134,29 @@ python -X utf8 T3_ga.py --base-url http://127.0.0.1:8080
 2026 CUMCM B 题 · 问题三：遗传算法自动定位与清除
 ==========================================================================
 连接模拟器 http://127.0.0.1:2026（robot_id=202614023005）
-完成：清除 14 个，虚拟总时间 5008.1 s，平均 357.7 s/个，测向 158 次，清除动作 20 次
+完成：清除 16 个，巡视 7 个圆心，里程 15489 m，虚拟时间 3864 s，测向 113 次（补测 2 次），听到 16 个频道（40 条示向度）
+结果已保存：results/t3/official/t3_cover_plan.json，results/t3/official/t3_cover_circles.csv，results/t3/official/t3_survey.json，results/t3/official/t3_observations.csv
+轨迹图：results/t3/official/trajectory/ep01_official.png，results/t3/official/trajectory/ep01_official.csv
+接口调用日志：共 134 次（/clear 19、/enter 1、/exit 1、/measure 113）→ results/t3/official/api_calls.jsonl
 定位 GA：14 次训练（每代 80 个体），提前收敛 2/14 次（判据 适应度<1e-04），否则跑满 150 代...
 路线 GA：覆盖路点巡回（8 点）8145 m → 8117 m，改进 0.3%
 训练结果已保存：results/t3_ga/official/ga_training.json，results/t3_ga/official/ga_convergence.csv，results/t3_ga/official/episodes.csv
 接口调用日志：共 180 次（/clear 20、/enter 1、/exit 1、/measure 158）→ results/t3_ga/official/api_calls.jsonl
 ```
 
+上面是 **T3.py（确定性主线）** 的实测样例（与 `results/t3/official/` 一起留档，便于对照；
+`T3_ga.py` 的输出格式不同，样例见 `results/t3_ga/official/`）。
+
 **核对要点**：本程序报的「清除 N 个」应与模拟器界面显示的清除结果一致；
-`/enter`、`/exit` 各恰好 1 次。
-注意「清除动作」次数会多于「清除」个数（上面例子 20 > 14）——多出来的几次是
+`/enter`、`/exit` 各恰好 1 次；`/measure` 次数 = 测向次数。
+注意「清除动作」次数会多于「清除」个数（上面例子 19 > 16）——多出来的几次是
 `/clear` 返回 `no_target_in_range`（定位略有偏差），随后程序会沿实测示向度逼近重试，
 这是正常策略行为，只多花虚拟时间（每次 3 秒）。
 
 ### 2.4 每局结束自动生成轨迹图
 
-每跑完一局，程序会在 `<save-dir>/trajectory/` 下生成一张轨迹图 `ep01.png` 和同名轨迹表
-`ep01.csv`，用来看清机器狗这一局怎么走的：行驶路径、每个测向点、每次清除尝试、成功清除落点，
+每跑完一局，程序会在 `<save-dir>/trajectory/` 下生成一张轨迹图（官方模式名为 `ep01_official.png`，
+演练模式名为 `epNN_seedS.png`）和同名轨迹表，用来看清机器狗这一局怎么走的：行驶路径、每个测向点、每次清除尝试、成功清除落点，
 以及干扰源真值及其 20 m 清除半径。
 
 - 绘图在 `/exit` **之后**进行，**不占用 20 分钟现实时间预算**（单张约 1 秒）。
@@ -158,8 +177,10 @@ python -X utf8 T3_ga.py --base-url http://127.0.0.1:8080
 2. 结果建议另存目录，便于区分：
 
 ```powershell
-python -X utf8 T3_ga.py --base-url http://127.0.0.1:2026 --save-dir results\formal
+python -X utf8 T3.py --base-url http://127.0.0.1:2026 --save-dir results\formal
 ```
+
+（官方模式缺省另写 `<结果目录>/official/`，所以不加 `--save-dir` 也不会覆盖演练批数据。）
 
 3. 正式测试结束后，**导出模拟器生成的加密行为日志**（界面 4.6 节路径），
    连同本程序的 `results\formal\api_calls.jsonl` 一起作为支撑材料。
@@ -189,7 +210,7 @@ python -X utf8 T3_ga.py --base-url http://127.0.0.1:2026 --save-dir results\form
 25 分钟窗口超时会自动结束并标记超时退出。演练无所谓；正式测试则会浪费一次机会。
 
 **Q：中文显示为乱码**
-用 `python -X utf8 T3_ga.py`，或先在控制台执行 `chcp 65001`。
+用 `python -X utf8 T3.py`，或先在控制台执行 `chcp 65001`。
 （程序已做兜底，即使字符编不出来也不会中断。）
 
 **Q：能否在 Linux/Wine 上跑模拟器**

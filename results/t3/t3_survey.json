@@ -3,9 +3,10 @@
   "cover_plan": {
     "region_radius_m": 1800.0,
     "cover_radius_m": 1000.0,
-    "ring_radius_m": 1200.0,
+    "layout_kind": "general 7 点（config.SURVEY_CENTERS）",
+    "ring_radius_m": null,
     "rotation_deg": 0.0,
-    "ring_radius_chosen": true,
+    "ring_radius_chosen": false,
     "ring_radius_max_margin_m": 1558.846,
     "n_circles": 7,
     "analytic_worst_m": 994.9998,
@@ -40,45 +41,52 @@
     "centers": [
       {
         "id": 0,
-        "kind": "中心圆",
+        "kind": "巡视站1",
         "x": -234.569,
-        "y": 967.404
+        "y": 967.404,
+        "rho_m": 995.436
       },
       {
         "id": 1,
-        "kind": "环上圆",
+        "kind": "巡视站2",
         "x": -902.871,
-        "y": -372.004
+        "y": -372.004,
+        "rho_m": 976.506
       },
       {
         "id": 2,
-        "kind": "环上圆",
+        "kind": "巡视站3",
         "x": 961.266,
-        "y": -166.954
+        "y": -166.954,
+        "rho_m": 975.657
       },
       {
         "id": 3,
-        "kind": "环上圆",
+        "kind": "巡视站4",
         "x": 508.271,
-        "y": -848.266
+        "y": -848.266,
+        "rho_m": 988.885
       },
       {
         "id": 4,
-        "kind": "环上圆",
+        "kind": "巡视站5",
         "x": -314.31,
-        "y": -931.091
+        "y": -931.091,
+        "rho_m": 982.711
       },
       {
         "id": 5,
-        "kind": "环上圆",
+        "kind": "巡视站6",
         "x": 856.231,
-        "y": 898.93
+        "y": 898.93,
+        "rho_m": 1241.453
       },
       {
         "id": 6,
-        "kind": "环上圆",
+        "kind": "巡视站7",
         "x": -878.561,
-        "y": 438.352
+        "y": 438.352,
+        "rho_m": 981.846
       }
     ],
     "feasible_ring_interval_m": [
@@ -203,9 +211,9 @@
     "n_sources": 131,
     "n_cleared": 131,
     "clear_ratio": 1.0,
-    "avg_time_s": 296.565,
-    "virtual_time_s_mean": 3796.401,
-    "travel_m_mean": 15037.5,
+    "avg_time_s": 296.218,
+    "virtual_time_s_mean": 3791.89,
+    "travel_m_mean": 15015.0,
     "n_measure_mean": 119.9,
     "n_probe_mean": 1.8,
     "n_precise_at_survey": 41,
@@ -213,7 +221,7 @@
     "n_inline_cleared": 36,
     "n_inline_fail": 9,
     "n_refined": 17,
-    "localize_err_mean_m": 8.061,
+    "localize_err_mean_m": 8.052,
     "localize_err_max_m": 19.92,
     "n_within_clear_radius": 131,
     "methods": {
@@ -4839,14 +4847,14 @@
       "n_within_clear_radius": 12,
       "n_cleared_after_probe": 0,
       "waypoints_visited": 7,
-      "travel_m": 14942.180448729987,
-      "virtual_time_s": 3803.43608,
+      "travel_m": 14520.045260036113,
+      "virtual_time_s": 3719.009042,
       "n_measure": 126,
       "n_clear": 12,
       "channels_heard": 12,
       "n_bearings": 30,
       "cleared": 12,
-      "avg_time_s": 316.9530066666667,
+      "avg_time_s": 309.91742016666666,
       "n_precise_at_survey": 4,
       "n_skip_measure": 16,
       "initial_scan": {
@@ -5441,19 +5449,19 @@
       "seed": 8,
       "n_sources": 11,
       "clear_ratio": 1.0,
-      "localize_err_mean_m": 7.629,
+      "localize_err_mean_m": 7.524,
       "localize_err_max_m": 13.08,
       "n_within_clear_radius": 11,
       "n_cleared_after_probe": 3,
       "waypoints_visited": 7,
-      "travel_m": 15990.742714555523,
-      "virtual_time_s": 4032.148531,
+      "travel_m": 16187.35874586295,
+      "virtual_time_s": 4071.471736,
       "n_measure": 128,
       "n_clear": 15,
       "channels_heard": 11,
       "n_bearings": 29,
       "cleared": 11,
-      "avg_time_s": 366.55895736363635,
+      "avg_time_s": 370.1337941818182,
       "n_precise_at_survey": 4,
       "n_skip_measure": 4,
       "initial_scan": {
@@ -5529,13 +5537,13 @@
           "bounded_survey": false,
           "n_probe": 1,
           "clear_point": [
-            -775.694271458778,
-            -1288.098407309611
+            -780.1525087082136,
+            -1293.9922578917328
           ],
-          "clear_radius_m": 13.875,
-          "diameter_final_m": 27.751,
+          "clear_radius_m": 13.848,
+          "diameter_final_m": 27.697,
           "precise_final": true,
-          "mec_radius_m": 13.875,
+          "mec_radius_m": 13.848,
           "bounded_final": true,
           "n_obs_total": 2,
           "method": "try-refined",
@@ -5649,13 +5657,13 @@
           "bounded_survey": false,
           "n_probe": 1,
           "clear_point": [
-            -1465.193449675492,
-            731.6778927928727
+            -1465.6765118309465,
+            731.9901954480661
           ],
-          "clear_radius_m": 13.166,
-          "diameter_final_m": 26.332,
+          "clear_radius_m": 12.86,
+          "diameter_final_m": 25.719,
           "precise_final": true,
-          "mec_radius_m": 13.166,
+          "mec_radius_m": 12.86,
           "bounded_final": true,
           "n_obs_total": 2,
           "method": "try-refined",
@@ -5825,11 +5833,11 @@
             "cleared": true,
             "diameter_survey_m": 403.039,
             "n_probe": 1,
-            "diameter_final_m": 27.751,
-            "mec_radius_final_m": 13.875,
-            "clear_radius_m": 13.875,
+            "diameter_final_m": 27.697,
+            "mec_radius_final_m": 13.848,
+            "clear_radius_m": 13.848,
             "method": "try-refined",
-            "localize_err_m": 8.57
+            "localize_err_m": 7.11
           },
           {
             "channel": 5,
@@ -5961,18 +5969,18 @@
             "cleared": true,
             "diameter_survey_m": 353.271,
             "n_probe": 1,
-            "diameter_final_m": 26.332,
-            "mec_radius_final_m": 13.166,
-            "clear_radius_m": 13.166,
+            "diameter_final_m": 25.719,
+            "mec_radius_final_m": 12.86,
+            "clear_radius_m": 12.86,
             "method": "try-refined",
-            "localize_err_m": 2.02
+            "localize_err_m": 2.32
           }
         ],
         "worst_nearest_m": 679.94,
         "all_within_cover": true,
         "missed_channels": [],
         "n_cleared": 11,
-        "localize_err_mean_m": 7.629,
+        "localize_err_mean_m": 7.524,
         "localize_err_max_m": 13.08,
         "n_within_clear_radius": 11,
         "n_cleared_after_probe": 3

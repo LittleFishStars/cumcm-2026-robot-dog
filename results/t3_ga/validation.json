@@ -359,7 +359,7 @@
       {
         "check": "接口调用序列完全一致（除时间戳）",
         "pass": true,
-        "detail": "354 条 vs 354 条"
+        "detail": "324 条 vs 324 条"
       },
       {
         "check": "论文图 PDF 不含生成时间戳（可逐字节复现）",
@@ -514,9 +514,9 @@
       "episodes.csv": true
     },
     "f_figures_pdf": 10,
-    "elapsed_s": 72.7
+    "elapsed_s": 104.2
   },
   "failed": 0,
-  "elapsed_s": 72.7,
-  "generated_at": "2026-09-11 19:16:31"
+  "elapsed_s": 104.2,
+  "generated_at": "2026-09-11 19:31:17"
 }

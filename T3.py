@@ -19,17 +19,31 @@
 ρ_6 = 0.5559052、ρ_7 = 0.5），而本题 r/R = 1000/1800 = 5/9 ≈ 0.5555556 落在 ρ_7 与 ρ_6 之间，
 故 6 个不够（只差 0.063%）、7 个够，最少 7 个 —— 详见 `cumcm.t3.covering.min_circle_count`。
 
-用法：
+用法（与 GA 对照方案 T3_ga.py 一致，**不加参数即连官方模拟器**）：
 
-    python T3.py --practice 1                    # 本地演练 1 局（需 jammers-py/）
+    python T3.py                                 # 官方模式：连 http://127.0.0.1:2026 跑完一局
+    python T3.py --base-url http://127.0.0.1:8080   # 换地址（模拟器控制台改了端口时）
+    python T3.py --practice 1                    # 本地演练 1 局（需 jammers-py/，自带真值）
     python T3.py --practice 10 --seed 0          # 10 局，seed 0~9
     python T3.py --practice 3 --survey-only      # 只做阶段一（巡视扫描 + 覆盖核对）
     python T3.py --practice 5 --no-reuse --console-port 8095 --robot-port 2027
                                                  # 另起独占演练实例（多会话并行时避免抢端口）
-    python T3.py                                 # 官方模式（连 --base-url）
+    python T3.py --plan-only                     # 只求覆盖圆方案，不连任何模拟器
 
-结果默认写到 results/t3/（--save-dir 改），轨迹图落在其下的 trajectory/（--no-plot 关闭，
---traj-dir 改目录）。GA 对照方案的结果树在 results/t3_ga/，两者互相独立。
+三种模式共用同一次覆盖圆求解与同一份策略代码，差别只在"场景从哪来"与"结果写哪去"：
+
+| 模式 | 触发 | 场景来源 | 真值 | 结果目录 |
+|---|---|---|---|---|
+| 官方 | 不加参数（或 --base-url） | 官方模拟器 | **不可见** | `results/t3/official/` |
+| 演练 | `--practice N` | jammers-py（自动拉起） | 可见，可核对覆盖保证 | `results/t3/` |
+| 仅求解 | `--plan-only` | 无 | — | `results/t3/` |
+
+官方模式默认另写 `results/t3/official/`，以免覆盖演练批数据（--save-dir 可改）。轨迹图落在
+结果目录下的 `trajectory/`（--no-plot 关闭，--traj-dir 改目录）；接口调用全程落盘到
+`<save-dir>/api_calls.jsonl`（--api-log 改路径、传空串关闭）—— 官方模式拿不到真值，这份
+逐次请求/响应的记录就是唯一的证据链。GA 对照方案的结果树在 `results/t3_ga/`，两者互相独立。
+
+官方模式运行环境见 `reports/OFFICIAL_PLATFORM_GUIDE.md`（模拟器只监听 127.0.0.1，须同机运行）。
 """
 
 from __future__ import annotations

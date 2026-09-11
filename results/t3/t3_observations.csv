@@ -986,7 +986,7 @@ episode,channel,stage,x_m,y_m,outcome,svd_deg,nearest_center_m
 9,4,survey-clear,-957.08,-248.77,no_signal,,0.00
 9,4,survey-clear,-430.94,-875.33,direction,230.15,0.00
 9,4,survey-clear,621.37,-1074.76,no_signal,,0.00
-9,4,refine,-1165.07,-1105.18,direction,334.81,769.27
+9,4,refine,-520.17,-1642.23,direction,126.77,772.08
 9,5,survey,0.00,0.00,no_signal,,975.66
 9,5,survey,994.31,-47.40,no_signal,,0.00
 9,5,survey-clear,668.06,719.53,no_signal,,0.00
@@ -1076,7 +1076,7 @@ episode,channel,stage,x_m,y_m,outcome,svd_deg,nearest_center_m
 9,19,survey-clear,-102.64,971.10,no_signal,,0.00
 9,19,survey-clear,-804.87,563.83,direction,165.73,0.00
 9,19,survey-clear,-957.08,-248.77,no_signal,,0.00
-9,19,refine,-1380.72,1016.65,direction,253.53,732.56
+9,19,refine,-1526.84,471.94,direction,76.72,727.80
 9,20,survey,0.00,0.00,no_signal,,975.66
 9,20,survey,994.31,-47.40,no_signal,,0.00
 9,20,survey-clear,668.06,719.53,no_signal,,0.00

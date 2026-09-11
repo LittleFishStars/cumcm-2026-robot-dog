@@ -1,0 +1,674 @@
+{
+  "stage": "覆盖圆求解 + 依次到圆心巡视扫描 + 就近试清（未命中按文献准则补测缩小后再清）",
+  "cover_plan": {
+    "region_radius_m": 1800.0,
+    "cover_radius_m": 1000.0,
+    "layout_kind": "general 7 点（config.SURVEY_CENTERS）",
+    "ring_radius_m": null,
+    "rotation_deg": 0.0,
+    "ring_radius_chosen": false,
+    "ring_radius_max_margin_m": 1558.846,
+    "n_circles": 7,
+    "analytic_worst_m": 994.9998,
+    "computed_worst_m": 994.9998,
+    "margin_m": 5.0002,
+    "worst_point": [
+      362.93,
+      1763.03
+    ],
+    "coverage_ratio": 1.0,
+    "multiplicity_points": {
+      "1": 123881,
+      "2": 213903,
+      "3": 83492,
+      "4": 5734,
+      "5": 113,
+      "6": 42
+    },
+    "single_ratio": 0.2900073741996652,
+    "multi_ratio": 0.7099926258003347,
+    "mean_multiplicity": 1.9335,
+    "survey_order": [
+      0,
+      6,
+      1,
+      4,
+      3,
+      2,
+      5
+    ],
+    "survey_length_m": 6167.32,
+    "centers": [
+      {
+        "id": 0,
+        "kind": "巡视站1",
+        "x": -234.569,
+        "y": 967.404,
+        "rho_m": 995.436
+      },
+      {
+        "id": 1,
+        "kind": "巡视站2",
+        "x": -902.871,
+        "y": -372.004,
+        "rho_m": 976.506
+      },
+      {
+        "id": 2,
+        "kind": "巡视站3",
+        "x": 961.266,
+        "y": -166.954,
+        "rho_m": 975.657
+      },
+      {
+        "id": 3,
+        "kind": "巡视站4",
+        "x": 508.271,
+        "y": -848.266,
+        "rho_m": 988.885
+      },
+      {
+        "id": 4,
+        "kind": "巡视站5",
+        "x": -314.31,
+        "y": -931.091,
+        "rho_m": 982.711
+      },
+      {
+        "id": 5,
+        "kind": "巡视站6",
+        "x": 856.231,
+        "y": 898.93,
+        "rho_m": 1241.453
+      },
+      {
+        "id": 6,
+        "kind": "巡视站7",
+        "x": -878.561,
+        "y": 438.352,
+        "rho_m": 981.846
+      }
+    ],
+    "feasible_ring_interval_m": [
+      1122.956,
+      1732.051
+    ],
+    "ring_radius_tradeoff": [
+      {
+        "ring_radius_m": 1122.956,
+        "computed_worst_m": 1000.0,
+        "analytic_worst_m": 1000.0,
+        "margin_m": 0.0,
+        "survey_length_m": 6737.7,
+        "survey_time_s": 1347.5,
+        "mean_multiplicity": 1.8622,
+        "min_multiplicity": 1
+      },
+      {
+        "ring_radius_m": 1200.0,
+        "computed_worst_m": 968.902,
+        "analytic_worst_m": 968.902,
+        "margin_m": 31.098,
+        "survey_length_m": 7200.0,
+        "survey_time_s": 1440.0,
+        "mean_multiplicity": 1.7846,
+        "min_multiplicity": 1
+      },
+      {
+        "ring_radius_m": 1300.0,
+        "computed_worst_m": 936.483,
+        "analytic_worst_m": 936.483,
+        "margin_m": 63.517,
+        "survey_length_m": 7800.0,
+        "survey_time_s": 1560.0,
+        "mean_multiplicity": 1.6784,
+        "min_multiplicity": 1
+      },
+      {
+        "ring_radius_m": 1400.0,
+        "computed_worst_m": 913.91,
+        "analytic_worst_m": 913.91,
+        "margin_m": 86.09,
+        "survey_length_m": 8400.0,
+        "survey_time_s": 1680.0,
+        "mean_multiplicity": 1.5686,
+        "min_multiplicity": 1
+      },
+      {
+        "ring_radius_m": 1558.846,
+        "computed_worst_m": 900.0,
+        "analytic_worst_m": 900.0,
+        "margin_m": 100.0,
+        "survey_length_m": 9353.1,
+        "survey_time_s": 1870.6,
+        "mean_multiplicity": 1.3907,
+        "min_multiplicity": 1
+      },
+      {
+        "ring_radius_m": 1700.0,
+        "computed_worst_m": 981.122,
+        "analytic_worst_m": 981.495,
+        "margin_m": 18.878,
+        "survey_length_m": 10200.0,
+        "survey_time_s": 2040.0,
+        "mean_multiplicity": 1.2324,
+        "min_multiplicity": 1
+      },
+      {
+        "ring_radius_m": 1732.051,
+        "computed_worst_m": 1000.0,
+        "analytic_worst_m": 1000.0,
+        "margin_m": 0.0,
+        "survey_length_m": 10392.3,
+        "survey_time_s": 2078.5,
+        "mean_multiplicity": 1.1968,
+        "min_multiplicity": 1
+      }
+    ],
+    "reference_hex_lattice": {
+      "ring_radius_m": 1732.051,
+      "computed_worst_m": 1000.0,
+      "analytic_worst_m": 1000.0,
+      "margin_m": 0.0,
+      "survey_length_m": 10392.3,
+      "survey_time_s": 2078.5,
+      "mean_multiplicity": 1.1968,
+      "min_multiplicity": 1
+    },
+    "compare_six_circles": {
+      "n_circles": 6,
+      "best_ring_radius_m": 1000.0,
+      "computed_worst_m": 1059.3906,
+      "feasible": false,
+      "family": "仅「1 中心 + 6 环上圆」这一族；更一般布局的严格下界见 min_circle_count"
+    },
+    "min_circle_count": {
+      "min_count": 7,
+      "ratio_r_over_R": 0.5555555556,
+      "disk_ratios": {
+        "5": 0.6093828640807096,
+        "6": 0.5559052114165887,
+        "7": 0.5
+      },
+      "boundary_arc_lower": 6,
+      "area_density_lower": 4,
+      "six_required_cover_radius_m": 1000.6294,
+      "six_shortfall_m": 0.6294,
+      "six_shortfall_ratio": 0.000629,
+      "six_max_region_radius_m": 1798.8678,
+      "seven_required_cover_radius_m": 900.0
+    },
+    "grid_step_m": 5.0,
+    "boundary_samples": 20000
+  },
+  "clear_radius_m": 20.0,
+  "receive_radius_m": [
+    1000.0,
+    1500.0
+  ],
+  "summary": {
+    "episodes": 1,
+    "n_sources": 0,
+    "n_cleared": 16,
+    "clear_ratio": null,
+    "avg_time_s": 241.484,
+    "virtual_time_s_mean": 3863.751,
+    "travel_m_mean": 15488.8,
+    "n_measure_mean": 113.0,
+    "n_probe_mean": 2.0,
+    "n_precise_at_survey": 2,
+    "n_skip_measure": 14,
+    "n_inline_cleared": 7,
+    "n_inline_fail": 1,
+    "n_refined": 2,
+    "localize_err_mean_m": null,
+    "localize_err_max_m": null,
+    "n_within_clear_radius": 0,
+    "methods": {},
+    "rotation_deg_mean": 60.667,
+    "rotation_deg_min": 60.667,
+    "rotation_deg_max": 60.667,
+    "n_episodes_rotated": 1,
+    "n_face_scanned_mean": 8.0
+  },
+  "episodes": [
+    {
+      "episode": 1,
+      "seed": null,
+      "n_sources": null,
+      "clear_ratio": 1.0,
+      "localize_err_mean_m": null,
+      "localize_err_max_m": null,
+      "n_within_clear_radius": 0,
+      "n_cleared_after_probe": 0,
+      "waypoints_visited": 7,
+      "travel_m": 15488.753296335928,
+      "virtual_time_s": 3863.750645,
+      "n_measure": 113,
+      "n_clear": 19,
+      "channels_heard": 16,
+      "n_bearings": 40,
+      "cleared": 16,
+      "avg_time_s": 241.4844153125,
+      "n_precise_at_survey": 2,
+      "n_skip_measure": 14,
+      "initial_scan": {
+        "direction": 8,
+        "near": 0,
+        "no_signal": 12,
+        "skip": 0,
+        "n_channels": 20
+      },
+      "rotation_deg": 60.6668,
+      "dense_dir_deg": 107.0604,
+      "n_face_scanned": 8,
+      "survey_order_used": [
+        0,
+        6,
+        1,
+        4,
+        3,
+        2,
+        5
+      ],
+      "n_inline_cleared": 7,
+      "n_inline_fail": 1,
+      "n_refined": 2,
+      "n_probe": 2,
+      "tracks": {
+        "2": {
+          "clear_point": [
+            -753.2013583932641,
+            -263.477549385719
+          ],
+          "method": "survey-inline"
+        },
+        "9": {
+          "clear_point": [
+            -642.1602932110919,
+            -175.41482698502773
+          ],
+          "method": "survey-inline"
+        },
+        "14": {
+          "clear_point": [
+            238.19190427116285,
+            -765.5081829287137
+          ],
+          "method": "survey-inline"
+        },
+        "16": {
+          "clear_point": [
+            797.2601429728306,
+            506.7960184636293
+          ],
+          "method": "survey-inline"
+        },
+        "1": {
+          "clear_point": [
+            -420.06719078490227,
+            971.2423836536298
+          ],
+          "method": "survey-inline"
+        },
+        "12": {
+          "clear_point": [
+            -380.2968500276748,
+            1186.524867158151
+          ],
+          "method": "survey-inline"
+        },
+        "18": {
+          "clear_point": [
+            35.0902362531573,
+            1009.2180470674863
+          ],
+          "method": "survey-inline"
+        },
+        "3": {
+          "n_obs_survey": 3,
+          "n_no_signal_survey": 1,
+          "diameter_survey_m": 87.365,
+          "mec_radius_survey_m": 43.683,
+          "bounded_survey": true,
+          "n_probe": 1,
+          "clear_point": [
+            1188.1929689756828,
+            502.3984833179624
+          ],
+          "clear_radius_m": 18.191,
+          "diameter_final_m": 36.383,
+          "precise_final": true,
+          "mec_radius_m": 18.191,
+          "bounded_final": true,
+          "n_obs_total": 4,
+          "method": "try-refined",
+          "cleared": true
+        },
+        "4": {
+          "n_obs_survey": 2,
+          "n_no_signal_survey": 2,
+          "diameter_survey_m": 69.756,
+          "mec_radius_survey_m": 34.878,
+          "bounded_survey": true,
+          "n_probe": 0,
+          "clear_point": [
+            1398.7643618548464,
+            926.5116452565751
+          ],
+          "clear_radius_m": 34.878,
+          "diameter_final_m": 69.756,
+          "precise_final": false,
+          "mec_radius_m": 34.878,
+          "bounded_final": true,
+          "n_obs_total": 2,
+          "method": "try",
+          "cleared": true
+        },
+        "5": {
+          "n_obs_survey": 2,
+          "n_no_signal_survey": 2,
+          "diameter_survey_m": 45.331,
+          "mec_radius_survey_m": 22.666,
+          "bounded_survey": true,
+          "n_probe": 0,
+          "clear_point": [
+            321.5087004739565,
+            -1448.3195050138897
+          ],
+          "clear_radius_m": 22.666,
+          "diameter_final_m": 45.331,
+          "precise_final": false,
+          "mec_radius_m": 22.666,
+          "bounded_final": true,
+          "n_obs_total": 2,
+          "method": "try",
+          "cleared": true
+        },
+        "6": {
+          "n_obs_survey": 2,
+          "n_no_signal_survey": 2,
+          "diameter_survey_m": 38.529,
+          "mec_radius_survey_m": 19.264,
+          "bounded_survey": true,
+          "n_probe": 0,
+          "clear_point": [
+            649.1043656691161,
+            -1217.5070143599442
+          ],
+          "clear_radius_m": 19.264,
+          "diameter_final_m": 38.529,
+          "precise_final": true,
+          "mec_radius_m": 19.264,
+          "bounded_final": true,
+          "n_obs_total": 2,
+          "method": "try",
+          "cleared": true
+        },
+        "7": {
+          "n_obs_survey": 2,
+          "n_no_signal_survey": 2,
+          "diameter_survey_m": 58.924,
+          "mec_radius_survey_m": 29.462,
+          "bounded_survey": true,
+          "n_probe": 0,
+          "clear_point": [
+            -437.9077437478678,
+            -1457.6160840505229
+          ],
+          "clear_radius_m": 29.462,
+          "diameter_final_m": 58.924,
+          "precise_final": false,
+          "mec_radius_m": 29.462,
+          "bounded_final": true,
+          "n_obs_total": 2,
+          "method": "try",
+          "cleared": true
+        },
+        "8": {
+          "n_obs_survey": 2,
+          "n_no_signal_survey": 2,
+          "diameter_survey_m": 52.141,
+          "mec_radius_survey_m": 26.07,
+          "bounded_survey": true,
+          "n_probe": 0,
+          "clear_point": [
+            291.0463062556034,
+            1668.1086722566479
+          ],
+          "clear_radius_m": 26.07,
+          "diameter_final_m": 52.141,
+          "precise_final": false,
+          "mec_radius_m": 26.07,
+          "bounded_final": true,
+          "n_obs_total": 2,
+          "method": "try",
+          "cleared": true
+        },
+        "10": {
+          "n_obs_survey": 3,
+          "n_no_signal_survey": 2,
+          "diameter_survey_m": 84.274,
+          "mec_radius_survey_m": 42.137,
+          "bounded_survey": true,
+          "n_probe": 0,
+          "clear_point": [
+            1243.4233198134903,
+            -1239.2856880852778
+          ],
+          "clear_radius_m": 42.137,
+          "diameter_final_m": 84.274,
+          "precise_final": false,
+          "mec_radius_m": 42.137,
+          "bounded_final": true,
+          "n_obs_total": 3,
+          "method": "try",
+          "cleared": true
+        },
+        "13": {
+          "n_obs_survey": 2,
+          "n_no_signal_survey": 0,
+          "diameter_survey_m": 34.952,
+          "mec_radius_survey_m": 17.476,
+          "bounded_survey": true,
+          "n_probe": 0,
+          "clear_point": [
+            -308.1352484444308,
+            546.3676498512563
+          ],
+          "clear_radius_m": 17.476,
+          "diameter_final_m": 34.952,
+          "precise_final": true,
+          "mec_radius_m": 17.476,
+          "bounded_final": true,
+          "n_obs_total": 2,
+          "method": "try",
+          "cleared": true
+        },
+        "20": {
+          "n_obs_survey": 3,
+          "n_no_signal_survey": 2,
+          "diameter_survey_m": 63.978,
+          "mec_radius_survey_m": 31.989,
+          "bounded_survey": true,
+          "n_probe": 1,
+          "clear_point": [
+            1562.7166001406863,
+            327.12883839824605
+          ],
+          "clear_radius_m": 12.607,
+          "diameter_final_m": 25.214,
+          "precise_final": true,
+          "mec_radius_m": 12.607,
+          "bounded_final": true,
+          "n_obs_total": 4,
+          "method": "try-refined",
+          "cleared": true
+        }
+      },
+      "waypoint_stats": [
+        {
+          "waypoint": 0,
+          "x": -958.2810770074855,
+          "y": 269.4259669836296,
+          "n_channels": 20,
+          "direction": 5,
+          "near": 0,
+          "no_signal": 15,
+          "skip": 0,
+          "virtual_time_s": 438.087,
+          "travel_m": 995.44
+        },
+        {
+          "waypoint": 6,
+          "x": -812.5449606090293,
+          "y": -551.1735143604336,
+          "n_channels": 17,
+          "direction": 2,
+          "near": 0,
+          "no_signal": 14,
+          "skip": 1,
+          "virtual_time_s": 769.149,
+          "travel_m": 2120.74
+        },
+        {
+          "waypoint": 1,
+          "x": -117.99827073878507,
+          "y": -969.3504295300623,
+          "n_channels": 17,
+          "direction": 5,
+          "near": 0,
+          "no_signal": 10,
+          "skip": 2,
+          "virtual_time_s": 1021.293,
+          "travel_m": 2931.46
+        },
+        {
+          "waypoint": 4,
+          "x": 657.7350806899874,
+          "y": -730.1407662655852,
+          "n_channels": 16,
+          "direction": 6,
+          "near": 0,
+          "no_signal": 8,
+          "skip": 2,
+          "virtual_time_s": 1276.578,
+          "travel_m": 3762.89
+        },
+        {
+          "waypoint": 3,
+          "x": 988.5014855000622,
+          "y": 27.54789912952145,
+          "n_channels": 15,
+          "direction": 5,
+          "near": 0,
+          "no_signal": 6,
+          "skip": 4,
+          "virtual_time_s": 1507.926,
+          "travel_m": 4589.63
+        },
+        {
+          "waypoint": 2,
+          "x": 616.4604963868651,
+          "y": 756.229033087794,
+          "n_channels": 12,
+          "direction": 6,
+          "near": 0,
+          "no_signal": 4,
+          "skip": 2,
+          "virtual_time_s": 1824.096,
+          "travel_m": 5830.48
+        },
+        {
+          "waypoint": 5,
+          "x": -364.21670258758104,
+          "y": 1186.8246944167659,
+          "n_channels": 8,
+          "direction": 1,
+          "near": 0,
+          "no_signal": 4,
+          "skip": 3,
+          "virtual_time_s": 2302.333,
+          "travel_m": 7996.67
+        }
+      ],
+      "plan_centers": [
+        [
+          -958.2810770074855,
+          269.4259669836296
+        ],
+        [
+          -117.99827073878507,
+          -969.3504295300623
+        ],
+        [
+          616.4604963868651,
+          756.229033087794
+        ],
+        [
+          988.5014855000622,
+          27.54789912952145
+        ],
+        [
+          657.7350806899874,
+          -730.1407662655852
+        ],
+        [
+          -364.21670258758104,
+          1186.8246944167659
+        ],
+        [
+          -812.5449606090293,
+          -551.1735143604336
+        ]
+      ],
+      "truth_check": {
+        "sources": [],
+        "worst_nearest_m": 0.0,
+        "all_within_cover": true,
+        "missed_channels": [],
+        "n_cleared": 0,
+        "localize_err_mean_m": null,
+        "localize_err_max_m": null,
+        "n_within_clear_radius": 0,
+        "n_cleared_after_probe": 0
+      },
+      "bearings_per_channel": {
+        "1": 3,
+        "2": 2,
+        "3": 4,
+        "4": 2,
+        "5": 2,
+        "6": 2,
+        "7": 2,
+        "8": 2,
+        "9": 2,
+        "10": 3,
+        "12": 2,
+        "13": 2,
+        "14": 3,
+        "16": 3,
+        "18": 2,
+        "20": 4
+      },
+      "cleared_channels": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        12,
+        13,
+        14,
+        16,
+        18,
+        20
+      ]
+    }
+  ]
+}

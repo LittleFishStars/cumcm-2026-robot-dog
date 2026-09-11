@@ -36,7 +36,8 @@ Problem/     赛题材料（已在 .gitignore 中，不入库）
 ```bash
 uv sync                              # 或 pip install -e .
 .venv/bin/python T1.py               # 问题一示例
-.venv/bin/python T3.py               # 只求覆盖圆方案（不连模拟器）
+.venv/bin/python T3.py               # 官方模式：连 http://127.0.0.1:2026 跑完一局
+.venv/bin/python T3.py --plan-only   # 只求覆盖圆方案（不连任何模拟器）
 .venv/bin/python T3.py --practice 3  # 本地演练 3 局（结果落 results/t3/）
 .venv/bin/python T3_ga.py --practice 3        # 结果落 results/t3_ga/
 .venv/bin/python T3_validate.py      # 六组独立验证（默认审计 results/t3_ga/ + 其 holdout/）
@@ -44,7 +45,13 @@ uv sync                              # 或 pip install -e .
 .venv/bin/python -m cumcm.t3.covering   # 覆盖圆方案自检（旋转不破坏保证 / 密集扇区选向 / 最少圆数）
 ```
 
-`T3.py` 的 `--no-rotate` 可关掉"起始扫描后把覆盖圆环转到源最密集方向"这一步，用于对照实验。
+`T3.py` 与 `T3_ga.py` 的命令行一致（都不加参数即连官方模拟器），三种模式共用同一次覆盖圆求解
+与同一份策略代码，差别只在"场景从哪来"与"结果写哪去"：官方模式缺省写 `results/t3/official/`
+且**拿不到真值**（逐次请求/响应落盘到 `api_calls.jsonl`，这是唯一的证据链）；`--practice` 用
+jammers-py 自动拉起、**自带真值**可核对覆盖保证，写 `results/t3/`。
+
+`T3.py` 的 `--no-rotate` 可关掉"起始扫描后把覆盖圆布局转到源最密集方向"这一步，用于对照实验；
+`--hex-layout` 可退回经典的正六边形布局，用于对照"布局优化到底值多少"（实测配对省 5.3%）。
 
 **为什么是 7 个覆盖圆**（而不是更少）：半径 1000 m 的圆盘覆盖半径 1800 m 的圆域，属于经典的
 *disk covering problem*。k 个等半径圆盘覆盖一个圆所需的最小半径比 ρ_k 已有证明：ρ_5 = 0.6093829

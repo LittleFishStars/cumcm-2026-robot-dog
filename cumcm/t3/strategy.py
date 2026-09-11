@@ -28,6 +28,7 @@ from cumcm.common.geometry import dist
 from cumcm.common.geometry import clamp_to_region as _clamp_to_region
 from cumcm.common.routing import (dist_matrix, exact_open_by_end,
                                   exact_open_order, nearest_order, two_opt_greedy)
+from cumcm.common.sim_client import RecordedSim
 from cumcm.t3.config import (BEARING_ERROR_DEG, CHANNELS, CLEAR_RADIUS, CLIP_ERR, CLIP_SIDES,
                              COVER_RADIUS, HOMING_CAP, HOMING_MAX, HOMING_STEP,
                              INLINE_DETOUR, INLINE_TRY_RADIUS, K_CLEAR_MAX, K_COVER_SAMPLES,
@@ -69,8 +70,11 @@ class RobotDog:
                  k_clear_max: int = K_CLEAR_MAX,
                  inline_try_radius: float = INLINE_TRY_RADIUS,
                  inline_detour: float = INLINE_DETOUR,
-                 rotate: bool = True) -> None:
-        self.sim = sim
+                 rotate: bool = True,
+                 api_log=None) -> None:
+        # 传入 api_log 时套一层记录代理：4 个接口的每一次调用都会落盘
+        # （官方模式下这是唯一的证据链 —— 拿不到真值，但每次请求/响应都有记录）
+        self.sim = sim if api_log is None else RecordedSim(sim, api_log, episode)
         self.verbose = verbose
         self.clear_enabled = clear
         self.k_clear_max = int(k_clear_max)

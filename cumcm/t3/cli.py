@@ -18,12 +18,23 @@ import numpy as np
 from cumcm.common.console import relax_console_encoding
 from cumcm.common.paths import default_jammers_dir
 from cumcm.common.practice_arena import PracticeArena
-from cumcm.common.sim_client import ROBOT_ID, Simulator
+from cumcm.common.sim_client import (API_LOG_NAME, BASE_URL, ROBOT_ID, ApiLog,
+                                     Simulator)
+from cumcm.common.sim_client import api_log as _api_log_raw
 from cumcm.t3.config import (CHOSEN_RING_RADIUS, CLEAR_RADIUS, COVER_RADIUS, INLINE_DETOUR, INLINE_TRY_RADIUS, K_CLEAR_MAX, RESULTS_DIR, SEED, TRAJ_DIR)
 from cumcm.t3.covering import (CoverSolveResult, optimal_ring_radius, print_cover_report, solve_covering_circles)
 from cumcm.t3.plotting import save_trajectory, truth_points
 from cumcm.t3.report import (episode_row, save_plan, save_survey, truth_check, observation_rows)
 from cumcm.t3.strategy import RobotDog
+
+
+def _api_log(args: argparse.Namespace, echo: bool):
+    """接口日志上下文（把 CLI 参数拆成公共层 api_log 所需的参数）。
+
+    路径优先取 --api-log；未指定时用 <save-dir>/api_calls.jsonl；显式传空串则关闭日志。
+    与 GA 方案（cumcm.t3ga.cli）同一套机制，便于两份结果用同样的方式审计。
+    """
+    return _api_log_raw(args.save_dir, args.api_log, echo)
 
 
 def _episode_printer(clear: bool):
@@ -58,9 +69,10 @@ def run_practice(args: argparse.Namespace, res: CoverSolveResult, save_dir: Path
     show = _episode_printer(clear)
     rows: List[dict] = []
     observations: List[dict] = []
-    with PracticeArena(jammers_dir, robot_id=args.robot_id,
-                       robot_port=args.robot_port, console_port=args.console_port,
-                       reuse_existing=not args.no_reuse) as arena:
+    with _api_log(args, not args.quiet) as api_log, \
+            PracticeArena(jammers_dir, robot_id=args.robot_id,
+                          robot_port=args.robot_port, console_port=args.console_port,
+                          reuse_existing=not args.no_reuse) as arena:
         print(f"jammers-py 已就绪：机器狗接口 {arena.robot_url}，控制台 {arena.console_url}")
         for ep in range(args.practice):
             seed = args.seed + ep
@@ -73,7 +85,7 @@ def run_practice(args: argparse.Namespace, res: CoverSolveResult, save_dir: Path
                            clear=clear, k_clear_max=args.k_clear_max,
                            inline_try_radius=args.inline_try_radius,
                            inline_detour=args.inline_detour,
-                           rotate=not args.no_rotate)
+                           rotate=not args.no_rotate, api_log=api_log)
             stats = dog.run(res.plan, res.survey_order)
             arena.finish_episode()
             # 用 dog.plan / dog.survey_order_used：布局在起始扫描后按源密集方向旋转过，
@@ -125,40 +137,51 @@ def run_practice(args: argparse.Namespace, res: CoverSolveResult, save_dir: Path
     paths = (save_plan(res, save_dir)
              + save_survey(save_dir, rows, observations, res.to_json()))
     print("结果已保存：" + "，".join(str(p) for p in paths))
+    if api_log is not None:
+        api_log.report()
     return 0
 
 
 def run_official(args: argparse.Namespace, res: CoverSolveResult, save_dir: Path) -> int:
     """官方评测接口模式：连 127.0.0.1 上已开放接口的模拟器，跑完整一局。
 
-    与演练的唯一差别是**拿不到干扰源真值**，因此定位误差等需要真值的指标留空。
+    与演练的两处差别：① **拿不到干扰源真值**，故定位误差等需要真值的指标留空（覆盖核对也
+    无从做）；② 结果默认写到 <RESULTS_DIR>/official/，不覆盖演练批数据。
+    策略代码与参数完全一致，因此演练里验证过的行为在正式模式同样成立。
+
+    接口调用全程落盘到 <save-dir>/api_calls.jsonl（--api-log 改路径、传空串关闭）：官方模式
+    没有真值，这份逐次请求/响应的记录就是唯一的证据链，事后可据此复核每次测量与清除。
     """
     sim = Simulator(robot_id=args.robot_id, base_url=args.base_url, timeout=args.timeout)
     print(f"连接模拟器 {args.base_url}（robot_id={args.robot_id}）")
-    dog = RobotDog(sim, verbose=not args.quiet, logfile=args.log, episode=1,
-                   clear=not args.survey_only, k_clear_max=args.k_clear_max,
-                   inline_try_radius=args.inline_try_radius,
-                   inline_detour=args.inline_detour,
-                   rotate=not args.no_rotate)
-    stats = dog.run(res.plan, res.survey_order)
-    print(f"完成：清除 {stats['cleared']} 个，巡视 {stats['waypoints_visited']} 个圆心，"
-          f"里程 {stats['travel_m']:.0f} m，虚拟时间 {stats['virtual_time_s']:.0f} s，"
-          f"测向 {stats['n_measure']} 次（补测 {stats['n_probe']} 次），"
-          f"听到 {stats['channels_heard']} 个频道（{stats['n_bearings']} 条示向度）")
-    row = episode_row(1, args.seed, None, dog, stats,
-                      truth_check(None, dog.plan, dog.obs, dog.cleared, dog.tracks))
-    if not args.no_plot:
-        files = save_trajectory(
-            save_dir, f"ep01_seed{args.seed}", dog.actions, dog.plan,
-            dog.survey_order_used, (),
-            title=f"官方模式：清除 {stats['cleared']} 个、里程 {stats['travel_m']:.0f} m、"
-                  f"虚拟时间 {stats['virtual_time_s']:.0f} s（无真值可比）",
-            traj_dir=args.traj_dir)
-        print("轨迹图：" + "，".join(str(f) for f in files))
-    paths = (save_plan(res, save_dir)
-             + save_survey(save_dir, [row], observation_rows(1, dog.plan, dog.meas),
-                           res.to_json()))
-    print("结果已保存：" + "，".join(str(p) for p in paths))
+    with _api_log(args, not args.quiet) as api_log:
+        dog = RobotDog(sim, verbose=not args.quiet, logfile=args.log, episode=1,
+                       clear=not args.survey_only, k_clear_max=args.k_clear_max,
+                       inline_try_radius=args.inline_try_radius,
+                       inline_detour=args.inline_detour,
+                       rotate=not args.no_rotate, api_log=api_log)
+        stats = dog.run(res.plan, res.survey_order)
+        print(f"完成：清除 {stats['cleared']} 个，巡视 {stats['waypoints_visited']} 个圆心，"
+              f"里程 {stats['travel_m']:.0f} m，虚拟时间 {stats['virtual_time_s']:.0f} s，"
+              f"测向 {stats['n_measure']} 次（补测 {stats['n_probe']} 次），"
+              f"听到 {stats['channels_heard']} 个频道（{stats['n_bearings']} 条示向度）")
+        # 官方模式的场景由平台生成，不受我们的 --seed 控制，故 seed 记为 None 以免误读
+        row = episode_row(1, None, None, dog, stats,
+                          truth_check(None, dog.plan, dog.obs, dog.cleared, dog.tracks))
+        if not args.no_plot:
+            files = save_trajectory(
+                save_dir, "ep01_official", dog.actions, dog.plan,
+                dog.survey_order_used, (),
+                title=f"官方模式：清除 {stats['cleared']} 个、里程 {stats['travel_m']:.0f} m、"
+                      f"虚拟时间 {stats['virtual_time_s']:.0f} s（无真值可比）",
+                traj_dir=args.traj_dir)
+            print("轨迹图：" + "，".join(str(f) for f in files))
+        paths = (save_plan(res, save_dir)
+                 + save_survey(save_dir, [row], observation_rows(1, dog.plan, dog.meas),
+                               res.to_json()))
+        print("结果已保存：" + "，".join(str(p) for p in paths))
+        if api_log is not None:
+            api_log.report()
     return 0
 
 
@@ -167,8 +190,14 @@ def build_parser() -> argparse.ArgumentParser:
         description="2026 CUMCM B 题问题三（第一阶段）：1000 m 覆盖圆求解 + 依次到圆心巡视扫描")
     p.add_argument("--practice", type=int, nargs="?", const=1, default=0,
                    help="本地演练局数：自动拉起 jammers-py 跑 N 局（缺省 1 局）")
-    p.add_argument("--base-url", default=None,
-                   help="官方模拟器地址（赛期用，如 http://127.0.0.1:2026）；缺省只求解覆盖圆")
+    p.add_argument("--base-url", default=BASE_URL,
+                   help=f"官方模拟器地址（缺省 {BASE_URL}）；不带任何参数即连它跑完一局。"
+                        f"只想求覆盖圆方案、不连模拟器时用 --plan-only")
+    p.add_argument("--plan-only", action="store_true",
+                   help="只求解并保存 1000 m 覆盖圆方案（含校验与文献对照），不连模拟器")
+    p.add_argument("--api-log", default=None,
+                   help=f"接口调用日志路径（缺省 <save-dir>/{API_LOG_NAME}；传空串关闭）。"
+                        f"官方模式下这是唯一的证据链，建议保留")
     p.add_argument("--robot-id", default=ROBOT_ID, help="参赛队号（须与模拟器一致）")
     p.add_argument("--timeout", type=float, default=5.0, help="HTTP 超时 / s")
     p.add_argument("--ring-radius", type=float, default=None,
@@ -189,8 +218,9 @@ def build_parser() -> argparse.ArgumentParser:
                         "配合 --console-port/--robot-port 避免端口冲突）")
     p.add_argument("--seed", type=int, default=SEED,
                    help="演练第 1 局的种子（场景布局与示向度噪声都由它确定，可复现）")
-    p.add_argument("--save-dir", default=RESULTS_DIR,
-                   help=f"结果输出目录（缺省 {RESULTS_DIR}/）")
+    p.add_argument("--save-dir", default=None,
+                   help=f"结果输出目录（演练/仅求解缺省 {RESULTS_DIR}/，"
+                        f"官方模式缺省 {RESULTS_DIR}/official/，以免覆盖演练批数据）")
     p.add_argument("--log", default=None, help="过程日志文件（逐站扫描的文字过程，追加写入）")
     p.add_argument("--k-clear-max", type=int, default=K_CLEAR_MAX,
                    help=f"试清未中后最多再补清几个点（用 K 个半径 20 m 的圆覆盖定位区域；"
@@ -214,9 +244,22 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
+    """按模式分派：`--practice` → 本地演练；`--plan-only` → 只求覆盖圆；其余 → 官方模拟器。
+
+    即 `python T3.py` 不带任何参数时**直接连官方模拟器**（缺省 http://127.0.0.1:2026）跑完一局，
+    与 GA 方案 T3_ga.py 的手感一致。三种模式共用同一次覆盖圆求解与同一份策略代码，差别只在
+    "场景从哪来"与"结果写哪去"。
+    """
     relax_console_encoding()
     args = build_parser().parse_args(argv)
+    official = not args.practice and not args.plan_only
+    if args.save_dir is None:               # 官方模式另起目录，避免覆盖演练批数据
+        args.save_dir = str(Path(RESULTS_DIR) / "official") if official else RESULTS_DIR
     save_dir = Path(args.save_dir)
+
+    print("=" * 78)
+    print("2026 CUMCM B 题 · 问题三：机器狗搜索与清除干扰源（确定性策略）")
+    print("=" * 78)
 
     res = solve_covering_circles(args.ring_radius, use_hex=args.hex_layout)   # 第一步：求 1000 m 覆盖圆的位置
     if not args.quiet:
@@ -227,18 +270,20 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     try:
         if args.practice:                   # 第二步：依次移动到圆心进行扫描
             return run_practice(args, res, save_dir)
-        if args.base_url:
+        if official:
             return run_official(args, res, save_dir)
     except KeyboardInterrupt:
         print("\n已中断")
         return 130
     except OSError as exc:
+        sys.stdout.flush()          # 先冲掉缓存的正常输出，错误信息才会出现在末尾而非表头前
         print(f"连接模拟器失败：{exc}", file=sys.stderr)
-        print("请确认模拟器已启动并处于测试窗口内（默认地址 http://127.0.0.1:2026）。",
-              file=sys.stderr)
+        print(f"请确认模拟器已启动并处于测试窗口内（缺省地址 {BASE_URL}）。", file=sys.stderr)
+        if official:
+            print("本地验证策略可用 --practice N（自动拉起 jammers-py，无需官方模拟器）。",
+                  file=sys.stderr)
         return 1
-    print("提示：加 --practice N 跑本地演练（自动拉起 jammers-py），"
-          "或加 --base-url 连官方模拟器执行巡视扫描。")
+    print("提示：不加参数即连官方模拟器；加 --practice N 跑本地演练（自动拉起 jammers-py）。")
     return 0
 
 

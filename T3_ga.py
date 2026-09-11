@@ -97,8 +97,8 @@ COORD_LIMIT = 2.0e6             # 坐标分量绝对值上限 / m
 
 # 覆盖路点设计：三个参数共同决定"圆域内任意点到最近路点 ≤ COVER_RADIUS"的保证强度。
 # 离散化越细，实际能达到的最坏距离越接近 COVER_RADIUS。实算（连续圆域上求最坏点）：
-#   100/120/950 → 8 路点，最坏 1008.4 m（>1000，圆域边缘存在听不到的源 ❌）
-#    60/ 80/920 → 8 路点，最坏  962.4 m（余量 +37.6 m，巡视里程还短 480 m ✅ 现用）
+#   100/120/950 → 8 路点，最坏 1008.4 m（>1000，圆域边缘存在听不到的源 ×）
+#    60/ 80/920 → 8 路点，最坏  962.4 m（余量 +37.6 m，巡视里程还短 480 m √ 现用）
 COVER_RADIUS = 920.0            # 覆盖路点设计半径（<1000 接收下界）/ m
 COVER_GRID = 60.0               # 目标圆域离散网格 / m
 COVER_STEP = 80.0               # 候选路点网格 / m
@@ -1307,6 +1307,21 @@ def run_practice(args: argparse.Namespace) -> int:
     return 0
 
 
+def _relax_console_encoding() -> None:
+    """放宽控制台编码的错误处理，避免打印日志时因个别字符中断整局。
+
+    Windows 中文控制台默认用 GBK（cp936），遇到它编不出的字符（如 ✅、²）会抛
+    UnicodeEncodeError；在正式测试中这会中断刚 /enter 的一局，白白浪费机会。
+    这里只把错误处理改为替换（不改编码，否则控制台会全乱码），保证日志一定能打印。
+    """
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            try:
+                stream.reconfigure(errors="replace")
+            except (ValueError, OSError):
+                pass
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         description="2026 CUMCM B 题问题三：遗传算法机器狗自动定位与清除")
@@ -1332,6 +1347,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
+    _relax_console_encoding()
     args = build_parser().parse_args(argv)
     print("=" * 74)
     print("2026 CUMCM B 题 · 问题三：遗传算法自动定位与清除")

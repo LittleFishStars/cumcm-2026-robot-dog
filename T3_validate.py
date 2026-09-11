@@ -57,7 +57,7 @@ class Report:
             {"check": name, "pass": bool(ok), "detail": detail})
         if not ok:
             self.failed += 1
-        mark = "✅" if ok else "❌"
+        mark = "√" if ok else "×"
         print(f"    {mark} {name}" + (f"：{detail}" if detail else ""))
         return bool(ok)
 
@@ -643,6 +643,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     print("T3_ga.py 求解方案验证")
     print("=" * 74)
 
+    T._relax_console_encoding()      # Windows 中文控制台下也能正常打印检查结果
     rep = Report()
     t0 = time.time()
     rng = np.random.default_rng(2026)

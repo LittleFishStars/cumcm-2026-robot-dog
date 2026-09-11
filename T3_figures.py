@@ -86,7 +86,7 @@ def dump_data(out_dir: Path, name: str, header: Sequence[str],
 def save(fig, path: Path) -> None:
     fig.savefig(path)
     plt.close(fig)
-    print(f"  ✅ {path}")
+    print(f"  √ {path}")
 
 
 # ---------------------------------------------------------------------------
@@ -342,7 +342,7 @@ def fig_ga_convergence_route(train: Dict[str, Any], rows: List[Dict[str, str]],
 def fig_sigma_geometry(val: Dict[str, Any], fig_dir: Path, data_dir: Path) -> None:
     stats = val["metrics"].get("a_sigma_by_geometry")
     if not stats:
-        print("  ⚠ 验证结果缺少 σ 标定数据，跳过 fig_t3_sigma_geometry.pdf")
+        print("  ! 验证结果缺少 σ 标定数据，跳过 fig_t3_sigma_geometry.pdf")
         return
     order = ["全方位", "中等张角", "窄张角(病态)"]
     order = [k for k in order if k in stats] or list(stats)
@@ -486,7 +486,7 @@ def fig_sensitivity(val: Dict[str, Any], fig_dir: Path, data_dir: Path) -> None:
     loc_p = m.get("d_loc_pop") or {}
     r_g = m.get("d_route_gens") or {}
     if not (loc_g and r_g):
-        print("  ⚠ 验证结果缺少敏感性数据，跳过 fig_t3_sensitivity.pdf")
+        print("  ! 验证结果缺少敏感性数据，跳过 fig_t3_sensitivity.pdf")
         return
 
     fig, axes = plt.subplots(1, 3, figsize=(11.4, 3.1))
@@ -582,6 +582,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     ap.add_argument("--data", default="figures/data", help="图表数据输出目录")
     args = ap.parse_args(argv)
 
+    import T3_ga
+    T3_ga._relax_console_encoding()  # 中文控制台下也能正常打印进度
     res, fig_dir, data_dir = Path(args.results), Path(args.figures), Path(args.data)
     fig_dir.mkdir(parents=True, exist_ok=True)
 

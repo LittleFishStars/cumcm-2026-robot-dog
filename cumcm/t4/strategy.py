@@ -33,8 +33,9 @@ from cumcm.common.geometry import dist
 from cumcm.common.routing import dist_matrix, exact_open_order
 from cumcm.common.sim_client import RecordedSim
 from cumcm.t4.config import (BEARING_ERROR_DEG, CHANNELS, CLEAR_RADIUS, CLIP_ERR,
-                             CLIP_SIDES, HOMING_CAP, HOMING_MAX, HOMING_STEP, INLINE_EXCLUDE_R_M,
-                             INLINE_SECTOR_DEG, K_CLEAR_MAX, K_COVER_SAMPLES, K_COVER_STEP_MIN, NEAR_RADIUS,
+                             CLIP_SIDES, HOMING_CAP, HOMING_MAX, HOMING_STEP,
+                             INLINE_MAX_MEC_R, INLINE_NEAR_R, INLINE_R_MAX, INLINE_R_MIN,
+                             K_CLEAR_MAX, K_COVER_SAMPLES, K_COVER_STEP_MIN, NEAR_RADIUS,
                              OBS_CAP, RECEIVE_MAX, REFINE_MAX, REGION_MARGIN, REGION_RADIUS, SAFETY_MARGIN,
                              SIDE_SCAN_DIAM, SWEEP_OPP_RADIUS, TOL, TRY_CLEAR_RADIUS)
 from cumcm.t4.probing import hypothesis_points, probe_candidates
@@ -65,16 +66,20 @@ class RobotDog:
                  episode: int = 0, clear: bool = True,
                  k_clear_max: int = K_CLEAR_MAX,
                  sweep_opp_radius: float = SWEEP_OPP_RADIUS,
-                 inline_sector_deg: float = INLINE_SECTOR_DEG,
-                 inline_exclude_r: float = INLINE_EXCLUDE_R_M,
+                 inline_r_min: float = INLINE_R_MIN,
+                 inline_r_max: float = INLINE_R_MAX,
+                 inline_near_r: float = INLINE_NEAR_R,
+                 inline_max_mec_r: float = INLINE_MAX_MEC_R,
                  api_log=None) -> None:
         self.sim = sim if api_log is None else RecordedSim(sim, api_log, episode)
         self.verbose = verbose
         self.clear_enabled = bool(clear)
         self.k_clear_max = int(k_clear_max)
         self.sweep_opp_radius = float(sweep_opp_radius)   # 顺路补测半径 / m
-        self.inline_sector_deg = float(inline_sector_deg) # 顺路清除扇形（起点段）半张角 / 度
-        self.inline_exclude_r = float(inline_exclude_r)   # 顺路清除排除的距圆心半径 / m
+        self.inline_r_min = float(inline_r_min)           # 前向顺路半径下界 / m
+        self.inline_r_max = float(inline_r_max)           # 前向顺路半径上界 / m
+        self.inline_near_r = float(inline_near_r)         # 近距顺路清除半径 / m
+        self.inline_max_mec_r = float(inline_max_mec_r)   # 参与顺路的区域最大 mec 半径 / m
         self._logfile = open(logfile, "w", encoding="utf-8") if logfile else None
         self.obs: Dict[int, List[Obs]] = defaultdict(list)
         self.meas: Dict[int, List[Meas]] = defaultdict(list)
@@ -301,7 +306,14 @@ class RobotDog:
                      f" 次（示向度 {counts['direction']}，无信号 {counts['no_signal']}"
                      f"{skip_note}），"
                      f"累计听到 {heard} 个频道")
-            if k + 1 < len(plan.route) and self.clear_enabled:
+            if k == 0:
+                continue          # 起点段顺路清除已按问题三优化删除（2026-09-12 同步）
+            # 到站后顺路清除（问题三优化机制）：
+            #   1) 近距清：距本站 INLINE_NEAR_R 以内的估计点全清（不分方位，_nearby_clear）；
+            #   2) 前向清：去下一站方向的方位扇区内、估计点距原点 [INLINE_R_MIN, INLINE_R_MAX]
+            #      且区域小的频道（_inline_clear）。
+            self._nearby_clear()
+            if k + 1 < len(plan.route):
                 nxt = plan.route[k + 1]
                 self._inline_clear(at, (float(pts[nxt][0]), float(pts[nxt][1])))
 
@@ -465,12 +477,7 @@ class RobotDog:
                 self.tracks.setdefault(c, {})["method"] = "near@side"
             # no_signal 对定向源不构成硬约束（可能背光），无新增区域信息，正常跳过
 
-    # ---- 途中顺路清除（沿用问题三 _inline_clear 的机制，见 cumcm.t3.strategy）----
-    @staticmethod
-    def _at_origin(p: Sequence[float]) -> bool:
-        """是否（近似）位于区域圆心（原点）—— 起点 (0,0) 特判用。"""
-        return math.hypot(p[0], p[1]) <= 1.0
-
+    # ---- 途中顺路清除（沿用问题三优化后的机制与参数，见 cumcm.t3.strategy，2026-09-12 同步）----
     @staticmethod
     def _polar_deg(p: Sequence[float]) -> float:
         """点 p 相对区域圆心（原点）的方位角 / 度，[0, 360)。起点 (0,0) 的方位未定义。"""
@@ -480,19 +487,20 @@ class RobotDog:
                         est: Sequence[float]) -> Optional[Tuple[float, float, float]]:
         """估计点 est 是否落在「本站→圆心」与「下一站→圆心」两条连线之间的扇区内。
 
-        以区域圆心（原点）为参照的极角扇区，**半径以两站为限**：
-          · 方位：est 与圆心的连线方向 th_est 位于 th_at 与 th_next 夹出的**较短弧**上，
-            即 ang_diff(th_est, th_at) + ang_diff(th_est, th_next) == ang_diff(th_at, th_next)
+        判据（以区域圆心为参照的极角扇区，半径限定 [INLINE_R_MIN, INLINE_R_MAX]）：
+          · 方位：est 与圆心的连线方向 th_est 位于 th_at 与 th_next 夹出的**较短弧**上，即
+                ang_diff(th_est, th_at) + ang_diff(th_est, th_next) == ang_diff(th_at, th_next)
             （三角不等式取等；ang_diff ∈ [0,180]，较短弧是唯一候选）；
-          · 半径：r_est ≤ max(r_at, r_next)，扇区自然止于两站所在的半径。
+          · 半径：INLINE_R_MIN ≤ r_est ≤ INLINE_R_MAX（下界承接原"排除近圆心点"的语义并入
+            判据本身，上界原 1500 → 搜索最优 1700，比"两站所在半径"更宽）。
         反侧点（th_est 与 th_at 差 180°）由三角不等式排除；必须用角度而不用 sin（|sin 180°|=0
         会把反侧点误判成同向）。返回 (短弧进度 0~1, 距圆心半径, 与 th_at 的角度差)。
         """
-        r_at = math.hypot(at[0], at[1])
-        r_next = math.hypot(next_wp[0], next_wp[1])
         r_est = math.hypot(est[0], est[1])
-        if r_est > max(r_at, r_next) + 1e-6:
-            return None
+        if r_est < self.inline_r_min - 1e-6:
+            return None                              # 距原点太近，不在前向清的范围
+        if r_est > self.inline_r_max + 1e-6:
+            return None                              # 超出半径上界
         th_at = self._polar_deg(at)
         th_next = self._polar_deg(next_wp)
         th_est = self._polar_deg(est)
@@ -506,89 +514,136 @@ class RobotDog:
             return None
         return (a1 / d, r_est, a1)
 
-    def _in_sector(self, at: Sequence[float], next_wp: Sequence[float],
-                   est: Sequence[float]) -> Optional[Tuple[float, float, float]]:
-        """起点段的兜底判据：从原点出发去下一站，以"朝向下一站"方向为中心展开的本地扇形。
+    def _cover_clear(self, channel: int, why: str) -> int:
+        """在"覆盖该频道定位区域的半径 20 m 圆"的圆心处清除（顺路清除的新清法）。
 
-        仅当本站是起点（_at_origin）时使用："起点与圆心的连线"是零向量、无方位，极角扇区
-        无从谈起；退化为"朝向第一站 ± INLINE_SECTOR_DEG"的本地扇形，把两站之间的近点顺路清掉。
-        返回 (沿线距离, 横向偏离, 角度偏差)。
+        用户 2026-09-12 指定（问题三同步）：在**区域的覆盖圆圆心**处清 —— 用半径
+        `CLEAR_RADIUS`（20 m）的圆覆盖定位区域；区域用一个圆盖不住（最小覆盖圆半径 > 20 m）
+        就按贪心补选多个半径 20 m 的圆（复用 _k_cover_points：第 1 个圆 = 区域最小覆盖圆的
+        圆心），逐个在圆心处 /clear，**命中即停**；k_clear_max 个圆盖不满区域时只清第 1 个
+        圆心（大区域多清命中率趋零，纯白跑）。圆心顺序按"距当前位置由近及远"（最近邻，命中
+        概率最高的先试）。返回清除成功数（0 或 1：命中后频道即加入 cleared，不再试剩余圆）。
         """
-        L = dist(at, next_wp)
-        if L <= 1e-9:
-            return None
-        d = dist(at, est)
-        if d > L + 1e-6:
-            return None
-        alpha = 0.0 if d <= 1e-9 else ang_diff(bearing(at, est), bearing(at, next_wp))
-        if alpha > self.inline_sector_deg:
-            return None
-        t = d * math.cos(math.radians(alpha))
-        h = d * math.sin(math.radians(alpha))
-        return (t, h, alpha)
+        region = self.region(channel)
+        mec = region.enclosing_circle
+        if mec is None or region.region.is_empty:
+            return 0
+        center = (float(mec[0]), float(mec[1]))
+        extra, leftover = self._k_cover_points(channel, self.k_clear_max)
+        if leftover > 1e-9:
+            extra = []                 # 盖不满区域：只清区域最小覆盖圆圆心一次，不白跑多个
+        pts = [center] + list(extra)
+        cur = np.array(self.pos, dtype=float)
+        rest = list(pts)
+        order: List[Tuple[float, float]] = []
+        while rest:                                   # 最近邻：从当前位置由近及远
+            k = min(range(len(rest)),
+                    key=lambda i: (float(np.linalg.norm(np.asarray(rest[i]) - cur)), i))
+            p = rest.pop(k)
+            order.append((float(p[0]), float(p[1])))
+            cur = np.asarray(p, dtype=float)
+        self.log(f"    [顺路清除] 频道{channel}（{why}）：{len(order)} 个半径 "
+                 f"{CLEAR_RADIUS:.0f} m 覆盖圆圆心依次试清"
+                 f"（区域最小覆盖圆半径 {mec[2]:.0f} m）")
+        for i, (x, y) in enumerate(order, 1):
+            if self._out_of_time():
+                break
+            self.stage = "survey-clear"
+            if self.clear(x, y, channel):
+                self.tracks.setdefault(channel, {}).update({
+                    "method": "inline", "clear_point": [x, y],
+                    "n_cover_clear": len(order)})
+                self.n_inline += 1
+                self.log(f"    [顺路清除] 频道{channel} @ ({x:.1f}, {y:.1f}) 命中"
+                         f"（{why}，第 {i}/{len(order)} 个覆盖圆）")
+                return 1
+            self.n_inline_fail += 1
+            self.log(f"    [顺路清除] 频道{channel} @ ({x:.1f}, {y:.1f}) 未命中"
+                     f"（{why}，留到收尾阶段处理）")
+        return 0
 
-    def _inline_excluded(self, est: Sequence[float]) -> bool:
-        """估计点是否因"距区域圆心（原点）太近"（< INLINE_EXCLUDE_R_M）被排除在顺路清除外。"""
-        return math.hypot(est[0], est[1]) < self.inline_exclude_r
+    def _nearby_clear(self, radius: Optional[float] = None) -> int:
+        """每站到站后的近距顺路清除：距当前点 radius（缺省 self.inline_near_r）以内的估计点全清。
+
+        用户 2026-09-12 指定（问题三同步）：不分方位，只要估计点距当前点 ≤ 180 m 就清，清法
+        同为"覆盖圆圆心处清、多个圆就清多次"（_cover_clear）。顺序按距离由近到远。只有
+        **区域小**（最小覆盖圆半径 ≤ self.inline_max_mec_r）的频道才参与。返回本段清除数。
+        """
+        radius = self.inline_near_r if radius is None else float(radius)
+        if not self.clear_enabled or self._out_of_time():
+            return 0
+        cur = np.array(self.pos, dtype=float)
+        cand = []
+        for ch in sorted(self.obs):
+            if ch in self.cleared:
+                continue
+            mec = self.region(ch).enclosing_circle
+            if mec is None or mec[2] > self.inline_max_mec_r:
+                continue              # 区域为空/退化，或区域太大不参与顺路
+            d = float(np.linalg.norm(np.asarray(mec[:2]) - cur))
+            if d <= radius + 1e-6:
+                cand.append((d, ch))
+        if not cand:
+            return 0
+        cand.sort(key=lambda p: (p[0], p[1]))         # 由近到远
+        n = 0
+        for _d, ch in cand:
+            if self._out_of_time():
+                break
+            n += self._cover_clear(ch, f"距本站 {_d:.0f} m ≤ {radius:.0f} m")
+        if n:
+            self.log(f"    本段近距清除 {n} 个，累计已清 {len(self.cleared)} 个")
+        return n
 
     def _inline_clear(self, at: Sequence[float], next_wp: Sequence[float]) -> int:
-        """途中顺路清除：把「本站→圆心」与「下一站→圆心」夹出的方位扇区内的未清频道，在
-        从 at 走向 next_wp 的途中走到其估计点试清（起点段退化为本地扇形；排除距原点过近的点）。
+        """途中**前向**顺路清除：把去下一站方向扇区内的估计点顺路清掉。
 
-        成本：清点要走到估计点再回来——但这些源收尾阶段反正要清，顺路清掉省的是"从别处专程跑
-        一趟"的里程；清点固定 5 s（命中）/ 3 s（未命中），命中后该频道后续测量点都不再测向。
-        沿用问题三的做法：**不设"估计可信度"门槛**——扇区内都试，未命中只花 3 s。
+        判据（用户 2026-09-12 改，问题三同步）：以区域圆心（原点）为参照的方位扇区
+        （_in_azimuth_arc）——估计点与圆心的连线方向落在「本站→圆心」与「下一站→圆心」两条
+        连线之间（较短弧），且估计点距原点半径在 [INLINE_R_MIN, INLINE_R_MAX] 之间。不设
+        "估计可信度"门槛，也没有起点段兜底（起点段顺路清除已删除，本站恒为测量位置、at 非
+        原点）与独立的 600 m 排除规则（其语义由半径下界并入判据）。**只清区域小的频道**：
+        定位区域最小覆盖圆半径 ≤ INLINE_MAX_MEC_R（75 m）才参与顺路，大区域命中率低、留给
+        收尾阶段专程处理。
+
+        成本：清点要走到估计点再回来——但这些源收尾阶段反正要清，顺路清掉省的是"从别处专程
+        跑一趟"的里程；清点固定 5 s（命中）/ 3 s（未命中），命中后该频道后续测量点都不再测向。
+        清法（_cover_clear）：在覆盖定位区域的半径 20 m 圆的圆心处清，区域大需多个圆则逐个
+        清、命中即停。
         """
-        if not self.clear_enabled:
+        if not self.clear_enabled or self._out_of_time():
             return 0
-        arc = not self._at_origin(at)          # 站点间 → 极角扇区；起点 → 本地扇形兜底
-        picked: List[Tuple[float, int, Tuple[float, float], float, float, float, str]] = []
+        picked: List[Tuple[float, int, Sequence[float]]] = []
+        n_too_big = 0                                  # 区域太大不参与顺路的频道数
         for ch in sorted(self.obs):
             if ch in self.cleared:
                 continue
             mec = self.region(ch).enclosing_circle
             if mec is None:
                 continue
+            if mec[2] > self.inline_max_mec_r:
+                n_too_big += 1
+                continue
             est = (float(mec[0]), float(mec[1]))
-            got = (self._in_azimuth_arc(at, next_wp, est) if arc
-                   else self._in_sector(at, next_wp, est))
+            got = self._in_azimuth_arc(at, next_wp, est)
             if got is None:
                 continue
-            if self._inline_excluded(est):
-                continue                        # 距区域圆心太近：按作用范围限制排除
-            picked.append((got[0], ch, est, got[1], got[2], float(mec[2]),
-                           "arc" if arc else "sector"))
+            picked.append((got[0], ch, est))
         if not picked:
             return 0
-        picked.sort(key=lambda p: (p[0], p[1]))  # 沿扇区方位（或沿线）由近到远依次清
-        if arc:
-            th_a = self._polar_deg(at)
-            th_b = self._polar_deg(next_wp)
-            self.log(f"    [顺路清除] 本站 ({at[0]:.0f}, {at[1]:.0f}) → 下一站"
-                     f" ({next_wp[0]:.0f}, {next_wp[1]:.0f})：方位扇区 {th_a:.0f}° ~ {th_b:.0f}°"
-                     f" 内有 {len(picked)} 个估计点")
-        else:
-            self.log(f"    [顺路清除] 起点→第一站 ({next_wp[0]:.0f}, {next_wp[1]:.0f})："
-                     f"朝向第一站 {self.inline_sector_deg:.1f}° 扇形内（半径"
-                     f" {dist(at, next_wp):.0f} m）有 {len(picked)} 个估计点")
+        picked.sort(key=lambda p: (p[0], p[1]))  # 沿扇区方位由近到远依次清
+        th_a = self._polar_deg(at)
+        th_b = self._polar_deg(next_wp)
+        self.log(f"    [顺路清除] 本站 ({at[0]:.0f}, {at[1]:.0f}) → 下一站"
+                 f" ({next_wp[0]:.0f}, {next_wp[1]:.0f})：方位扇区 {th_a:.0f}° ~ {th_b:.0f}°、"
+                 f"半径 {self.inline_r_min:.0f}~{self.inline_r_max:.0f} m、区域覆盖圆半径"
+                 f" ≤ {self.inline_max_mec_r:.0f} m，有 {len(picked)} 个估计点"
+                 + (f"（跳过 {n_too_big} 个区域过大的频道）" if n_too_big else ""))
         n = 0
-        for key, ch, est, a, b, r_mec, mode in picked:
+        for _key, ch, _est in picked:
             if self._out_of_time():
                 break
-            self.stage = "survey-clear"
-            where = (f"方位距「本站→圆心」{b:.1f}°、距圆心 {a:.0f} m、"
-                     f"估计覆盖圆半径 {r_mec:.0f} m") if mode == "arc" else (
-                         f"沿线 {key:.0f} m、横向偏离 {a:.0f} m、方向偏差 {b:.2f}°、"
-                         f"估计覆盖圆半径 {r_mec:.0f} m")
-            if self.clear(est[0], est[1], ch):
-                self.tracks.setdefault(ch, {}).update({"method": "inline",
-                                                       "clear_point": [est[0], est[1]]})
-                self.n_inline += 1
-                self.log(f"    [顺路清除] 频道{ch} @ ({est[0]:.1f}, {est[1]:.1f}) 命中（{where}）")
-            else:
-                self.n_inline_fail += 1
-                self.log(f"    [顺路清除] 频道{ch} @ ({est[0]:.1f}, {est[1]:.1f}) 未命中"
-                         f"（{where}，留到阶段二处理）")
+            n += self._cover_clear(ch, "前向扇区")
         if n:
             self.log(f"    本段顺路清除 {n} 个，累计已清 {len(self.cleared)} 个")
         return n

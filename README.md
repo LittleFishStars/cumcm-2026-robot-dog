@@ -14,7 +14,7 @@ t2/        问题二：第二个检测点的选择与候选区域（config / reg
 t3/        问题三主线（确定性策略）：config / covering / regions / probing / strategy /
            report / plotting / cli
 t4/        问题四（定向 + 全向混合，确定性策略）：config / sweep（7 覆盖基点 + 12 外圈点 =
-           20 个测量位置，含听到率统计）/ regions / probing / strategy / nn_layout* 布局搜索 /
+           20 个测量位置，含听到率统计）/ regions / probing / strategy /
            report / plotting / cli
 analysis/  静态检查：undefined_names（漏定义/缺失参数扫描）
 （六个包都直接放在仓库根，不再套一层包名；每个题目包都带 `__main__.py`，所以
@@ -28,16 +28,15 @@ results/     运行产物，按各题分成独立子树（**不按运行模式�
   t3/        确定性方案（python -m t3）：覆盖圆方案、巡视汇总、逐条观测、接口日志、总轨迹图、逐步扫描图
   t4/        问题四方案（python -m t4）：扫描方案（7 覆盖基点 + 12 外圈点、含听到率统计）、
              逐局统计、观测明细、接口日志、轨迹图与逐步扫描图
-reports/     方案说明与结果报告
 ```
 
 > `results/` 是**求解产物**：删掉后重跑命令即可原样重建（同 seed 逐字节一致，唯一例外是
 > `api_calls.jsonl` 里带现实时间戳）。
 > `resources/` 下的演练场与文献不是代码依赖，只在本地演练（`--practice` 会自动去
 > `resources/jammers-py/` 找模拟器）与撰写论文时需要。
-> 论文用图随论文存放：`paper/t2/figures/`（`python -m t2` 直接写出）与 `paper/t4/figures/`
-> （由 `paper/t4/make_figures.py` 读当前 `results/t4/` 生成，图里数字不写死；早期的
-> `figures/` 目录与 `figures_t4*.py` 生成脚本已按用户要求删除）。
+> `paper/`（论文正文与出图脚本）与 `reports/`（阶段报告、平台说明）目前**不在仓库里**：
+> 它们已被删除，需要时按新流程重建。出图只依赖 `results/`：`python -m t2` 直接写出
+> `results/t2/` 下的适合度图与判据图。
 
 ## 依赖与运行
 
@@ -142,7 +141,8 @@ t = 3.97），里程 16419 → **15038 m**（省 1381 m，8.4%，t = 5.90）。
 的定位四边形内嵌图（直径 134 m）；`results/t2/t2_criteria.png`（+ `.pdf`）是文献判据对照图
 （交会角对半径的影响 + GDOP 与精确直径的散点）；逐格数据在 `results/t2/t2_suitability.csv`，
 全部结论与自检数字在 `results/t2/t2_second_site.json`。模型、算法、校验、文献依据与灵敏度的
-完整说明见 `reports/问题二第二检测点候选区域.md`。
+完整说明见模块文档（`t2/theory.py` 的判据对比、`t2/score.py` 的最坏情况最小化与校验、
+`t2/region.py` 的几何口径）。
 
 分层规则见 `AGENTS.md`（Repo layout）：依赖只能向下（common ← t1/t2/t3/t4 ← analysis），
 严禁下层反向导入上层；t2/t3/t4 是并列叶子，t2 复用 t1 的定位区域口径（同一套楔形交，
@@ -152,11 +152,10 @@ t2 只是把它向量化到成千上万个候选点），t4 复用 t3 时只 imp
 
 扫描阶段用 20 个测量位置（原点 + 问题三的 7 个覆盖基点 + 12 个均匀方位外圈点 r = 1850 m），
 扫完即对每个源取"最近一次测向"三角定位；定向源按 180° 光束建模，半圆盘命中率经 422 万算例
-统计校验（贴边对抗 0 漏、蒙特卡洛漏 320/400 万，**非严格保证**），方案与统计数字见
-`reports/RESULTS_REPORT_T4.md`，模块文档见 `t4/sweep.py`。
+统计校验（贴边对抗 0 漏、蒙特卡洛漏 320/400 万，**非严格保证**）：统计数字由
+`python -m t4.sweep` 原样打印并写入 `results/t4/t4_sweep_plan.json`，模块文档见 `t4/sweep.py`。
 
 ```bash
 .venv/bin/python -m t4 --plan-only     # 只求扫描方案（约 1.7 s）
 .venv/bin/python -m t4 --practice 20 --seed 0 --no-reuse --robot-port 2112 --console-port 8092
-.venv/bin/python paper/t4/make_figures.py                              # 重画 paper/t4 的 8 张论文图
 ```

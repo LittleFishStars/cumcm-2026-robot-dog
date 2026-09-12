@@ -19,16 +19,15 @@
   them in place, and the same `--seed` is byte-identical — the only exception is `api_calls.jsonl`,
   which carries wall-clock timestamps. Expect a dirty tree after a run; the committed artifacts are
   the **latest** run, so refresh them deliberately rather than mixing runs.
-- The old `figures/` directory and the `figures_t4*.py` / `T4_figures.py` generators were deleted at
-  the user's request; paper figures now live with their paper: `paper/t2/figures/` (written by `python -m t2`)
-  and `paper/t4/figures/` (written by `paper/t4/make_figures.py`, which reads `results/t4/` and never
-  hard-codes a number). Regenerate after a rerun with `.venv/bin/python paper/t4/make_figures.py`.
+- Figures were deleted at the user's request: the old `figures/` directory, the `figures_t4*.py` /
+  `T4_figures.py` generators, `paper/` (paper sources incl. `make_figures.py`) and `reports/` (stage
+  reports) are no longer in the repo. `python -m t2` writes its figures into `results/t2/`, problem 4's
+  plan/points into `results/t4/`; rebuild any paper output from those, not from a checked-in figure dir.
 
 ## Setup / environment
 
-- `pyproject.toml` requires **Python >= 3.14** and uses the Tsinghua PyPI mirror; the official
-  platform guide (`reports/OFFICIAL_PLATFORM_GUIDE.md`) was aligned to 3.14 + numpy/matplotlib/
-  shapely.
+- `pyproject.toml` requires **Python >= 3.14** and uses the Tsinghua PyPI mirror; the stack is
+  Python 3.14 + numpy/matplotlib/shapely.
 - Use `uv sync` then `uv run python <script>`. README's `.venv/bin/python` is POSIX-only; on Windows
   use `uv run` or `.venv\Scripts\python.exe`. Prefer `python -X utf8 ...` so Chinese output renders.
 
@@ -46,7 +45,8 @@
 - `uv run python -m t4 --plan-only` — solve the 20 measurement positions + hearing-rate statistics
   (~2 s; writes `results/t4/t4_sweep_plan.json` + `t4_sweep_points.csv`).
 - `uv run python -m t4 --practice 20 --seed 0 --layout-file <layout.npy> --save-dir <dir>` — benchmark
-  an alternative measurement layout with the same harness (used for the paper's layout verdict table).
+  an alternative measurement layout with the same harness (benchmark any candidate layout on the same
+  seed set).
 - `uv run python -m t4.sweep` — problem 4 scan self-check (batched hearing predicate vs the
   single-case reference, then the 4.2 M-case statistics without touching any simulator).
 - `uv run python -m analysis.undefined_names` — static scan of every repo `.py` for names read
@@ -138,7 +138,7 @@
 验证这类改动的做法（本仓库没有测试套件，靠下面三条证据）：
 
 1. **全量自检 + 产物零改动**：跑完五条自检与 `python -m t2`、`python -m t3 --plan-only`、`python -m t4 --plan-only`，
-   要求 `git status --porcelain -- results paper/t2/figures` 为空——空就说明产物与改动前逐字节一致。
+   要求 `git status --porcelain -- results` 为空——空就说明产物与改动前逐字节一致。
 2. **AST 归一化审计**：把 `HEAD` 版与工作区版都解析成 AST，剥离 docstring、函数签名注解、带注解
    赋值的注解、类型别名与 import 名单后比对 `ast.dump`，必须完全相同（注释本就不进 AST）。这一步能
    证明"只有注解/docstring/注释/导入写法变了"。为折行而提取局部变量之类的改动会被它标出来，属正常，

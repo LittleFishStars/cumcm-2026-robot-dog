@@ -7,12 +7,12 @@
     sim_client.py      模拟器 HTTP+JSON 接口薄封装（题目附件 2 的 4 条指令）
     practice_arena.py  本地演练场：拉起/复用 jammers-py 与其控制台 REST
     plotting.py        matplotlib 中文环境、确定性出图、统一配色
-    records.py         结果落盘：CSV/JSON 写出与接口调用日志
     paths.py           项目内路径定位（包根 / 仓库根 / 默认演练场目录）
+    console.py         控制台输出：放宽编码、统一打印
 
 原先这些实现散落在各题入口脚本里各有一份（dist、bearing、clamp_to_region 等完全重复），
 抽取后各题共用同一实现。
 """
 
 __all__ = ["geometry", "routing", "sim_client", "practice_arena", "plotting",
-           "records", "paths", "console"]
+           "paths", "console"]

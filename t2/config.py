@@ -22,8 +22,6 @@
 
 from __future__ import annotations
 
-import math
-
 # ----------------------------------------------------------------------------
 # 题目物理设定（与 t3/t4 的 config 同源，此处按分量重述，避免 t2 反向依赖）
 REGION_RADIUS = 1800.0          # 目标圆域半径 / m（源必在圆域内）
@@ -83,8 +81,3 @@ DPI = 160.0
 # 数值容差与哨兵
 PARALLEL_EPS = 1e-12            # 两条边界射线视为平行的行列式阈值（此时四边形不封闭）
 DIAM_SENTINEL = 1.0e9           # 退化（近共线）情形的直径哨兵值 / m：相当于"无法定位"
-
-
-def bearing_error_rad() -> float:
-    """示向度误差半宽 / rad（解析式里用）。"""
-    return math.radians(BEARING_ERROR_DEG)

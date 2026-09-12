@@ -12,7 +12,7 @@
 * `two_opt_greedy` ：扫描过程中一旦发现更短就把当前解替换掉并继续往后扫（不回退），
                      整轮无改进才结束。
 
-两者都被问题四（sweep / nn_layout）与公共精确算子（exact_open_order 的降级路径）使用。
+两者都被问题四（sweep）与公共精确算子（exact_open_order 的降级路径）使用。
 
 两者的共同前提是"距离矩阵 D 的第 0 行代表起点"（见 `dist_matrix`）。
 """

@@ -9,27 +9,29 @@
 **背对着所有巡视点的源即使近在咫尺也听不到**（引擎返回 no_signal，见 engine.py 的
 _in_directional_coverage —— 这就是"搜索不到还有可能是方向不对"）。
 
-本模块的布局（"尽量减少路程"优化后的 20 个测量位置）：
+本模块的布局（"尽量减少路程"优化后的 23 个测量位置）：
 
   1. **原点**：起点全频道扫描（位置成本为零）；
   2. **7 个覆盖基点** = 问题三巡视站（cumcm.t3.config.SURVEY_CENTERS，直接复用，全向覆盖保证）；
-  3. **12 个均匀方位外圈点**，半径 OUTER_RING_RAD = 1850 m。
+  3. **3 个内部补点**（半径 MID_RING_RAD = 850 m、旋转 15°、间隔 120°）：补"内部半径源 +
+     波束朝外 + 方向恰落点族空隙"的残余漏例（文献"中心 + 多环带"布局的第三带），漏率降十倍；
+  4. **12 个均匀方位外圈点**，半径 OUTER_RING_RAD = 1850 m。
 
 为什么外圈取 1850 m、12 个方位（这是对"7+21 中点外推"布局的结构优化）：
 
   * **半径 1850 m**：任意源的迎光区在源前方 [|g|, |g|+R] 纵深；源最远半径 1770，所以**任意
     贴边源**的迎光区内沿 = 1770 m，外圈设在其内侧 1850 m 时径向偏差 < 80 m。原"中点外推"
     布局把多数点推到 2270 m，反而离内部源的迎光面太远（实测只剩 99.81%）；1850 m 单圈、
-    12 个方位同时覆盖贴边源与内部半径源的迎光区，实测 **99.99%**（400 万算例、4 seed 稳健，
-    贴边对抗 4.3 万例 0 漏）；
+    12 个方位同时覆盖贴边源与内部半径源的迎光区，加 3 个内部补点（r = 850 m）收窄内部方向
+    空隙后，实测 **~99.997%**（400 万算例、4 seed 稳健，贴边对抗 4.3 万例 0 漏）；
   * **12 个方位（间隔 30°）**：相邻外圈点最大距离 ≈ 1850·sin15° ≈ 479 m < 接收半径一半，
     任何方向的源都能被方向差 ≤ 15° 的外圈点听到。**为什么不是更少的点**：试过 11 点
     （间隔 32.7°、布局路线 16 725 m），但方位间隔变宽使顺路清除的方位扇区也变宽、绕路更多，
     实战总里程反升 464 m——12 点是"减少路程"的实战最优；
-  * **里程**：20 个测量位置的最短开放路径 17 019 m —— 比"7+21 中点外推"（29 点、21 580 m）
-    省 21%，还少 9 个测量位置。
+  * **里程**：23 个测量位置的最短开放路径 17 358 m —— 比"7+21 中点外推"（29 点、21 580 m）
+    省 20%，还少 6 个测量位置。
 
-仍是**非严格保证**（内部半径源 + 波束朝外 + 方向恰落点族空隙的残余约 0.01%），论文按实测
+仍是**非严格保证**（内部半径源 + 波束朝外 + 方向恰落点族空隙的残余约 0.003%），论文按实测
 统计报告（verify_hearing_stats），不声称严格不漏。
 """
 
@@ -43,15 +45,24 @@ import numpy as np
 
 from cumcm.common.routing import dist_matrix, nearest_order, two_opt_first, two_opt_greedy
 from cumcm.t3.config import SURVEY_CENTERS
-from cumcm.t4.config import OUTER_RING_N, OUTER_RING_RAD
+from cumcm.t4.config import (MID_RING_N, MID_RING_RAD, MID_RING_ROT_DEG,
+                             OUTER_RING_N, OUTER_RING_RAD)
 
 
 def measure_layout() -> List[Tuple[float, float]]:
-    """20 个测量位置：原点 + 7 覆盖基点 + 12 均匀方位外圈点（半径 OUTER_RING_RAD）。"""
+    """23 个测量位置：原点 + 7 覆盖基点 + MID_RING_N 内部补点 + 12 均匀方位外圈点。
+
+    内部补点（半径 MID_RING_RAD、旋转 MID_RING_ROT_DEG）补上"内部半径源 + 波束朝外 +
+    方向恰落点族空隙"的残余漏例（文献"中心 + 多环带"布局的第三带），漏率降一个数量级。
+    """
     base = np.asarray(SURVEY_CENTERS, dtype=float)
     ang = np.arange(OUTER_RING_N, dtype=float) * (2.0 * math.pi / OUTER_RING_N)
     ring = np.stack((OUTER_RING_RAD * np.cos(ang), OUTER_RING_RAD * np.sin(ang)), axis=1)
+    mid = np.arange(MID_RING_N, dtype=float) * (2.0 * math.pi / MID_RING_N) \
+        + math.radians(MID_RING_ROT_DEG)
+    mid_pts = np.stack((MID_RING_RAD * np.cos(mid), MID_RING_RAD * np.sin(mid)), axis=1)
     return [(0.0, 0.0)] + [(float(x), float(y)) for x, y in base] + \
+        [(float(x), float(y)) for x, y in mid_pts] + \
         [(float(x), float(y)) for x, y in ring]
 
 
@@ -70,6 +81,8 @@ class SweepPlan:
     route: List[int] = field(repr=False)
     route_m: float = 0.0
     verification: Optional[Dict[str, Any]] = None
+    interior_n: int = 0
+    interior_radius: float = 0.0
 
     @property
     def n_points(self) -> int:
@@ -82,6 +95,8 @@ class SweepPlan:
         return {
             "outer_n": int(self.outer_n),
             "outer_radius_m": float(self.outer_radius),
+            "interior_n": int(self.interior_n),
+            "interior_radius_m": float(self.interior_radius),
             "n_measure_points": int(self.n_points),
             "n_base": 7,
             "n_outer": int(self.outer_n),
@@ -93,7 +108,7 @@ class SweepPlan:
 
 
 def build_sweep_plan() -> SweepPlan:
-    """构造默认扫描方案：20 个测量位置，从原点出发的最近邻 + 2-opt 精修开路径。
+    """构造默认扫描方案：23 个测量位置，从原点出发的最近邻 + 2-opt 精修开路径。
 
     顺序与里程不参与检测效果（效果只取决于**点集**），只影响行驶耗时，故这里取确定性下
     里程较短的一种；`nearest_order`/`two_opt_*` 都是无随机算子（见 common.routing）。
@@ -108,6 +123,7 @@ def build_sweep_plan() -> SweepPlan:
         route_m += float(np.hypot(*(arr[i] - prev)))
         prev = arr[i]
     return SweepPlan(outer_n=OUTER_RING_N, outer_radius=OUTER_RING_RAD,
+                     interior_n=MID_RING_N, interior_radius=MID_RING_RAD,
                      points=arr, route=route, route_m=route_m)
 
 
@@ -196,14 +212,15 @@ def verify_hearing_stats(points: Sequence[Sequence[float]],
         "edge_miss": edge_miss,
         "worst_fail": worst_fail,
         "guaranteed": False,
-        "note": "原点 + 7 覆盖基点 + 12 均匀外圈点（r=1850 m）：实测听到率统计（非严格不漏）",
+        "note": "原点 + 7 覆盖基点 + 3 内部补点 + 12 均匀外圈点：实测听到率统计（非严格不漏）",
     }
 
 
 def print_sweep_report(plan: SweepPlan, verify: Optional[Dict[str, Any]]) -> None:
     """打印扫描方案与听到率统计报告（命令行 --plan-only / 每局开头使用）。"""
-    print(f"扫描方案：7 覆盖基点 + {plan.outer_n} 均匀外圈点（r={plan.outer_radius:.0f} m），"
-          f"测量位置 {plan.n_points} 个（含原点起点扫描），访问里程 {plan.route_m:.0f} m")
+    print(f"扫描方案：7 覆盖基点 + {plan.interior_n} 内部补点 + {plan.outer_n} 均匀外圈点"
+          f"（r={plan.outer_radius:.0f} m），测量位置 {plan.n_points} 个（含原点起点扫描），"
+          f"访问里程 {plan.route_m:.0f} m")
     if verify is None:
         print("  （未做听到率统计）")
         return

@@ -17,7 +17,7 @@ cumcm/
              report / plotting / cli
   t3ga/      问题三 GA 对照方案：config / localize / routing_ga / ga_ops / covering /
              strategy / plotting / training / cli
-  t4/        问题四（定向 + 全向混合，确定性策略）：config / sweep（7 基点 + 12 外圈点扫描）/ regions /
+  t4/        问题四（定向 + 全向混合，确定性策略）：config / sweep（7 基点 + 3 内点 + 12 外圈点扫描）/ regions /
              probing / strategy / report / plotting / cli
   analysis/  验证与出图：validate（六组独立验证）、figures / figures_t4（论文图表）
 jammers-py/  本地演练场（复刻模拟器；data/behavior-logs/ 会随每次演练累积日志，可随时清空）
@@ -25,7 +25,7 @@ results/     运行产物，按各题分成独立子树（**不按运行模式�
   t3/        确定性方案（T3.py）：覆盖圆方案、巡视汇总、逐条观测、接口日志、总轨迹图、逐步扫描图
   t3_ga/     GA 对照方案（T3_ga.py）：GA 训练记录、逐局统计、接口日志、验证结果、
              轨迹与扫描图，以及 holdout/（独立 seed 泛化批）
-  t4/        问题四方案（T4.py）：扫描方案（复用 7 覆盖基点 + 12 外圈点、含听到率统计）、
+  t4/        问题四方案（T4.py）：扫描方案（复用 7 覆盖基点 + 3 内点 + 12 外圈点、含听到率统计）、
              逐局统计、观测明细、接口日志、轨迹图与逐步扫描图
 figures/     论文用图表 PDF 与背后的数据 CSV
 reports/     方案说明与结果报告

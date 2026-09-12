@@ -27,7 +27,7 @@ from __future__ import annotations
 import math
 import time
 from collections import defaultdict
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Sequence
 
 import numpy as np
 
@@ -76,16 +76,34 @@ class RobotDog(ActionRecorder):
     其中"直径 < 40 m"只是**补测的收工条件**（表示估计已够准），不决定清不清除。
     """
 
-    def __init__(self, sim, verbose: bool = True, logfile: Optional[str] = None,
+    def __init__(self, sim: "Simulator", verbose: bool = True,
+                 logfile: str | None = None,
                  episode: int = 0, clear: bool = True,
                  k_clear_max: int = K_CLEAR_MAX,
                  inline_r_min: float = INLINE_R_MIN,
                  inline_r_max: float = INLINE_R_MAX,
                  inline_near_r: float = INLINE_NEAR_R,
                  inline_max_mec_r: float = INLINE_MAX_MEC_R,
-                 inline_radius_max: Optional[float] = None,  # None=前向上界取 inline_r_max
+                 inline_radius_max: float | None = None,  # None=前向上界取 inline_r_max
                  rotate: bool = True,
-                 api_log=None) -> None:
+                 api_log: "ApiLog | None" = None) -> None:
+        """构造两阶段机器狗策略
+
+        Args:
+            sim: 模拟器客户端（原始 Simulator；传了 api_log 时会自动套一层记录代理）
+            verbose: 是否打印过程日志
+            logfile: 过程日志文件路径（每局开头重写，只留最新一局）
+            episode: 局号（写进接口日志的 request_id，便于与模拟器行为日志对账）
+            clear: 是否做阶段二（定位与清除）；False 时只做巡视扫描
+            k_clear_max: 覆盖定位区域的半径 20 m 圆最多补几个
+            inline_r_min: 站点间前向顺路清除的估计点半径下界 / m
+            inline_r_max: 站点间前向顺路清除的估计点半径上界 / m
+            inline_near_r: 每站到站后的近距顺路清除半径 / m
+            inline_max_mec_r: 参与顺路清除的区域最大最小覆盖圆半径 / m
+            inline_radius_max: 兼容旧参数：覆盖前向上界的统一值 / m（None 时取 inline_r_max）
+            rotate: 起始全频道扫描后是否把覆盖圆布局旋转到源最密集方向
+            api_log: 接口调用日志（传入后 4 个接口的每次调用都会落盘）
+        """
         # 传入 api_log 时套一层记录代理：4 个接口的每一次调用都会落盘
         # （官方模式下这是唯一的证据链 —— 拿不到真值，但每次请求/响应都有记录）
         self.sim = sim if api_log is None else RecordedSim(sim, api_log, episode)
@@ -102,14 +120,14 @@ class RobotDog(ActionRecorder):
         # 过程日志用 "w"：每局开头重写，于是整份日志只描述**最新一局**。
         # 原先用 "a" 追加，跨局、跨运行无限累积，几轮演练后文件里混着几百局的内容难以查阅。
         self._logfile = open(logfile, "w", encoding="utf-8") if logfile else None
-        self.obs: Dict[int, List[Obs]] = defaultdict(list)
-        self.meas: Dict[int, List[Meas]] = defaultdict(list)   # 全部测量（含 no_signal）
+        self.obs: dict[int, list[Obs]] = defaultdict(list)
+        self.meas: dict[int, list[Meas]] = defaultdict(list)   # 全部测量（含 no_signal）
         self.n_skip = 0                                        # 判定必无信号而跳过的测量次数
         self.n_inline_fail = 0                                 # 巡视途中顺路试清白跑的次数
-        self.initial_scan: Dict[str, Any] = {}                 # 起始全频道扫描的统计
-        self.actions: List[Dict[str, Any]] = []                # 逐次动作记录（供轨迹图/轨迹表）
-        self.regions: Dict[int, ProbRegion] = {}
-        self.tracks: Dict[int, Dict[str, Any]] = {}      # 逐频道的定位/清除档案
+        self.initial_scan: dict[str, Any] = {}                 # 起始全频道扫描的统计
+        self.actions: list[dict[str, Any]] = []                # 逐次动作记录（供轨迹图/轨迹表）
+        self.regions: dict[int, ProbRegion] = {}
+        self.tracks: dict[int, dict[str, Any]] = {}      # 逐频道的定位/清除档案
         self.cleared: set = set()
         self.pos = np.zeros(2)
         self.vt = 0.0
@@ -117,18 +135,18 @@ class RobotDog(ActionRecorder):
         self.n_clear = 0
         self.episode = episode
         self.deadline = float("inf")
-        self.waypoint_stats: List[Dict[str, Any]] = []   # 逐圆心扫描统计
+        self.waypoint_stats: list[dict[str, Any]] = []   # 逐圆心扫描统计
         self.travel_m = 0.0                              # 实际走过的里程 / m
         self.stage = "survey"                            # 观测所处阶段（survey / refine）
-        self.plan: Optional[CoverPlan] = None            # 本局实际使用的覆盖圆方案（含旋转）
+        self.plan: CoverPlan | None = None            # 本局实际使用的覆盖圆方案（含旋转）
         self.rotation_deg = 0.0                          # 布局旋转角 / 度（起始扫描后确定）
-        self.dense_dir_deg: Optional[float] = None       # 源最密集的扇区中心方位 / 度
+        self.dense_dir_deg: float | None = None       # 源最密集的扇区中心方位 / 度
         self.n_face_scanned = 0                          # 起始扫描听到的源个数（选向依据）
-        self.survey_order_used: List[int] = []           # 本局实际的巡视顺序
+        self.survey_order_used: list[int] = []           # 本局实际的巡视顺序
         # 逐步扫描记录：一步 = 机器狗停在某处把当前该测的频道测一遍（起点全频道扫描 + 各巡视
         # 站）。仅登记、不在此处绘图 —— 绘图统一在 /exit 之后做，不占用现实时间预算。
-        self.scan_steps: List[Dict[str, Any]] = []
-        self._cur_step: Optional[Dict[str, Any]] = None
+        self.scan_steps: list[dict[str, Any]] = []
+        self._cur_step: dict[str, Any] | None = None
 
     # ---- 日志与原子动作（log / close / clear / _note / _polar_deg 等）见 cumcm.common.actions ----
     def measure(self, x: float, y: float, channel: int) -> dict:
@@ -164,7 +182,7 @@ class RobotDog(ActionRecorder):
         reg = self.regions.get(channel)
         return reg is not None and reg.provably_out_of_reach(at, RECEIVE_MAX)
 
-    def _end_scan_step(self, counts: Dict[str, int]) -> None:
+    def _end_scan_step(self, counts: dict[str, int]) -> None:
         """收尾一步扫描：填统计与本步结束时的状态快照，然后登记（供收尾统一出图）。"""
         step = self._cur_step
         self._cur_step = None
@@ -225,7 +243,7 @@ class RobotDog(ActionRecorder):
         return mec is not None and mec[2] + CLIP_ERR < CLEAR_RADIUS
 
     # ---- 阶段 1：巡视扫描 ----
-    def _active_channels(self) -> List[int]:
+    def _active_channels(self) -> list[int]:
         """仍需测向的频道：未清除、示向度条数未达上限、且**定位还不够准**。
 
         第三条是关键：叠加 no_signal 禁区与接收半径环带后，很多频道两条射线就已把可能源集合压到
@@ -238,7 +256,7 @@ class RobotDog(ActionRecorder):
                 and not self._precise(c)]
 
     def _sweep(self, channels: Sequence[int], at: Sequence[float],
-               label: Optional[str] = None, index: int = 0) -> Dict[str, int]:
+               label: str | None = None, index: int = 0) -> dict[str, int]:
         """在 at 处按频道号升序逐频道测向（升序可省频道切换时间）；near 就地清除。
 
         传入 `label` 时把这一步登记进 `scan_steps`（收尾逐步骤出"扫描结果图"）。
@@ -351,7 +369,7 @@ class RobotDog(ActionRecorder):
                  f"累计示向度 {sum(len(v) for v in self.obs.values())} 条，"
                  f"途中顺路清除 {len(self.cleared)} 个")
 
-    def _bearings_at(self, at: Sequence[float]) -> List[float]:
+    def _bearings_at(self, at: Sequence[float]) -> list[float]:
         """在 at 处测得的示向度（度）——即"在这个点听到的源各自在哪个方向"。"""
         out = []
         for ml in self.meas.values():
@@ -360,7 +378,7 @@ class RobotDog(ActionRecorder):
                     out.append(float(m.theta))
         return out
 
-    def _orient_route(self, order: List[int], origin: Sequence[float],
+    def _orient_route(self, order: list[int], origin: Sequence[float],
                       bearings: Sequence[float]) -> None:
         """用起始扫描听到的方位，联合决定"巡视路线绕向 + 布局旋转 + 落脚点"（零成本）。
 
@@ -418,10 +436,13 @@ class RobotDog(ActionRecorder):
             self.log(f"    [朝向] --no-rotate：不做布局旋转，仅在现有朝向下选终点")
 
         first = int(path[0])
+        # 巡视是否会因布局旋转而偏移（旋转后第一个站点正对最密集方向）
+        rotate_note = (f"布局旋转 {self.rotation_deg:.1f}° 使" if self.rotate
+                       else "未旋转（--no-rotate），")
         self.log(f"    [朝向] 起始扫描听到 {len(bearings)} 个源，最密集方向 "
                  f"{math.degrees(dense % (2.0 * math.pi)):.1f}°，其顺时针 90° 处 = "
                  f"{math.degrees((dense - math.pi / 2.0) % (2.0 * math.pi)):.1f}°；"
-                 f"{'布局旋转 ' + format(self.rotation_deg, '.1f') + '° 使' if self.rotate else '未旋转（--no-rotate），'}"
+                 f"{rotate_note}"
                  f"第一个巡视点站点{first} 正对该方位。巡视终点为站点{end}"
                  f"（终点路径长 {length:.0f} m，比最短路径多 {length - L_min:.0f} m）")
         order[:] = list(path)
@@ -434,7 +455,7 @@ class RobotDog(ActionRecorder):
         return math.hypot(p[0], p[1]) <= 1.0
 
     def _in_azimuth_arc(self, at: Sequence[float], next_wp: Sequence[float],
-                        est: Sequence[float]) -> Optional[Tuple[float, float, float]]:
+                        est: Sequence[float]) -> tuple[float, float, float] | None:
         """估计点 est 是否落在「本站→圆心」与「下一站→圆心」两条连线之间的扇区内。
 
         判据（以区域圆心为参照的极角扇区，半径限定 [INLINE_R_MIN, INLINE_R_MAX]）：
@@ -495,7 +516,7 @@ class RobotDog(ActionRecorder):
         pts = [center] + list(extra)                  # 第 1 个 = 区域覆盖圆圆心（mec 圆心）
         cur = np.array(self.pos, dtype=float)
         rest = list(pts)
-        order: List[Tuple[float, float]] = []
+        order: list[tuple[float, float]] = []
         while rest:                                   # 最近邻：从当前位置由近及远
             k = min(range(len(rest)),
                     key=lambda i: (float(np.linalg.norm(np.asarray(rest[i]) - cur)), i))
@@ -521,7 +542,7 @@ class RobotDog(ActionRecorder):
                      f"（{why}，留到阶段二处理）")
         return 0
 
-    def _nearby_clear(self, radius: Optional[float] = None) -> int:
+    def _nearby_clear(self, radius: float | None = None) -> int:
         """每站到站后的近距顺路清除：距当前点 radius（缺省 self.inline_near_r）以内的估计点全清。
 
         用户 2026-09-12 指定（替代原"站点间后向"）：不分方位，只要估计点距当前点 ≤ 100 m
@@ -575,7 +596,7 @@ class RobotDog(ActionRecorder):
         """
         if not self.clear_enabled or self._out_of_time():
             return 0
-        picked: List[Tuple[float, int, Sequence[float]]] = []
+        picked: list[tuple[float, int, Sequence[float]]] = []
         n_too_big = 0                                  # 区域太大不参与顺路的频道数（INLINE_MAX_MEC_R）
         for ch in sorted(self.obs):
             if ch in self.cleared:
@@ -613,7 +634,7 @@ class RobotDog(ActionRecorder):
         return n
 
     # ---- 阶段 2a：巡视后的定位诊断（只记录，不改变处理流程）----
-    def diagnose(self) -> Dict[str, int]:
+    def diagnose(self) -> dict[str, int]:
         """记录每个频道巡视后的定位区域直径/有界性，并统计"估计已够准"的个数。
 
         这是纯诊断：清除流程对所有频道一视同仁（都先就近试清），不按直径分叉。
@@ -640,7 +661,7 @@ class RobotDog(ActionRecorder):
         return {"n_channels": len(self.obs), "n_precise": precise,
                 "n_skip": self.n_skip}
 
-    def _nearest_order(self, channels: Sequence[int]) -> List[int]:
+    def _nearest_order(self, channels: Sequence[int]) -> list[int]:
         """确定性的访问顺序：直接求**精确**最短开放路径（Held-Karp 动态规划）。
 
         访问点取各频道定位区域的最小覆盖圆圆心（清缺点），起点为机器狗当前位置。实测（n=10~16，
@@ -730,7 +751,7 @@ class RobotDog(ActionRecorder):
             p = np.array(nxt, dtype=float)
         return False
 
-    def _try_clear(self, channel: int, tag: str) -> Optional[str]:
+    def _try_clear(self, channel: int, tag: str) -> str | None:
         """走到定位区域的最小覆盖圆圆心（当前的位置估计），就地 /clear 一次。
 
         成功返回 tag，失败返回 None。这是全局唯一的清除位置：区域最小覆盖圆半径 < 20 m 时
@@ -747,7 +768,7 @@ class RobotDog(ActionRecorder):
             return tag
         return None
 
-    def _nearby_try_clear(self, channel: int) -> Optional[str]:
+    def _nearby_try_clear(self, channel: int) -> str | None:
         """就近试清：走到当前估计点，直接 /clear 一次；未命中则就地复测。
 
         为什么"试"而不是"先判断能不能清"。清除半径只有 20 m，**走到源的近处是清除的必要
@@ -789,7 +810,7 @@ class RobotDog(ActionRecorder):
         return None
 
     def _k_cover_points(self, channel: int, k_extra: int,
-                        radius: float = CLEAR_RADIUS) -> Tuple[List[Tuple[float, float]], float]:
+                        radius: float = CLEAR_RADIUS) -> tuple[list[tuple[float, float]], float]:
         """用"当前估计点已清过一次"为起点，再贪心选 k_extra 个清除点，使半径 radius 的圆尽量
         覆盖整个定位区域；返回（补充清除点列表, 未被覆盖的目标点比例）。
 
@@ -821,7 +842,7 @@ class RobotDog(ActionRecorder):
             cand = cand[:: len(cand) // 2500 + 1]
 
         covered = np.linalg.norm(targets - np.asarray(mec[:2]), axis=1) <= radius + TOL
-        points: List[Tuple[float, float]] = []
+        points: list[tuple[float, float]] = []
         for _ in range(k_extra):
             if covered.all():
                 break
@@ -835,7 +856,7 @@ class RobotDog(ActionRecorder):
             covered |= dists[j] <= radius + TOL
         return points, float(1.0 - covered.mean())
 
-    def _multi_try_clear(self, channel: int) -> Optional[str]:
+    def _multi_try_clear(self, channel: int) -> str | None:
         """试清未中后就地"多清几次"：用至多 k_clear_max 个半径 20 m 的圆覆盖定位区域，依次补清。
 
         只在"这几个圆能把区域盖满"时才动手（否则白跑，直接交给补测）；顺序按最近邻，从当前
@@ -873,7 +894,7 @@ class RobotDog(ActionRecorder):
         if not self.clear_enabled:                   # 只定位模式：补测到估计够准为止
             if not self._precise(channel):
                 self.refine(channel)
-            method: Optional[str] = "skipped"
+            method: str | None = "skipped"
         else:
             method = self._nearby_try_clear(channel)     # ① 就近试清
             if method is None:                           # ② 未命中：多清几次（几个 20 m 圆盖满区域）
@@ -894,7 +915,7 @@ class RobotDog(ActionRecorder):
         })
 
     # ---- 主流程 ----
-    def run(self, plan: CoverPlan, order: Sequence[int]) -> Dict[str, Any]:
+    def run(self, plan: CoverPlan, order: Sequence[int]) -> dict[str, Any]:
         """/enter → 巡视扫描 → 诊断 → 逐频道就近试清（未命中则补测缩小后再清）→ /exit。"""
         enter = self.sim.enter()
         if not enter.get("accepted"):

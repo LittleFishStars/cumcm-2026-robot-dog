@@ -13,7 +13,7 @@ from __future__ import annotations
 import csv
 import json
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Any, Sequence
 
 import numpy as np
 
@@ -24,9 +24,9 @@ from cumcm.t4.regions import Meas, Obs
 from cumcm.t4.sweep import SweepPlan
 
 
-def truth_check(truth: Optional[Sequence[dict]], plan: SweepPlan,
-                obs: Dict[int, List[Obs]], cleared: set, tracks: dict,
-                first_heard: Optional[Dict[int, int]] = None) -> Dict[str, Any]:
+def truth_check(truth: Sequence[dict] | None, plan: SweepPlan,
+                obs: dict[int, list[Obs]], cleared: set, tracks: dict,
+                first_heard: dict[int, int] | None = None) -> dict[str, Any]:
     """逐源核对（仅演练模式有真值）：
 
     * 检测：该源频道是否被听到（拖网保证每个源 ≥ 1 次示向度），记录首次听到的拖网步骤；
@@ -35,7 +35,7 @@ def truth_check(truth: Optional[Sequence[dict]], plan: SweepPlan,
     """
     tracks = tracks or {}
     first_heard = first_heard or {}
-    rows: List[Dict[str, Any]] = []
+    rows: list[dict[str, Any]] = []
     for j in truth or []:
         p = (float(j["position"]["x"]), float(j["position"]["y"]))
         ch = int(j["channel"])
@@ -76,9 +76,21 @@ def truth_check(truth: Optional[Sequence[dict]], plan: SweepPlan,
     }
 
 
-def episode_row(ep: int, seed: Optional[int], truth: Optional[Sequence[dict]],
-                dog, stats: dict, check: dict) -> dict:
-    """一局的汇总行（整批汇总表 + 落盘 JSON 都用它）。"""
+def episode_row(ep: int, seed: int | None, truth: Sequence[dict] | None,
+                dog: "RobotDog", stats: dict, check: dict) -> dict:
+    """一局的汇总行（整批汇总表 + 落盘 JSON 都用它）
+
+    Args:
+        ep: 局号（从 1 开始）
+        seed: 该局的种子（官方模式场景不由 --seed 控制，记 None 以免误读）
+        truth: 干扰源真值列表（官方模式无真值，为 None）
+        dog: 该局的机器人策略实例（本行字段取自 stats 与 check，此参数用于统一调用口径）
+        stats: dog.run() 返回的本局统计
+        check: truth_check() 给出的真值核对结果
+
+    Returns:
+        dict: 一行的汇总字段（清除比例、里程、虚拟时间、测向次数、定位误差等）
+    """
     return {
         "episode": int(ep),
         "seed": seed,
@@ -110,7 +122,7 @@ def episode_row(ep: int, seed: Optional[int], truth: Optional[Sequence[dict]],
     }
 
 
-def observation_rows(ep: int, plan: SweepPlan, meas: Dict[int, List[Meas]]) -> List[dict]:
+def observation_rows(ep: int, plan: SweepPlan, meas: dict[int, list[Meas]]) -> list[dict]:
     """逐条观测明细（channel, x, y, outcome, theta, stage, episode）。"""
     rows = []
     for ch in sorted(meas):
@@ -123,7 +135,7 @@ def observation_rows(ep: int, plan: SweepPlan, meas: Dict[int, List[Meas]]) -> L
     return rows
 
 
-def save_plan(plan: SweepPlan, save_dir: Path, verify: Optional[dict] = None) -> List[Path]:
+def save_plan(plan: SweepPlan, save_dir: Path, verify: dict | None = None) -> list[Path]:
     """扫描方案落盘：JSON（含听到率统计）与 CSV（测量点坐标）。"""
     save_dir.mkdir(parents=True, exist_ok=True)
     plan = SweepPlan(outer_n=plan.outer_n, outer_radius=plan.outer_radius,
@@ -145,7 +157,7 @@ def save_plan(plan: SweepPlan, save_dir: Path, verify: Optional[dict] = None) ->
 
 
 def save_survey(save_dir: Path, rows: Sequence[dict], observations: Sequence[dict],
-                plan_json: dict, meta: dict) -> List[Path]:
+                plan_json: dict, meta: dict) -> list[Path]:
     """逐局统计（JSON）与观测明细（CSV）落盘。"""
     save_dir.mkdir(parents=True, exist_ok=True)
     out = {

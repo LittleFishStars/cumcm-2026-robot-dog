@@ -21,21 +21,32 @@ import ast
 import builtins
 import sys
 from pathlib import Path
-from typing import List, Tuple
 
 BUILTINS = set(dir(builtins)) | {
     "__file__", "__name__", "__doc__", "__package__", "__class__", "__spec__", "__loader__",
     "__build_class__", "__debug__"}
 
 
-def collect(body):
+def collect(body: list[ast.stmt]) -> tuple[set[str], list[tuple[str, int]], list[ast.stmt]]:
     """扫描一个作用域：返回 (绑定名, [(读到的名, 行号)], [嵌套的 def/class 节点])。
 
     不下钻嵌套 def/lambda/class 的函数体（它们各自成作用域），但把它们收集起来单独递归。
+
+    Args:
+        body: 该作用域的语句列表（模块体或函数体）
+
+    Returns:
+        tuple[set[str], list[tuple[str, int]], list[ast.stmt]]:
+        本作用域绑定的名字、读到的名字与行号、以及待递归的嵌套 def/class 节点
     """
     binds, loads, nested = set(), [], []
 
-    def visit(node):
+    def visit(node: ast.AST) -> None:
+        """递归访问单个 AST 节点，把绑定与读取分别记进 binds / loads
+
+        Args:
+            node: 待访问的 AST 节点
+        """
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
             binds.add(node.name)
             nested.append(node)
@@ -74,13 +85,23 @@ def collect(body):
     return binds, loads, nested
 
 
-def check(body, visible, where, out):
+def check(body: list[ast.stmt], visible: set[str], where: str,
+          out: list[tuple[str, str, int]]) -> None:
+    """递归检查一个作用域：读到但不可见的名字记进 out，再逐层下钻嵌套 def/class
+
+    Args:
+        body: 该作用域的语句列表（模块体或函数体）
+        visible: 外层可见的名字（调用方负责并上本层的绑定）
+        where: 出错时打印的作用域名（函数名或 "<module>"）
+        out: 结果累积列表，元素为 (作用域名, 名字, 行号)
+    """
     binds, loads, nested = collect(body)
     vis = visible | binds
     for nm, ln in loads:
         if nm not in vis:
             out.append((where, nm, ln))
     for nd in nested:
+        # 函数要把自己的形参并进可见集，类体则沿用外层可见集
         if isinstance(nd, (ast.FunctionDef, ast.AsyncFunctionDef)):
             a = nd.args
             params = {p.arg for p in a.posonlyargs + a.args + a.kwonlyargs}
@@ -93,14 +114,22 @@ def check(body, visible, where, out):
             check(nd.body, vis, nd.name, out)
 
 
-def check_file(path):
+def check_file(path: str) -> list[tuple[str, str, int]]:
+    """检查单个 .py 文件，返回模块体以下各作用域的漏定义列表
+
+    Args:
+        path: 待检查的 Python 文件路径
+
+    Returns:
+        list[tuple[str, str, int]]: (作用域名, 未绑定的名字, 行号)；模块体本身的问题不计
+    """
     tree = ast.parse(Path(path).read_text(encoding="utf-8"), str(path))
     out = []
     check(tree.body, set(BUILTINS), "<module>", out)
     return [p for p in out if p[0] != "<module>"]
 
 
-def check_argparse_attrs(path: str) -> List[Tuple[str, str, int]]:
+def check_argparse_attrs(path: str) -> list[tuple[str, str, int]]:
     """同一类错漏的 argparse 版本：读到的 `args.X` 却没有任何 `add_argument` 产生。
 
     为什么要这一项：撤/换命令行参数时按"两处锚点之间的区间"删代码，很容易连带删掉夹在中间的
@@ -155,10 +184,10 @@ def check_argparse_attrs(path: str) -> List[Tuple[str, str, int]]:
     return out
 
 
-def main(argv: List[str]) -> int:
+def main(argv: list[str]) -> int:
     """扫若干文件或目录（缺省整个 `cumcm/` 包）；有漏定义返回 1，否则返回 0。"""
     args = argv or ["cumcm"]
-    targets: List[str] = []
+    targets: list[str] = []
     for a in args:
         p = Path(a)
         if p.is_dir():
@@ -179,5 +208,5 @@ def main(argv: List[str]) -> int:
     return 1 if total else 0
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     raise SystemExit(main(sys.argv[1:]))

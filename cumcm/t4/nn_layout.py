@@ -17,7 +17,7 @@ from __future__ import annotations
 import argparse
 import math
 import time
-from typing import List, Optional, Sequence, Tuple
+from typing import Sequence
 
 import numpy as np
 import torch
@@ -37,7 +37,7 @@ BEST_PATH = "results/t4/.nn_best_layout.npy"
 # 1. 向量化蒙特卡洛听到率评估（打标签用）
 # --------------------------------------------------------------------------
 def fast_miss(pts: Sequence[Sequence[float]], n: int = MC_N_DEFAULT,
-              seed: int = 0) -> Tuple[float, float]:
+              seed: int = 0) -> tuple[float, float]:
     """向量化评估一个布局的缺听率，返回 (定向缺听, 全向缺听)。
 
     定向源：存在测量点 p 满足 |p−g| ≤ R 且 (p−g)·u(θ) ≥ 0（半圆盘命中）；
@@ -78,6 +78,11 @@ def gen_layouts(n: int, n_free: int, seed: int = 1) -> np.ndarray:
     out = np.empty((n, n_free, 2), dtype=float)
 
     def _fill_ring(i: int) -> None:
+        """把第 i 个布局填成"环 + 内部点"结构
+
+        Args:
+            i: 布局下标（结果写入 out[i]）
+        """
         n_ring = int(rng.integers(8, 15))
         n_in = n_free - n_ring
         r_ring = rng.uniform(1400.0, 1950.0)
@@ -137,7 +142,14 @@ def label_layouts(points: np.ndarray, mc_n: int, seed: int = 7
 class Net(nn.Module):
     """两层 MLP：输入 (n_free*2,)（归一化坐标）→ 输出 (2,) = 定向/全向听到率。"""
 
-    def __init__(self, n_in: int, h1: int = 128, h2: int = 128):
+    def __init__(self, n_in: int, h1: int = 128, h2: int = 128) -> None:
+        """构造两层 MLP
+
+        Args:
+            n_in: 输入维度（= n_free * 2）
+            h1: 第一隐藏层宽度
+            h2: 第二隐藏层宽度
+        """
         super().__init__()
         self.net = nn.Sequential(
             nn.Linear(n_in, h1), nn.ReLU(),
@@ -146,6 +158,14 @@ class Net(nn.Module):
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """前向传播：布局特征 → 两个头的缺听率预测
+
+        Args:
+            x: (B, n_in) 布局特征张量
+
+        Returns:
+            torch.Tensor: (B, 2) 定向 / 全向缺听率（log1p 尺度）
+        """
         return self.net(x)
 
 
@@ -167,7 +187,7 @@ def proxy_score(net: nn.Module, layout: np.ndarray, w_omni: float = 0.5,
 
 def train_net(X: np.ndarray, Y: np.ndarray, epochs: int = 80,
               batch: int = 256, lr: float = 1.5e-3,
-              dev: str = "cpu") -> Tuple[nn.Module, List[float]]:
+              dev: str = "cpu") -> tuple[nn.Module, list[float]]:
     """Adam 训练，返回 (网络, 每 epoch 平均损失)。"""
     n = X.shape[0]
     net = Net(X.shape[1]).to(dev)
@@ -197,10 +217,10 @@ def train_net(X: np.ndarray, Y: np.ndarray, epochs: int = 80,
 # --------------------------------------------------------------------------
 def search(net: nn.Module, n_free: int, starts: Sequence[np.ndarray],
            iters: int = 4000, sigma: float = 120.0, w_omni: float = 0.5,
-           seed: int = 3, dev: str = "cpu") -> Tuple[np.ndarray, float]:
+           seed: int = 3, dev: str = "cpu") -> tuple[np.ndarray, float]:
     """从每个起点做高斯扰动爬山：每次随机扰动一个点，代理评分变好才接受。"""
     rng = np.random.default_rng(seed)
-    best_layout: Optional[np.ndarray] = None
+    best_layout: np.ndarray | None = None
     best_score = float("inf")
     feats = np.empty((1, n_free * 2), dtype=np.float32)
     for si, start in enumerate(starts):
@@ -250,7 +270,7 @@ def ga_search(net: nn.Module, n_free: int, n_pop: int = 300,
               n_elite: int = 20, n_gen: int = 40, mc_elite: int = 40_000,
               w_omni: float = 0.5, w_edge: float = 0.4, w_route: float = 0.0,
               seed: int = 9, dev: str = "cpu", log_every: int = 5
-              ) -> Tuple[np.ndarray, dict]:
+              ) -> tuple[np.ndarray, dict]:
     """代理(MNN)引导 + 精英精确验证的进化布局搜索。
 
     每代：代理对种群排序 → top 精英做蒙特卡洛精评（真实缺听率锚定）→ 精英保留并变异
@@ -260,7 +280,17 @@ def ga_search(net: nn.Module, n_free: int, n_pop: int = 300,
     from cumcm.t4.sweep import measure_layout
     rng = np.random.default_rng(seed)
 
-    def ring(n, r, rot=0.0):
+    def ring(n: int, r: float, rot: float = 0.0) -> np.ndarray:
+        """生成半径为 r、均匀 n 个点、整体旋转 rot 的环
+
+        Args:
+            n: 环上的点数
+            r: 环半径 / m
+            rot: 整体旋转角 / rad
+
+        Returns:
+            np.ndarray: (n, 2) 环上点坐标
+        """
         a = np.linspace(0, 2 * math.pi, n, endpoint=False) + rot
         return np.stack([r * np.cos(a), r * np.sin(a)], 1)
 
@@ -289,7 +319,7 @@ def ga_search(net: nn.Module, n_free: int, n_pop: int = 300,
             pop[i, :, 0] = rr * np.cos(aa); pop[i, :, 1] = rr * np.sin(aa)
 
     feats = np.empty((n_pop, n_free * 2), dtype=np.float32)
-    best_overall: Optional[np.ndarray] = None
+    best_overall: np.ndarray | None = None
     best_score = float("inf")
     history = []
     rec: dict = {"history": history, "elite": []}
@@ -366,8 +396,17 @@ def route_of(layout: np.ndarray) -> float:
     return m
 
 
-def validate(layout: np.ndarray, mc_n: int = 400_000, seed: int = 2026):
-    """精确验证：返回 {定向缺听/全向缺听/贴边漏/TSP 路程}。"""
+def validate(layout: np.ndarray, mc_n: int = 400_000, seed: int = 2026) -> dict:
+    """精确验证：返回 {定向缺听/全向缺听/贴边漏/TSP 路程}。
+
+    Args:
+        layout: (n_free, 2) 自由点布局（原点由函数自行补上）
+        mc_n: 蒙特卡洛算例数
+        seed: 随机种子
+
+    Returns:
+        dict: 定向缺听率、全向缺听率、贴边对抗漏例数与 TSP 路程 / m
+    """
     dm, om = fast_miss(layout, n=mc_n, seed=seed)
     P = np.vstack([np.zeros(2), layout])
     hit, _ = _hit_cases(P, *adversarial_cases(360, 40, wrap=False))
@@ -376,6 +415,7 @@ def validate(layout: np.ndarray, mc_n: int = 400_000, seed: int = 2026):
 
 
 def main() -> None:
+    """命令行入口：生成/载入数据 → 训练代理 → GA 搜索 → 高精度精确复核"""
     ap = argparse.ArgumentParser()
     ap.add_argument("--gen", type=int, default=0)
     ap.add_argument("--n-free", type=int, default=22)
@@ -454,5 +494,5 @@ def main() -> None:
         print(f"  ({pp[0]:.1f}, {pp[1]:.1f})")
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()

@@ -10,11 +10,11 @@ from __future__ import annotations
 import csv
 import json
 from pathlib import Path
-from typing import Any, Iterable, List, Sequence, Union
+from typing import Any, Iterable, Sequence
 
 __all__ = ["ensure_dir", "write_json", "write_rows", "read_json", "read_rows"]
 
-PathLike = Union[str, Path]
+PathLike = str | Path
 
 
 def ensure_dir(path: PathLike) -> Path:
@@ -33,6 +33,7 @@ def write_json(path: PathLike, payload: Any, indent: int = 2) -> Path:
 
 
 def read_json(path: PathLike) -> Any:
+    """读 JSON 成 Python 对象（UTF-8）"""
     return json.loads(Path(path).read_text(encoding="utf-8"))
 
 
@@ -49,7 +50,7 @@ def write_rows(path: PathLike, header: Sequence[str], rows: Iterable[Sequence[An
     return p
 
 
-def read_rows(path: PathLike) -> List[dict]:
+def read_rows(path: PathLike) -> list[dict]:
     """读 CSV 成 list[dict]（全部字段为字符串，沿用 DictReader 语义）。"""
     with Path(path).open(newline="", encoding="utf-8") as f:
         return list(csv.DictReader(f))

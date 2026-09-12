@@ -26,7 +26,7 @@ from __future__ import annotations
 import datetime
 import math
 from pathlib import Path
-from typing import Any, Optional, Tuple
+from typing import Any
 
 import numpy as np
 
@@ -47,7 +47,7 @@ _PDF_DATE = datetime.datetime(2026, 1, 1, tzinfo=datetime.timezone.utc)  # 固�
 
 
 def zoom_window(result: SolveResult, margin: float = 150.0,
-                aspect: float = 1.10) -> Tuple[float, float, float, float]:
+                aspect: float = 1.10) -> tuple[float, float, float, float]:
     """放大视图窗口：可行域透镜的包围盒 + 边距，再按目标长宽比补成矩形 (x0, x1, y0, y1)。"""
     x0, y0, x1, y1 = result.lens.bounds
     x0, x1, y0, y1 = x0 - margin, x1 + margin, y0 - margin, y1 + margin
@@ -146,7 +146,7 @@ def _best_marker(ax: Any, result: SolveResult, fontsize: float = 7.0,
                 bbox=dict(boxstyle="round,pad=0.25", fc="white", ec=C_SRC, lw=0.6, alpha=0.92))
 
 
-def _line_through(ax: Any, p: Tuple[float, float], ang_deg: float, **kw: Any) -> None:
+def _line_through(ax: Any, p: tuple[float, float], ang_deg: float, **kw: Any) -> None:
     """画过点 p、方向 ang_deg 的整条直线（超出视窗的部分交给坐标轴裁剪）。"""
     a = math.radians(ang_deg)
     span = 6000.0
@@ -192,7 +192,7 @@ def _worst_case_inset(ax: Any, result: SolveResult) -> None:
     ax.grid(alpha=0.25, lw=0.4)
 
 
-def _farthest_pair(pts: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+def _farthest_pair(pts: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     """一组点中最远的一对（顶点只有几个，直接穷举）。"""
     best = (0.0, 0, 0)
     for i in range(len(pts)):
@@ -204,7 +204,7 @@ def _farthest_pair(pts: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
 
 
 def draw_suitability(out_path: Path, result: SolveResult, dpi: float = cfg.DPI,
-                     pdf_path: Optional[Path] = None) -> Path:
+                     pdf_path: Path | None = None) -> Path:
     """画"第二检测点适合度图"并落盘，返回 PNG 路径（给出 pdf_path 时同时输出矢量 PDF）。"""
     setup_mpl_env()
     try:
@@ -321,7 +321,7 @@ def _exact_radius_at(R1: float, R2: float, gamma_deg: float,
 
 
 def draw_criteria(out_path: Path, result: SolveResult, dpi: int = cfg.DPI,
-                  pdf_path: Optional[Path] = None) -> Path:
+                  pdf_path: Path | None = None) -> Path:
     """文献判据 vs 本文精确判据的对照图（写论文"为什么这么选点"用）。
 
     * **(a) 交会角的影响**：固定 R₁ = 1500 m、R₂ = 907 m（本文最坏情形的距离组合），

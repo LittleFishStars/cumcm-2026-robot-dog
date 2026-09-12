@@ -16,7 +16,7 @@ COVER_RADIUS = 1000.0           # 覆盖圆半径 = 有效接收半径下界 / m
 RECEIVE_MAX = 1500.0            # 有效接收半径上界 / m（题目给定 1000~1500）
 RECEIVE_MID = 0.5 * (COVER_RADIUS + RECEIVE_MAX)   # 接收半径中值，用于估源距离 / m
 EXCL_QUAD = 16                  # 圆盘约束的近似精度：正 4×EXCL_QUAD 边形（见 ProbRegion）
-CHANNELS: Tuple[int, ...] = tuple(range(1, 21))      # 20 个频道
+CHANNELS: tuple[int, ...] = tuple(range(1, 21))      # 20 个频道
 COORD_LIMIT = 2.0e6             # 坐标分量绝对值上限 / m（协议规定）
 REGION_MARGIN = 1.0             # 坐标裁剪保留的数值余量 / m
 # 每个频道最多采集的示向度条数。依据题面"同一地点……重复检测不会改变检测误差"：同点复测

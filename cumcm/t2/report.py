@@ -17,7 +17,7 @@ from __future__ import annotations
 import csv
 import json
 from pathlib import Path
-from typing import Any, Dict, Optional, Sequence
+from typing import Any, Sequence
 
 import numpy as np
 
@@ -53,7 +53,7 @@ def save_summary_json(save_dir: Path, result: SolveResult,
     path = Path(save_dir) / name
     path.parent.mkdir(parents=True, exist_ok=True)
     scenario = {k: v for k, v in result.scenario.items() if k != "quad"}
-    payload: Dict[str, Any] = {
+    payload: dict[str, Any] = {
         "problem": "CUMCM 2026 B 问题二：第二检测点的选择",
         "first_site_m": list(result.site),
         "first_bearing_deg": result.theta1,
@@ -85,14 +85,14 @@ def save_summary_json(save_dir: Path, result: SolveResult,
     return path
 
 
-def _theory_json(result: SolveResult) -> Dict[str, Any]:
+def _theory_json(result: SolveResult) -> dict[str, Any]:
     """文献判据层的可序列化子集（探针数组只用于出图，不进 JSON）。"""
     thy = dict(result.theory)
     thy.pop("probe", None)
     return thy
 
 
-def print_report(result: SolveResult, figure: Optional[Path] = None,
+def print_report(result: SolveResult, figure: Path | None = None,
                  files: Sequence[Path] = ()) -> None:
     """控制台报表：结论 + 关键数字 + 校验状态（异常直接标 ⚠）。"""
     c = result.checks
@@ -178,8 +178,8 @@ def print_report(result: SolveResult, figure: Optional[Path] = None,
         print(f"  → {p}")
 
 
-def write_outputs(save_dir: Path, result: SolveResult, figure: Optional[Path] = None,
-                  csv_name: str = cfg.MAP_CSV, json_name: str = cfg.SUMMARY_JSON) -> Dict[str, Path]:
+def write_outputs(save_dir: Path, result: SolveResult, figure: Path | None = None,
+                  csv_name: str = cfg.MAP_CSV, json_name: str = cfg.SUMMARY_JSON) -> dict[str, Path]:
     """一次写全 CSV 与 JSON，返回路径表（出图由调用方决定，便于 --no-plot）。"""
     save_dir = Path(save_dir)
     return {"csv": save_map_csv(save_dir, result, csv_name),

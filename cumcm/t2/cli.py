@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
-from typing import Dict, Optional, Sequence
+from typing import Sequence
 
 from cumcm.t2 import config as cfg
 from cumcm.t2.report import print_report, save_summary_json, write_outputs
@@ -23,6 +23,12 @@ __all__ = ["build_parser", "main"]
 
 
 def build_parser() -> argparse.ArgumentParser:
+    """构造命令行解析器（T2.py 的全部选项，缺省值取自 `cumcm.t2.config`）
+
+    Returns:
+        argparse.ArgumentParser: 已注册 --site/--bearing/--eta/--d-lo/--d-hi/--verify/
+        --save-dir/--no-plot/--no-csv/--quiet 的解析器
+    """
     p = argparse.ArgumentParser(
         prog="T2.py",
         description="CUMCM 2026 B 问题二：第二个检测点的选择与候选区域（最坏情况最小化）")
@@ -47,18 +53,26 @@ def build_parser() -> argparse.ArgumentParser:
     return p
 
 
-def main(argv: Optional[Sequence[str]] = None) -> int:
+def main(argv: Sequence[str] | None = None) -> int:
+    """问题二的命令行主流程：解析参数 → 求解最优第二检测点 → 写结果文件与图
+
+    Args:
+        argv: 命令行参数列表；缺省取 sys.argv[1:]
+
+    Returns:
+        int: 进程退出码（正常结束恒为 0）
+    """
     args = build_parser().parse_args(argv)
     result = solve(site=tuple(args.site), theta1=args.bearing, eta=args.eta, d_lo=args.d_lo,
                    d_hi=args.d_hi, verify_n=args.verify)
 
-    files: Dict[str, Path] = {}
+    files: dict[str, Path] = {}
     if args.no_csv:
         files["json"] = save_summary_json(args.save_dir, result)
     else:
         files = write_outputs(args.save_dir, result)
 
-    figure: Optional[Path] = None
+    figure: Path | None = None
     if not args.no_plot:
         from cumcm.t2.plotting import draw_criteria, draw_suitability
 
@@ -78,5 +92,5 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     return 0
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     raise SystemExit(main())

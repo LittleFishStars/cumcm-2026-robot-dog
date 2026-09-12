@@ -24,7 +24,7 @@ from __future__ import annotations
 
 import math
 import time
-from typing import Optional, Sequence
+from typing import Sequence
 
 import numpy as np
 
@@ -85,7 +85,7 @@ class ActionRecorder:
 
     # ---- 动作与逐步扫描的记录 ----
     def _note(self, kind: str, x: float, y: float, channel: int,
-              outcome: Optional[str] = None, theta: Optional[float] = None) -> None:
+              outcome: str | None = None, theta: float | None = None) -> None:
         """登记一次动作（/measure 或 /clear），供逐局轨迹图与轨迹表使用。
 
         记的是**动作点**（机器狗实际到达的坐标），与日志逐点对应；画图与落盘都在 /exit 之后

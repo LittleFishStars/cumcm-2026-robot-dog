@@ -45,7 +45,7 @@ B = r₂ε/sin γ）；对 (a, b) ∈ {±ε}² 取两两最大距离，即得以
 from __future__ import annotations
 
 import math
-from typing import Any, Dict, Sequence, Tuple
+from typing import Any, Sequence
 
 import numpy as np
 import shapely
@@ -67,10 +67,10 @@ __all__ = ["in_wedge", "quad_diameters", "quad_diameters_batch", "quad_polygon",
            "verify_analytic", "unit"]
 
 # 标量单位向量的小缓存：详见 unit() 的说明
-_UNIT_SCALAR_CACHE: Dict[float, Tuple[float, float]] = {}
+_UNIT_SCALAR_CACHE: dict[float, tuple[float, float]] = {}
 
 
-def _cos_sin_scalar(theta_deg: float) -> Tuple[float, float]:
+def _cos_sin_scalar(theta_deg: float) -> tuple[float, float]:
     """标量方位角 → (cos, sin)，带缓存（选点循环里同一批角度会被反复用到）。"""
     hit = _UNIT_SCALAR_CACHE.get(theta_deg)
     if hit is None:
@@ -82,7 +82,7 @@ def _cos_sin_scalar(theta_deg: float) -> Tuple[float, float]:
     return hit
 
 
-def _cos_sin(theta_deg):
+def _cos_sin(theta_deg: float | np.ndarray) -> tuple[float, float] | tuple[np.ndarray, np.ndarray]:
     """方位角（度）→ (cos, sin)。标量返回一对 float（带缓存），数组返回两个同形数组。
 
     与 `unit` 的唯一区别是不把结果 `stack` 成 `(..., 2)`：热点里的调用方本来就分别要用 cos 与
@@ -95,7 +95,7 @@ def _cos_sin(theta_deg):
     return np.cos(a), np.sin(a)
 
 
-def unit(theta_deg):
+def unit(theta_deg: float | np.ndarray) -> tuple[float, float] | np.ndarray:
     """方位角（度）对应的单位向量；标量返回 (ux, uy) 二元组，数组返回 (..., 2) 数组。
 
     角度约定同 `cumcm.common.geometry.bearing`（x 轴正向为 0、逆时针为正）。
@@ -136,7 +136,8 @@ def _norm2(x: np.ndarray, y: np.ndarray) -> np.ndarray:
 
 
 def _candidate_points_batch(site: Sequence[float], theta1: float, sx: np.ndarray, sy: np.ndarray,
-                            theta2_batch: np.ndarray, err_deg: float):
+                            theta2_batch: np.ndarray,
+                            err_deg: float) -> tuple[np.ndarray, np.ndarray]:
     """**一批**楔形方向下，两楔形之交的候选顶点与各自的"是否同时在两个楔形内"掩码。
 
     交区域的顶点只可能来自两类点：①两条边界射线的交点（4 个组合）；②某个楔形的顶点（检测点
@@ -147,6 +148,10 @@ def _candidate_points_batch(site: Sequence[float], theta1: float, sx: np.ndarray
     `theta2_batch` 形状 `(B, N)`（B 个候选方向、N 个候选点），返回 `P` 形状 `(6, B, N, 2)`
     与 `keep` 形状 `(6, B, N)`。单点情形（`_candidate_points`）就是 B = 1 的特例：两条路径
     共用同一套算式，故"向量化前后逐元素一致"是构造上的保证，而不是巧合。
+
+    Returns:
+        tuple[np.ndarray, np.ndarray]: 候选顶点 `P`（形状 `(6, B, N, 2)`）与"该点同时落在两个
+        楔形内"的掩码 `keep`（形状 `(6, B, N)`）
     """
     x1, y1 = float(site[0]), float(site[1])
     sx = np.asarray(sx, dtype=float)
@@ -175,7 +180,7 @@ def _candidate_points_batch(site: Sequence[float], theta1: float, sx: np.ndarray
 
 
 def _candidate_points(site: Sequence[float], theta1: float, sx: np.ndarray, sy: np.ndarray,
-                      theta2: np.ndarray, err_deg: float):
+                      theta2: np.ndarray, err_deg: float) -> tuple[np.ndarray, np.ndarray]:
     """单点情形的候选顶点（`_candidate_points_batch` 的 B = 1 特例）。"""
     P, keep = _candidate_points_batch(site, theta1, sx, sy,
                                       np.asarray(theta2, dtype=float)[None, :], err_deg)
@@ -338,7 +343,7 @@ def worst_diameters_all(site: Sequence[float], theta1: float, s2: Sequence[float
 
 def worst_case_scenario(site: Sequence[float], theta1: float, s2: Sequence[float],
                         sources: np.ndarray, deltas2: Sequence[float],
-                        err_deg: float = BEARING_ERROR_DEG) -> Dict[str, Any]:
+                        err_deg: float = BEARING_ERROR_DEG) -> dict[str, Any]:
     """单点 S2 的最坏情形：返回最大直径及其对应的源位置、第二次测向误差与定位区域多边形。
 
     供论文插图与结果说明使用（"最坏的那一次"到底长什么样）。实现上先把全部 (源, δ₂) 组合
@@ -354,7 +359,7 @@ def worst_case_scenario(site: Sequence[float], theta1: float, s2: Sequence[float
     w2 = np.degrees(np.arctan2(gy - float(s2[1]), gx - float(s2[0]))) % 360.0
     theta2 = w2 + np.tile(deltas2, src.shape[0])
     poly = quad_polygon(site, theta1, s2, float(theta2[k]), err_deg)
-    best: Dict[str, Any] = {
+    best: dict[str, Any] = {
         "diameter": float(diams[k]), "source": (float(gx[k]), float(gy[k])),
         "delta2_deg": float(theta2[k] - w2[k]), "theta2_deg": float(theta2[k]),
         "bearing_nominal_deg": float(w2[k]),
@@ -377,7 +382,7 @@ def worst_case_scenario(site: Sequence[float], theta1: float, s2: Sequence[float
 
 def verify_analytic(n: int = 200, seed: int = 2026, err_deg: float = BEARING_ERROR_DEG,
                     radius: float = REGION_RADIUS, sin_gamma_min: float = 0.02,
-                    gamma_ok_deg: Tuple[float, float] = (30.0, 120.0)) -> Dict[str, Any]:
+                    gamma_ok_deg: tuple[float, float] = (30.0, 120.0)) -> dict[str, Any]:
     """随机抽样核对两层实现与 shapely 精确值，返回可直接写进报告的校验数字。
 
     抽样分三类：
@@ -482,5 +487,5 @@ def _selfcheck(n: int = 400) -> None:
     print(f"  （对照）只测一次的定位区域直径 = {region.diameter:.0f} m")
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     _selfcheck()

@@ -18,7 +18,7 @@ import os
 import re
 import tempfile
 from pathlib import Path
-from typing import Any, Optional, Sequence
+from typing import Any, Sequence
 
 __all__ = ["setup_mpl_env", "font_context", "save_png", "slug", "hint_plot_once",
            "TRAJ_FONTS",
@@ -51,7 +51,7 @@ def setup_mpl_env() -> None:
                           os.path.join(tempfile.gettempdir(), "cumcm-mplconfig"))
 
 
-def font_context(size: Optional[float] = None, fonts: Optional[Sequence[str]] = None):
+def font_context(size: float | None = None, fonts: Sequence[str] | None = None) -> Any:
     """返回一个 rc_context，用于统一中文字体、坐标轴负号与（可选）字号。
 
         with font_context(size=10):

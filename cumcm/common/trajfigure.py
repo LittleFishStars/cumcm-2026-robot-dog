@@ -22,7 +22,7 @@ from __future__ import annotations
 import csv
 import math
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Callable, Sequence
 
 import numpy as np
 
@@ -37,22 +37,22 @@ MEASURE_LABELS_T3 = ("测得示向度", "无信号", "近距 near")
 MEASURE_LABELS_T4 = ("测向有示向度", "测向无信号", "近距")
 
 # 测量结果 → 点型。两题共用同一套：测得示向度 / 无信号 / 近距，颜色也来自公共配色表
-_MEASURE_STYLES: Tuple[Tuple[str, Dict[str, Any]], ...] = (
+_MEASURE_STYLES: tuple[tuple[str, dict[str, Any]], ...] = (
     ("direction", dict(marker=".", ms=5, ls="none", color=C_DIR)),
     ("no_signal", dict(marker="x", ms=3.5, ls="none", color=C_NOSIG)),
     ("near", dict(marker="o", ms=6, ls="none", mfc="none", mec=C_NEAR, mew=1.4)),
 )
-_TRY_STYLE: Dict[str, Any] = dict(marker="^", ms=5.5, ls="none", mfc="none", mec=C_TRY, mew=1.2)
-_HIT_STYLE: Dict[str, Any] = dict(marker="*", ms=11, ls="none", color=C_HIT)
+_TRY_STYLE: dict[str, Any] = dict(marker="^", ms=5.5, ls="none", mfc="none", mec=C_TRY, mew=1.2)
+_HIT_STYLE: dict[str, Any] = dict(marker="*", ms=11, ls="none", color=C_HIT)
 
 
-def truth_points(truth: Optional[Sequence[dict]]) -> List[Dict[str, Any]]:
+def truth_points(truth: Sequence[dict] | None) -> list[dict[str, Any]]:
     """把引擎的源真值统一成 `{channel, x, y, kind, direction_deg}`，供绘图使用。
 
     两种输入格式都要吃：引擎原始格式 `{"position": {"x": .., "y": ..}}`（演练模式）
     与核对行格式 `{"x": .., "y": ..}`。`direction_deg` 为空即全向源（问题三恒为空）。
     """
-    out: List[Dict[str, Any]] = []
+    out: list[dict[str, Any]] = []
     for j in truth or []:
         if "position" in j:                       # 引擎原始格式
             pos = j["position"]
@@ -67,7 +67,7 @@ def truth_points(truth: Optional[Sequence[dict]]) -> List[Dict[str, Any]]:
     return out
 
 
-def plot_action_points(ax: Any, actions: Sequence[Dict[str, Any]], handles: List[Any],
+def plot_action_points(ax: Any, actions: Sequence[dict[str, Any]], handles: list[Any],
                        measure_labels: Sequence[str] = MEASURE_LABELS_T3) -> None:
     """画本局的动作点（测向按结果分类、清除尝试与成功）并把对应图例项追加到 handles。
 
@@ -98,7 +98,7 @@ def plot_action_points(ax: Any, actions: Sequence[Dict[str, Any]], handles: List
         handles.append(Line2D([], [], label=f"清除成功（{len(ok)} 个）", **_HIT_STYLE))
 
 
-def plot_source_markers(ax: Any, sources: Sequence[Dict[str, Any]],
+def plot_source_markers(ax: Any, sources: Sequence[dict[str, Any]],
                         cos_th: np.ndarray, sin_th: np.ndarray,
                         clear_radius: float, ray_len: float = 0.0) -> None:
     """画真值源的红叉（定向源另画一条 ray_len 长的波束方向短射线）与清除半径小圆。
@@ -119,7 +119,7 @@ def plot_source_markers(ax: Any, sources: Sequence[Dict[str, Any]],
             color=C_SRC, lw=0.7, alpha=0.75, zorder=1.5)
 
 
-def write_trajectory_csv(csv_path: Path, actions: Sequence[Dict[str, Any]]) -> Path:
+def write_trajectory_csv(csv_path: Path, actions: Sequence[dict[str, Any]]) -> Path:
     """写出轨迹表（列与精度两题一致，逐点可与过程日志对账）。"""
     with Path(csv_path).open("w", newline="", encoding="utf-8") as f:
         w = csv.writer(f)
@@ -133,8 +133,8 @@ def write_trajectory_csv(csv_path: Path, actions: Sequence[Dict[str, Any]]) -> P
     return Path(csv_path)
 
 
-def save_trajectory(save_dir: Path, name: str, actions: Sequence[Dict[str, Any]],
-                    draw_png: Callable[[Path], Path], traj_dir: str) -> List[Path]:
+def save_trajectory(save_dir: Path, name: str, actions: Sequence[dict[str, Any]],
+                    draw_png: Callable[[Path], Path], traj_dir: str) -> list[Path]:
     """落盘一局的轨迹：同名 CSV（轨迹表）+ PNG（图），返回已写出的文件列表。
 
     `draw_png` 由各题传入（各题的图内元素不同，见模块文档）：传"目标 PNG 路径 → 落盘路径"的

@@ -30,7 +30,7 @@ import itertools
 import math
 from dataclasses import dataclass, field, replace
 from functools import lru_cache
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Sequence
 
 import numpy as np
 
@@ -59,11 +59,12 @@ class CoverPlan:
     cover_radius: float             # 覆盖圆半径（= 有效接收半径下界）/ m
     ring_radius: float              # 六边形环上圆心到原点的距离 d / m（仅六边形族用）
     rotation: float = 0.0           # 布局整体绕原点的旋转角 / rad
-    layout: Optional[Tuple[Tuple[float, float], ...]] = None
+    layout: tuple[tuple[float, float], ...] | None = None
     #   ^ 显式给定的圆心（一般布局）。为 None 时按"1 中心 + 6 环"的六边形族由 ring_radius 生成
     waypoints: np.ndarray = field(init=False, repr=False)
 
     def __post_init__(self) -> None:
+        """按 layout 或 ring_radius 算出各覆盖圆的圆心并写入冻结字段 waypoints"""
         if self.layout is None:
             wp = hex_layout(self.ring_radius, self.rotation)
         else:
@@ -82,7 +83,8 @@ class CoverPlan:
         return replace(self, rotation=float(rotation))
 
     @property
-    def centers(self) -> List[Tuple[float, float]]:
+    def centers(self) -> list[tuple[float, float]]:
+        """各覆盖圆的圆心坐标列表（巡视路点，顺序与 waypoints 一致）"""
         return [(float(x), float(y)) for x, y in self.waypoints]
 
 
@@ -105,7 +107,7 @@ def optimal_ring_radius(region_radius: float = REGION_RADIUS) -> float:
 
 
 def feasible_ring_interval(region_radius: float = REGION_RADIUS,
-                           cover_radius: float = COVER_RADIUS) -> Tuple[float, float]:
+                           cover_radius: float = COVER_RADIUS) -> tuple[float, float]:
     """满足覆盖保证 D(d) ≤ r 的环半径区间 [d_min, d_max]（解析）。
 
     两个约束各给一段区间，取交集：
@@ -128,13 +130,14 @@ def analytic_worst(ring_radius: float, region_radius: float = REGION_RADIUS) -> 
     到最近环心的距离。两项在 d* = √3·R/2 处同时等于 R/2，即最优点的最坏距离。
     """
     def g(rho: float) -> float:
+        """半径 rho 的圆域边界点、与最近环心夹角 30° 时到该环心的距离（解析的边界项 g₂）"""
         return math.sqrt(max(rho * rho + ring_radius * ring_radius
                              - math.sqrt(3.0) * rho * ring_radius, 0.0))
     return max(ring_radius / math.sqrt(3.0), g(region_radius))
 
 
 def min_circle_count(region_radius: float = REGION_RADIUS,
-                     cover_radius: float = COVER_RADIUS) -> Dict[str, Any]:
+                     cover_radius: float = COVER_RADIUS) -> dict[str, Any]:
     """覆盖半径 R 的圆域最少需要几个半径 r 的圆盘（本题 r/R = 5/9 = 0.5555556）。
 
     这是经典的 **disk covering problem**（用若干等半径圆盘覆盖一个圆）。k = 5、6 的最优值
@@ -185,7 +188,7 @@ def min_circle_count(region_radius: float = REGION_RADIUS,
 
 
 SECTOR_HALF_DEG = 30.0          # 扇区半宽 / 度（正六边形相邻环心隔 60°，各管一半）
-def _sector_score(bearings_rad: np.ndarray, phi: float) -> Tuple[int, float]:
+def _sector_score(bearings_rad: np.ndarray, phi: float) -> tuple[int, float]:
     """以 phi 为扇区中心的评分：(装入的源个数, 这些源的 ΣcosΔθ)。
 
     个数是主指标（"哪一片源最多"），ΣcosΔθ 只在个数相同时破平（片内的源越居中越好）。
@@ -197,7 +200,7 @@ def _sector_score(bearings_rad: np.ndarray, phi: float) -> Tuple[int, float]:
 
 
 def dense_sector_rotation(bearings: Sequence[float],
-                          step_deg: float = 1.0) -> Optional[float]:
+                          step_deg: float = 1.0) -> float | None:
     """选一个旋转角，使某个环心正对"听到的源最多"的 60° 扇区。
 
     6 个环心彼此相隔 60°，故"环心能对准哪些方向"只由旋转角模 60° 决定。于是把圆周切成 360/60
@@ -356,10 +359,10 @@ def cover_counts(points: np.ndarray, waypoints: np.ndarray, radius: float,
     return out
 
 
-def nearest_order(waypoints: np.ndarray, start: Sequence[float] = (0.0, 0.0)) -> List[int]:
+def nearest_order(waypoints: np.ndarray, start: Sequence[float] = (0.0, 0.0)) -> list[int]:
     """确定性最近邻访问顺序（并列时取编号小者）：从 start 出发依次走遍所有圆心。"""
     rest = list(range(len(waypoints)))
-    order: List[int] = []
+    order: list[int] = []
     cur = np.asarray(start, dtype=float)
     while rest:
         k = min(rest, key=lambda j: (float(np.linalg.norm(waypoints[j] - cur)), j))
@@ -385,21 +388,21 @@ class CoverSolveResult:
 
     plan: CoverPlan
     worst_distance: float               # 实算最坏最近距离 / m（网格 + 边界 + 解析候选点）
-    worst_point: Tuple[float, float]    # 实算最坏点位置
+    worst_point: tuple[float, float]    # 实算最坏点位置
     analytic_worst: float               # 解析最坏最近距离 / m
     coverage_ratio: float               # 被覆盖的采样点比例（1.0 表示全覆盖）
-    multiplicity: Dict[int, int]        # 覆盖重数 → 采样点数
+    multiplicity: dict[int, int]        # 覆盖重数 → 采样点数
     single_ratio: float                 # 单重覆盖（只有 1 条射线可用）的占比
     multi_ratio: float                  # 二重及以上覆盖的占比
     mean_multiplicity: float            # 圆域内平均覆盖重数（重复率 = 平均值 - 1）
-    survey_order: List[int]             # 巡视顺序（圆心编号）
+    survey_order: list[int]             # 巡视顺序（圆心编号）
     survey_length: float                # 巡视总里程 / m
-    feasible_interval: Tuple[float, float]   # 满足覆盖保证的环半径可行区间 / m
-    tradeoff: List[Dict[str, float]]    # 环半径权衡：d、最坏距离、余量、里程、时间
-    lattice: Dict[str, float]           # 参考文献紧贴六边形栅格（间距 √3·r）对照
+    feasible_interval: tuple[float, float]   # 满足覆盖保证的环半径可行区间 / m
+    tradeoff: list[dict[str, float]]    # 环半径权衡：d、最坏距离、余量、里程、时间
+    lattice: dict[str, float]           # 参考文献紧贴六边形栅格（间距 √3·r）对照
     six_circle_worst: float             # 6 圆方案的实算最坏距离（不可行对照）/ m
     six_circle_radius: float            # 6 圆方案的最优环半径 / m（仅六边形环这一族）
-    min_circles: Dict[str, Any]         # 最少圆数的判定依据（经典 disk covering problem）
+    min_circles: dict[str, Any]         # 最少圆数的判定依据（经典 disk covering problem）
     use_uniform: bool = False           # True=正七边形均匀布局（半径 1000 m 圆上均匀分布）
 
     @property
@@ -407,7 +410,12 @@ class CoverSolveResult:
         """最坏最近距离相对覆盖半径（1000 m）的余量 / m。"""
         return COVER_RADIUS - self.worst_distance
 
-    def to_json(self) -> Dict[str, Any]:
+    def to_json(self) -> dict[str, Any]:
+        """把方案与校验结果导出成 JSON 可序列化的字典（落盘 t3_cover_plan.json 用）
+
+        Returns:
+            dict[str, Any]: 圆心坐标、最坏距离、覆盖重数、可行区间、权衡表与文献对照等字段
+        """
         plan = self.plan
         is_hex = plan.layout is None
         return {
@@ -454,7 +462,7 @@ class CoverSolveResult:
 
 
 def _six_circle_best(step: float = COARSE_STEP,
-                     n_boundary: int = COARSE_BOUNDARY) -> Tuple[float, float]:
+                     n_boundary: int = COARSE_BOUNDARY) -> tuple[float, float]:
     """6 个覆盖圆的**族内**对照，不是全局最优：只允许「1 中心 + 6 环上圆」这一个受限族，
     故得到的只是"这一族里最好能到多少"，不能用来证明 6 个不行。
 
@@ -475,13 +483,13 @@ def _six_circle_best(step: float = COARSE_STEP,
 
 
 def layout_metrics(ring_radius: float, pts: np.ndarray,
-                   compute_multiplicity: bool = True) -> Dict[str, Any]:
+                   compute_multiplicity: bool = True) -> dict[str, Any]:
     """给定环半径，报出该布局的最坏最近距离、余量、覆盖重数与巡视里程。"""
     wp = hex_layout(float(ring_radius))
     near = nearest_distances(pts, wp)
     order = nearest_order(wp)
     length = path_length(wp, order)
-    row: Dict[str, Any] = {
+    row: dict[str, Any] = {
         "ring_radius_m": round(float(ring_radius), 3),
         "computed_worst_m": round(float(near.max()), 3),
         "analytic_worst_m": round(analytic_worst(float(ring_radius)), 3),
@@ -496,7 +504,7 @@ def layout_metrics(ring_radius: float, pts: np.ndarray,
     return row
 
 
-def tradeoff_table(interval: Tuple[float, float], pts: np.ndarray) -> List[Dict[str, Any]]:
+def tradeoff_table(interval: tuple[float, float], pts: np.ndarray) -> list[dict[str, Any]]:
     """可行区间内取若干代表环半径，给出"余量 vs 里程"的权衡表。"""
     lo, hi = interval
     radii = [lo, 1200.0, 1300.0, 1400.0, optimal_ring_radius(), 1700.0, hi]
@@ -504,7 +512,7 @@ def tradeoff_table(interval: Tuple[float, float], pts: np.ndarray) -> List[Dict[
     return [layout_metrics(r, pts) for r in sorted(set(round(r, 3) for r in radii))]
 
 
-def solve_covering_circles(ring_radius: Optional[float] = None,
+def solve_covering_circles(ring_radius: float | None = None,
                           use_hex: bool = False,
                           use_uniform: bool = False) -> CoverSolveResult:
     """求解 1000 m 覆盖圆的位置，并做实算校验、可行区间与权衡分析、文献方法对照。
@@ -809,5 +817,5 @@ def _selftest() -> int:
     return 0 if ok else 1
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     raise SystemExit(_selftest())

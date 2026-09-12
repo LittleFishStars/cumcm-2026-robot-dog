@@ -26,7 +26,7 @@ import math
 import shutil
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Sequence
 
 import numpy as np
 
@@ -40,7 +40,7 @@ __all__ = ["ScanStep", "scan_step_of", "scan_figure_path", "draw_scan_step",
 STEP_DIR_NAME = "scan"          # 扫描图落在 <save-dir>/scan/ 下（与 trajectory/ 并列）
 
 # 画图的几何参数由调用方从各自 config 传入，本模块不绑定任何一族的常量
-Point = Tuple[float, float]
+Point = tuple[float, float]
 
 
 @dataclass
@@ -57,15 +57,15 @@ class ScanStep:
     x: float
     y: float
     n_channels: int
-    counts: Dict[str, int] = field(default_factory=dict)
+    counts: dict[str, int] = field(default_factory=dict)
     virtual_time_s: float = 0.0
     travel_m: float = 0.0
-    measures: List[Dict[str, Any]] = field(default_factory=list)
-    clears: List[Dict[str, Any]] = field(default_factory=list)
-    path: List[Point] = field(default_factory=list)
-    cleared: List[int] = field(default_factory=list)
-    regions: Optional[Dict[int, Sequence[Point]]] = None      # 频道 → 多边形的外环顶点
-    estimates: Optional[Dict[int, Tuple[float, float, float]]] = None   # 频道 → (x, y, σ)
+    measures: list[dict[str, Any]] = field(default_factory=list)
+    clears: list[dict[str, Any]] = field(default_factory=list)
+    path: list[Point] = field(default_factory=list)
+    cleared: list[int] = field(default_factory=list)
+    regions: dict[int, Sequence[Point]] | None = None      # 频道 → 多边形的外环顶点
+    estimates: dict[int, tuple[float, float, float]] | None = None   # 频道 → (x, y, σ)
 
     def summary(self) -> str:
         """一行摘要（图内副标题与终端输出共用，保证图上文字与日志口径一致）。"""
@@ -85,7 +85,7 @@ class ScanStep:
         return "，".join(parts)
 
 
-def scan_step_of(raw: Dict[str, Any], k: int) -> ScanStep:
+def scan_step_of(raw: dict[str, Any], k: int) -> ScanStep:
     """由机器狗登记的一步扫描记录（dict）构造 `ScanStep`。
 
     键名契约见 `cumcm.common.actions.ActionRecorder._begin_scan_step` / 各题 `_end_scan_step`；
@@ -107,7 +107,7 @@ def scan_step_of(raw: Dict[str, Any], k: int) -> ScanStep:
     )
 
 
-def scan_figure_path(out_dir: Path, name: str, k: int, raw: Dict[str, Any]) -> Path:
+def scan_figure_path(out_dir: Path, name: str, k: int, raw: dict[str, Any]) -> Path:
     """一步扫描图的路径：`<局号>_s<步序>_<标签>.png`，排序后与执行顺序一致。
 
     标签经 `slug` 压成安全文件名片段，避免标签里的空格/括号在不同文件系统上出问题。
@@ -133,13 +133,13 @@ def draw_scan_step(out_path: Path, step: ScanStep, *,
                    visited: Sequence[int] = (),
                    cover_radius: float = 1000.0,
                    region_radius: float = 1800.0,
-                   gen_radius: Optional[float] = None,
+                   gen_radius: float | None = None,
                    ray_len: float = 1500.0,
-                   sources: Sequence[Dict[str, Any]] = (),
+                   sources: Sequence[dict[str, Any]] = (),
                    clear_radius: float = 20.0,
-                   title: Optional[str] = None,
-                   fonts: Optional[Sequence[str]] = None,
-                   figsize: Tuple[float, float] = (9.2, 7.8)) -> Path:
+                   title: str | None = None,
+                   fonts: Sequence[str] | None = None,
+                   figsize: tuple[float, float] = (9.2, 7.8)) -> Path:
     """画一步扫描的结果图并存盘（格式由后缀决定，.png / .pdf）。
 
     - `step`：本步记录（见 `ScanStep`）；
@@ -167,7 +167,7 @@ def draw_scan_step(out_path: Path, step: ScanStep, *,
         th = np.linspace(0.0, 2.0 * math.pi, 361)
         cos_th, sin_th = np.cos(th), np.sin(th)
 
-        handles: List[Any] = []
+        handles: list[Any] = []
         _draw_frame(ax, handles, cos_th, sin_th, region_radius, gen_radius)
         _draw_cover_circles(ax, handles, step, cos_th, sin_th, cover_centers, visit_order,
                             visited, cover_radius)
@@ -200,8 +200,8 @@ def draw_scan_step(out_path: Path, step: ScanStep, *,
 # ---------------------------------------------------------------------------
 # 各元素的分块画法（顺序即叠放顺序，与图例顺序一致）
 # ---------------------------------------------------------------------------
-def _draw_frame(ax, handles, cos_th, sin_th, region_radius: float,
-                gen_radius: Optional[float]) -> None:
+def _draw_frame(ax: "Axes", handles: list[Any], cos_th: np.ndarray, sin_th: np.ndarray,
+                region_radius: float, gen_radius: float | None) -> None:
     """作业圆域与源生成域（后者虚线，仅在给定 gen_radius 时画）。"""
     from matplotlib.lines import Line2D
 
@@ -215,9 +215,10 @@ def _draw_frame(ax, handles, cos_th, sin_th, region_radius: float,
                               label=f"源生成域 {gen_radius:.0f} m"))
 
 
-def _draw_cover_circles(ax, handles, step: ScanStep, cos_th, sin_th,
-                        cover_centers: Sequence[Point], visit_order: Sequence[int],
-                        visited: Sequence[int], cover_radius: float) -> None:
+def _draw_cover_circles(ax: "Axes", handles: list[Any], step: ScanStep, cos_th: np.ndarray,
+                        sin_th: np.ndarray, cover_centers: Sequence[Point],
+                        visit_order: Sequence[int], visited: Sequence[int],
+                        cover_radius: float) -> None:
     """覆盖圆与圆心：本步所在的站用粗线强调，已访问的圆心填实，圆心标注访问序号。"""
     from matplotlib.lines import Line2D
 
@@ -249,7 +250,7 @@ def _draw_cover_circles(ax, handles, step: ScanStep, cos_th, sin_th,
                           mec=C_COVER, alpha=0.75, label="已访问的圆心"))
 
 
-def _draw_path(ax, handles, step: ScanStep) -> None:
+def _draw_path(ax: "Axes", handles: list[Any], step: ScanStep) -> None:
     """到本步为止的行驶路径。"""
     from matplotlib.lines import Line2D
 
@@ -261,7 +262,7 @@ def _draw_path(ax, handles, step: ScanStep) -> None:
                           label=f"到本步的行驶路径（累计 {step.travel_m:.0f} m）"))
 
 
-def _draw_measures(ax, handles, step: ScanStep, ray_len: float) -> None:
+def _draw_measures(ax: "Axes", handles: list[Any], step: ScanStep, ray_len: float) -> None:
     """本步的测向点（按结果分类）与示向度射线。"""
     from matplotlib.lines import Line2D
 
@@ -291,7 +292,7 @@ def _draw_measures(ax, handles, step: ScanStep, ray_len: float) -> None:
                           label=f"示向度射线（长 {ray_len:.0f} m，{len(rays)} 条）"))
 
 
-def _draw_local_clears(ax, handles, step: ScanStep) -> None:
+def _draw_local_clears(ax: "Axes", handles: list[Any], step: ScanStep) -> None:
     """本步就地清除（近距命中）与未中次数。"""
     from matplotlib.lines import Line2D
 
@@ -313,7 +314,7 @@ def _draw_local_clears(ax, handles, step: ScanStep) -> None:
                               mec=C_TRY, mew=1.3, label=f"清除未中（{bad} 次）"))
 
 
-def _draw_regions(ax, handles, step: ScanStep) -> None:
+def _draw_regions(ax: "Axes", handles: list[Any], step: ScanStep) -> None:
     """本步结束时的可能源区域轮廓。
 
     按用户要求（2026-09-12）去掉"定位估计 1σ 圆 / 中心十字"（橙黄小圈与射线混在一起杂乱），
@@ -339,8 +340,8 @@ def _draw_regions(ax, handles, step: ScanStep) -> None:
                           label=f"可能源区域（{len(widths)} 个频道，中位宽 {med:.0f} m）"))
 
 
-def _draw_sources(ax, handles, sources: Sequence[Dict[str, Any]], cos_th, sin_th,
-                  clear_radius: float) -> None:
+def _draw_sources(ax: "Axes", handles: list[Any], sources: Sequence[dict[str, Any]],
+                  cos_th: np.ndarray, sin_th: np.ndarray, clear_radius: float) -> None:
     """干扰源真值（仅演练模式有）与清除半径小圆。"""
     from matplotlib.lines import Line2D
 

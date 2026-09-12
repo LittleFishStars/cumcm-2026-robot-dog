@@ -18,12 +18,13 @@
 from __future__ import annotations
 
 import math
-from typing import List, NamedTuple, Sequence, Tuple
+from typing import NamedTuple, Sequence
 
 import numpy as np
 
 from cumcm.common.geometry import bearing, dist
-from cumcm.t3.config import (HYP_GAP, HYP_MAX, PROBE_ANGLES, PROBE_GAP, PROBE_RADII, PROBE_TRY, REGION_MARGIN, REGION_RADIUS, SIGMA_DEG, SIGMA_RAD, SINGLE_HYP)
+from cumcm.t3.config import (HYP_GAP, HYP_MAX, PROBE_ANGLES, PROBE_GAP, PROBE_RADII, PROBE_TRY,
+                             REGION_MARGIN, REGION_RADIUS, SIGMA_DEG, SIGMA_RAD, SINGLE_HYP)
 from cumcm.t3.regions import Obs
 
 
@@ -53,14 +54,22 @@ def fisher_sigma(p: Sequence[float], bearings: Sequence[Sequence[float]]) -> flo
     return math.sqrt((J[0, 0] + J[1, 1]) / det)     # tr(J⁻¹) = (J₁₁ + J₀₀)/det
 
 
-def hypothesis_points(region, obs_list: Sequence[Obs]) -> List[Tuple[float, float]]:
-    """补测选点用的"假设源位置"集合。
+def hypothesis_points(region: "ProbRegion",
+                      obs_list: Sequence[Obs]) -> list[tuple[float, float]]:
+    """补测选点用的"假设源位置"集合
 
     区域已知时统一取"最小覆盖圆圆心 + 最远点采样出的若干顶点"（单条射线也适用：叠加 no_signal
     禁区与接收半径环带后，区域不再是无限长的一条带，而是有限的一段）；区域退化时（尚无禁区
     约束）才退回"沿那条射线按可能距离枚举"。
+
+    Args:
+        region: 该频道当前的定位区域（可能源集合）
+        obs_list: 该频道已有的示向度观测
+
+    Returns:
+        list[tuple[float, float]]: 假设源位置列表（区域已知时为最小覆盖圆圆心与最远点采样顶点）
     """
-    pts: List[Tuple[float, float]] = []
+    pts: list[tuple[float, float]] = []
     mec = region.enclosing_circle
     verts = list(region.vertices)
     if verts:
@@ -80,7 +89,7 @@ def hypothesis_points(region, obs_list: Sequence[Obs]) -> List[Tuple[float, floa
             if math.hypot(hx, hy) <= REGION_RADIUS:
                 pts.append((hx, hy))
     # 与已有检测点太近的假设点无法估计距离（r → 0），剔除；并去重
-    keep: List[Tuple[float, float]] = []
+    keep: list[tuple[float, float]] = []
     for h in pts:
         if any(dist(h, (o.x, o.y)) < HYP_GAP for o in obs_list):
             continue
@@ -100,7 +109,7 @@ class Probe(NamedTuple):
 
 
 def probe_candidates(obs_list: Sequence[Obs], hyps: Sequence[Sequence[float]],
-                     pos: Sequence[float]) -> List[Probe]:
+                     pos: Sequence[float]) -> list[Probe]:
     """按文献准则给补测点排序：最小化"对全部假设源位置的平均预测 σ"。
 
     候选点 = 每个假设源位置周围若干半径（PROBE_RADII，均 < 1000 m，保证落在源的有效接收
@@ -118,7 +127,7 @@ def probe_candidates(obs_list: Sequence[Obs], hyps: Sequence[Sequence[float]],
     其中取里程最短者（省时间），里程并列时取坐标字典序最小者。返回前 PROBE_TRY 个候选。
     """
     base = [(o.x, o.y, o.theta) for o in obs_list]      # 已有观测的（检测点, 示向度）
-    cands: List[Probe] = []
+    cands: list[Probe] = []
     seen = set()
     for hx, hy in hyps:
         for rho in PROBE_RADII:

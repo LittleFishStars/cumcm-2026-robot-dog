@@ -19,7 +19,7 @@
 
 from __future__ import annotations
 
-from typing import List, Sequence
+from typing import Sequence
 
 import numpy as np
 
@@ -48,7 +48,7 @@ def path_len_vec(orders: np.ndarray, D: np.ndarray) -> np.ndarray:
     return D[0, orders[:, 0]] + D[1 + orders[:, :-1], orders[:, 1:]].sum(axis=1)
 
 
-def nearest_order_from_D(n: int, D: np.ndarray) -> List[int]:
+def nearest_order_from_D(n: int, D: np.ndarray) -> list[int]:
     """最近邻构造初始个体（第 0 行代表起点）；并列时取编号小者。"""
     remaining, cur, order = list(range(n)), 0, []
     while remaining:
@@ -59,11 +59,11 @@ def nearest_order_from_D(n: int, D: np.ndarray) -> List[int]:
     return order
 
 
-def nearest_order(waypoints: np.ndarray, start: Sequence[float] = (0.0, 0.0)) -> List[int]:
+def nearest_order(waypoints: np.ndarray, start: Sequence[float] = (0.0, 0.0)) -> list[int]:
     """确定性最近邻访问顺序（并列时取编号小者）：从 start 出发依次走遍所有点。"""
     pts = np.asarray(waypoints, dtype=float)
     rest = list(range(len(pts)))
-    order: List[int] = []
+    order: list[int] = []
     cur = np.asarray(start, dtype=float)
     while rest:
         k = min(rest, key=lambda j: (float(np.linalg.norm(pts[j] - cur)), j))
@@ -84,11 +84,12 @@ def open_path_length(waypoints: np.ndarray, order: Sequence[int],
     return total
 
 
-def two_opt_first(order: Sequence[int], D: np.ndarray) -> List[int]:
+def two_opt_first(order: Sequence[int], D: np.ndarray) -> list[int]:
     """2-opt 精修（第一改进）：发现改进即翻转该段并 break，然后从头重扫。"""
     order = [int(v) for v in order]
 
     def d(a: int, b: int) -> float:
+        """D 上从 a 到 b 的距离 / m（a < 0 表示起点）"""
         return float(D[0, b] if a < 0 else D[1 + a, b])       # a < 0 表示起点
 
     improved = True
@@ -109,7 +110,7 @@ def two_opt_first(order: Sequence[int], D: np.ndarray) -> List[int]:
     return order
 
 
-def two_opt_greedy(order: Sequence[int], D: np.ndarray) -> List[int]:
+def two_opt_greedy(order: Sequence[int], D: np.ndarray) -> list[int]:
     """2-opt 精修（贪心就地替换）：扫描中一旦发现更短就替换当前解并继续往后扫。
 
     与 `two_opt_first` 的差别只在"发现改进后是 break 重扫还是继续往后扫"，但两者停在不同
@@ -118,9 +119,11 @@ def two_opt_greedy(order: Sequence[int], D: np.ndarray) -> List[int]:
     order = [int(v) for v in order]
 
     def d(a: int, b: int) -> float:
+        """D 上从 a 到 b 的距离 / m（a < 0 表示起点）"""
         return float(D[0, b] if a < 0 else D[1 + a, b])
 
     def length(seq: Sequence[int]) -> float:
+        """整条顺序的路径长度 / m：首点从起点起算，终点自由"""
         total, prev = 0.0, -1
         for c in seq:
             total += d(prev, c)
@@ -140,12 +143,19 @@ def two_opt_greedy(order: Sequence[int], D: np.ndarray) -> List[int]:
     return best
 
 
-def _held_karp(n: int, D: np.ndarray):
+def _held_karp(n: int, D: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     """Held-Karp 动态规划，返回 (dp, prev)。
 
     dp[mask, j] = 从起点出发、访问 mask 中的点、最后停在 j 的最短长度；
     prev[mask, j] = 对应路径上 j 的前一个点（-1 表示起点）。
     mask 的转移按 j 的候选集向量化，故 n=16（65536 个掩码、1.7e7 次松弛）也能秒级完成。
+
+    Args:
+        n: 待访问点个数
+        D: 距离矩阵，形状 (n+1, n)，第 0 行代表起点
+
+    Returns:
+        tuple[np.ndarray, np.ndarray]: (dp, prev) 两张 (2**n, n) 的表
     """
     INF = float("inf")
     full = 1 << n
@@ -173,7 +183,7 @@ def _held_karp(n: int, D: np.ndarray):
     return dp, prev
 
 
-def _hk_path(prev: np.ndarray, n: int, last: int) -> List[int]:
+def _hk_path(prev: np.ndarray, n: int, last: int) -> list[int]:
     """从 prev 表回溯出路径（不含起点）。"""
     order, mask, j = [], (1 << n) - 1, int(last)
     while j >= 0:
@@ -185,7 +195,7 @@ def _hk_path(prev: np.ndarray, n: int, last: int) -> List[int]:
     return order
 
 
-def exact_open_order(n: int, D: np.ndarray, limit: int = 16) -> List[int]:
+def exact_open_order(n: int, D: np.ndarray, limit: int = 16) -> list[int]:
     """从起点出发访问全部 n 个点、终点任意的**精确**最短开放路径（Held-Karp）。
 
     返回被访问点的编号序列（与 nearest_order / path_len 的约定一致，**不含**起点占位符）。
@@ -205,13 +215,21 @@ def exact_open_order(n: int, D: np.ndarray, limit: int = 16) -> List[int]:
     return _hk_path(prev, n, last)
 
 
-def exact_open_by_end(n: int, D: np.ndarray, limit: int = 16):
+def exact_open_by_end(n: int, D: np.ndarray, limit: int = 16) -> list[tuple[int, float, list[int]]]:
     """返回 (终点, 长度, 顺序) 列表：对每个可能的终点给出从起点出发的最短开放路径。
 
     用于"终点本身也是决策变量"的场合 —— 例如巡视路线既要短，又希望终点落在一片指定区域
     附近（终点决定后续行程的起点）。n > limit 时退化为最近邻 + 2-opt（只给一个终点）。
 
     确定性：最优值并列时按 (长度, 终点编号) 排序，故同一输入必得同一输出。
+
+    Args:
+        n: 待访问点个数
+        D: 距离矩阵，形状 (n+1, n)，第 0 行代表起点
+        limit: 精确 DP 的规模上限，超过即退化为启发式
+
+    Returns:
+        list[tuple[int, float, list[int]]]: 每项为 (终点编号, 路径长度 / m, 访问顺序)
     """
     if n <= 0:
         return []

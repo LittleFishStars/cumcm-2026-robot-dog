@@ -22,7 +22,7 @@ no_signal 一律**不**作为区域约束（它给出的"源在覆盖范围之�
 
 from __future__ import annotations
 
-from typing import NamedTuple, Optional
+from typing import NamedTuple
 
 from cumcm.common.disc_region import DiscConstraintMixin
 from cumcm.t1 import TriangulationRegion
@@ -53,7 +53,7 @@ class Meas(NamedTuple):
     x: float
     y: float
     outcome: str                        # direction / near / no_signal
-    theta: Optional[float] = None       # 仅 direction 时有值
+    theta: float | None = None       # 仅 direction 时有值
     stage: str = "sweep"
 
 
@@ -70,12 +70,12 @@ class DirProbRegion(DiscConstraintMixin, TriangulationRegion):
 
     WITH_OUTSIDE = False
 
-    def __init__(self, err: float = 1.0, radius: Optional[float] = None,
-                 sides: Optional[int] = None, quad: int = EXCL_QUAD) -> None:
+    def __init__(self, err: float = 1.0, radius: float | None = None,
+                 sides: int | None = None, quad: int = EXCL_QUAD) -> None:
         """err / radius / sides 见父类；quad 为圆盘近似的正多边形精度（见 config.EXCL_QUAD）。"""
         super().__init__(err, radius, sides, quad)
 
     @property
-    def diameter(self):
+    def diameter(self) -> float:
         """区域直径 / m：父类按顶点算最远点对（本题区域恒为凸，即为精确值）。"""
         return self._memo("diameter", lambda: TriangulationRegion.diameter.fget(self))

@@ -10,7 +10,7 @@
 from __future__ import annotations
 
 import math
-from typing import Sequence, Tuple
+from typing import Sequence
 
 __all__ = ["dist", "bearing", "ang_diff", "clamp_to_region", "point_in_circle"]
 
@@ -34,7 +34,7 @@ def ang_diff(a: float, b: float) -> float:
     return abs(((a - b + 180.0) % 360.0) - 180.0)
 
 
-def clamp_to_region(x: float, y: float, radius: float) -> Tuple[float, float]:
+def clamp_to_region(x: float, y: float, radius: float) -> tuple[float, float]:
     """把坐标拉回半径为 radius 的作业圆域内（出域时沿原方向缩到边界）。
 
     用于所有 /measure 与 /clear 的入口：定位解、补测点、末端归航步进都可能落在圆域之外，

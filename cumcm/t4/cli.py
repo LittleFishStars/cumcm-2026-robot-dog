@@ -12,7 +12,7 @@ from __future__ import annotations
 import argparse
 import sys
 from pathlib import Path
-from typing import List, Optional, Sequence
+from typing import Sequence
 
 import numpy as np
 
@@ -34,14 +34,37 @@ from cumcm.t4.sweep import (SweepPlan, build_sweep_plan, plan_from_points,
                             print_sweep_report, verify_hearing_stats)
 
 
-def _api_log(args: argparse.Namespace, echo: bool):
-    """接口日志上下文（便于用同一方式审计）。"""
+def _api_log(args: argparse.Namespace, echo: bool) -> "AbstractContextManager[ApiLog | None]":
+    """接口日志上下文（便于用同一方式审计）
+
+    Args:
+        args: 已解析的命令行参数
+        echo: 是否把每次接口调用回显到终端
+
+    Returns:
+        AbstractContextManager[ApiLog | None]: 上下文管理器；进入时得到日志对象，
+            日志被关闭（--api-log 传空串）时为 None
+    """
     return _api_log_raw(args.save_dir, args.api_log, echo)
 
 
-def _episode_printer(clear: bool):
-    """按模式打印本局小结。"""
-    def show(stats: dict, check: dict, n_sources: Optional[int]) -> None:
+def _episode_printer(clear: bool) -> "Callable[[dict, dict, int | None], None]":
+    """按模式打印本局小结
+
+    Args:
+        clear: 是否做了阶段二（定位与清除）；False 时只报扫描相关字段
+
+    Returns:
+        Callable[[dict, dict, int | None], None]: 打印函数 show(stats, check, n_sources)
+    """
+    def show(stats: dict, check: dict, n_sources: int | None) -> None:
+        """打印一局的扫描小结与命中核对结果
+
+        Args:
+            stats: 本局统计（里程、虚拟时间、测向次数、清除个数、首次听到步数等）
+            check: 真值核对结果（定位误差、命中情况等；官方模式无真值时为 None）
+            n_sources: 本局干扰源个数（官方模式无真值时为 None）
+        """
         fh = [v for v in stats["first_heard"].values()]
         worst = max(fh) if fh else 0
         print(f"本局：扫描 {stats['travel_m']:.0f} m + 收尾，虚拟时间 {stats['virtual_time_s']:.0f} s，"
@@ -63,8 +86,8 @@ def run_practice(args: argparse.Namespace, plan: SweepPlan, verify: dict, save_d
     jammers_dir = (Path(args.jammers_dir) if args.jammers_dir else default_jammers_dir())
     clear = not args.survey_only
     show = _episode_printer(clear)
-    rows: List[dict] = []
-    observations: List[dict] = []
+    rows: list[dict] = []
+    observations: list[dict] = []
     with _api_log(args, not args.quiet) as api_log, \
             PracticeArena(jammers_dir, robot_id=args.robot_id,
                           robot_port=args.robot_port, console_port=args.console_port,
@@ -127,13 +150,13 @@ def run_practice(args: argparse.Namespace, plan: SweepPlan, verify: dict, save_d
               f"{np.mean([r['n_side_scan'] for r in rows]):.0f} 次、途中顺路清除命中 "
               f"{np.mean([r['n_inline'] for r in rows]):.1f} 个、"
               f"判定必无信号跳过 {np.mean([r['n_skip_measure'] for r in rows]):.0f} 次）")
+        worst_err = max([r['localize_err_max_m'] for r in rows if r['localize_err_max_m']] or [0])
+        worst_step = max([r['worst_first_heard_step'] for r in rows
+                          if r['worst_first_heard_step'] is not None] or [0])
         print(f"  定位误差：均值 "
               f"{np.mean([r['localize_err_mean_m'] for r in rows if r['localize_err_mean_m']]):.2f}"
-              f" m，最差单源 "
-              f"{max([r['localize_err_max_m'] for r in rows if r['localize_err_max_m']] or [0]):.2f}"
-              f" m；最晚首次听到发生在第 "
-              f"{max([r['worst_first_heard_step'] for r in rows if r['worst_first_heard_step'] is not None] or [0])}"
-              f" 步（共 {plan.n_points} 个测量位置）")
+              f" m，最差单源 {worst_err:.2f} m；最晚首次听到发生在第 "
+              f"{worst_step} 步（共 {plan.n_points} 个测量位置）")
         print("逐局：" + "  ".join(f"seed{r['seed']}={r['cleared']}/{r['n_sources']}"
                                   f"({r['virtual_time_s']:.0f}s)" for r in rows))
     else:
@@ -211,6 +234,11 @@ def run_official(args: argparse.Namespace, plan: SweepPlan, verify: dict, save_d
 
 
 def build_parser() -> argparse.ArgumentParser:
+    """构建命令行解析器
+
+    Returns:
+        argparse.ArgumentParser: 已配置演练 / 官方 / 仅规划三种模式全部选项的解析器
+    """
     p = argparse.ArgumentParser(
         description="2026 CUMCM B 题问题四：定向 + 全向混合干扰源的搜索与清除（扫描 + 定位清除）")
     p.add_argument("--practice", type=int, nargs="?", const=1, default=0,
@@ -269,7 +297,7 @@ def build_parser() -> argparse.ArgumentParser:
     return p
 
 
-def main(argv: Optional[Sequence[str]] = None) -> int:
+def main(argv: Sequence[str] | None = None) -> int:
     """按模式分派：`--practice` → 本地演练；`--plan-only` → 只求扫描方案；其余 → 官方。"""
     relax_console_encoding()
     args = build_parser().parse_args(argv)
@@ -319,5 +347,5 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     return 0
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     raise SystemExit(main())

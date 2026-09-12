@@ -67,5 +67,5 @@ import sys
 
 from cumcm.t3.cli import main
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     sys.exit(main())

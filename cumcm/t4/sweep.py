@@ -45,7 +45,7 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass, field
 from functools import lru_cache
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Sequence
 
 import numpy as np
 
@@ -55,7 +55,7 @@ from cumcm.t4.config import (MID_RING_N, MID_RING_RAD, MID_RING_ROT_DEG,
                              OUTER_RING_N, OUTER_RING_RAD, OUTER_RING_ROT_DEG)
 
 
-def measure_layout() -> List[Tuple[float, float]]:
+def measure_layout() -> list[tuple[float, float]]:
     """20 个测量位置：原点 + 7 覆盖基点 + 12 均匀方位外圈点（MID_RING_N=0 无内部补点）。
 
     定案布局（见模块文档）：听率 99.9891% + 贴边对抗 0 漏 + 20 局演练 6 445 s、24 392 m
@@ -87,20 +87,27 @@ class SweepPlan:
     outer_n: int
     outer_radius: float
     points: np.ndarray = field(repr=False)
-    route: List[int] = field(repr=False)
+    route: list[int] = field(repr=False)
     route_m: float = 0.0
-    verification: Optional[Dict[str, Any]] = None
+    verification: dict[str, Any] | None = None
     interior_n: int = 0
     interior_radius: float = 0.0
 
     @property
     def n_points(self) -> int:
+        """测量位置个数（含原点的起点扫描）"""
         return len(self.points)
 
-    def route_points(self) -> List[Tuple[float, float]]:
+    def route_points(self) -> list[tuple[float, float]]:
+        """按访问顺序列出测量位置坐标（从原点起，顺序与 route 一致）"""
         return [(float(self.points[i][0]), float(self.points[i][1])) for i in self.route]
 
-    def to_json(self) -> Dict[str, Any]:
+    def to_json(self) -> dict[str, Any]:
+        """把扫描方案导出成 JSON 可序列化的字典（落盘 t4_sweep_plan.json 用）
+
+        Returns:
+            dict[str, Any]: 布局参数、测量点数、访问里程、坐标、访问顺序与听到率统计
+        """
         return {
             "outer_n": int(self.outer_n),
             "outer_radius_m": float(self.outer_radius),
@@ -159,7 +166,7 @@ def plan_from_points(points: Sequence[Sequence[float]]) -> SweepPlan:
                      points=arr, route=route, route_m=route_m)
 
 
-def _hit_report(pts: np.ndarray, g: np.ndarray, theta_rad: float, R: float) -> Tuple[bool, float]:
+def _hit_report(pts: np.ndarray, g: np.ndarray, theta_rad: float, R: float) -> tuple[bool, float]:
     """单个算例：是否存在测量点在（距离 ≤ R 且 在光束内）；返回 (命中?, 命中深度 |m−g|/R)。
 
     保留为**单例参考实现**：批量路径（`_hit_cases`）必须与它逐例等价，`python -m cumcm.t4.sweep`
@@ -176,7 +183,7 @@ def _hit_report(pts: np.ndarray, g: np.ndarray, theta_rad: float, R: float) -> T
 
 
 def _hit_cases(pts: np.ndarray, gx: np.ndarray, gy: np.ndarray, theta: np.ndarray,
-               R: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+               R: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     """**一批**算例的命中掩码与命中深度；逐例与 `_hit_report` 同一套算式（逐元素对应）。
 
     批量口径与逐例完全一致的三处细节：距离仍是"两分量平方和"（与 `einsum` 两次乘加同序）；
@@ -196,7 +203,7 @@ def _hit_cases(pts: np.ndarray, gx: np.ndarray, gy: np.ndarray, theta: np.ndarra
 
 
 def _scan_cases(pts: np.ndarray, gx: np.ndarray, gy: np.ndarray, theta: np.ndarray,
-                R: np.ndarray, chunk: int = 20_000) -> Tuple[int, int, Optional[dict]]:
+                R: np.ndarray, chunk: int = 20_000) -> tuple[int, int, dict | None]:
     """按**枚举顺序**分批扫描算例，返回 (算例数, 漏例数, 首个漏例描述)。
 
     首个漏例取"顺序上最早的那个"，与原先逐例扫描的口径一致（报告里的 `worst_fail`）。
@@ -207,7 +214,7 @@ def _scan_cases(pts: np.ndarray, gx: np.ndarray, gy: np.ndarray, theta: np.ndarr
     """
     gx = np.asarray(gx, dtype=float)
     n_cases = n_fail = 0
-    worst: Optional[dict] = None
+    worst: dict | None = None
     for i in range(0, gx.size, chunk):
         hit, _ = _hit_cases(pts, gx[i:i + chunk], gy[i:i + chunk], theta[i:i + chunk],
                             R[i:i + chunk])
@@ -227,7 +234,7 @@ def _scan_cases(pts: np.ndarray, gx: np.ndarray, gy: np.ndarray, theta: np.ndarr
 def adversarial_cases(n_azi: int = 360, n_off: int = 40, radius: float = 1770.0,
                       Rs: Sequence[float] = (1000.0, 1250.0, 1500.0),
                       span_deg: float = 8.0, wrap: bool = True
-                      ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+                      ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """贴边对抗算例 `(gx, gy, θ/rad, R)`：源贴在源生成圆盘边缘、θ 取径向 ±span/2 内的偏角。
 
     枚举顺序是 R → 方位 → 偏角，与原先的双层循环完全一致（`wrap=True` 时 θ 取模 2π，与
@@ -236,10 +243,10 @@ def adversarial_cases(n_azi: int = 360, n_off: int = 40, radius: float = 1770.0,
     结果按参数缓存（返回的是**共享的只读数组**，调用方不要就地修改）：算例集合只与参数有关、
     与测量点布局无关，而布局搜索会拿同一批算例评估成千上万个候选布局。
     """
-    gx: List[float] = []
-    gy: List[float] = []
-    th: List[float] = []
-    rr: List[float] = []
+    gx: list[float] = []
+    gy: list[float] = []
+    th: list[float] = []
+    rr: list[float] = []
     for R in Rs:
         for ka in range(int(n_azi)):
             a = 2.0 * math.pi * ka / n_azi
@@ -258,7 +265,7 @@ def adversarial_cases(n_azi: int = 360, n_off: int = 40, radius: float = 1770.0,
 
 def verify_hearing_stats(points: Sequence[Sequence[float]],
                          mc_n: int = 4_000_000,
-                         seed: int = 2026) -> Dict[str, Any]:
+                         seed: int = 2026) -> dict[str, Any]:
     """对测量点集合做"半圆盘命中"统计校验，返回听到率与最坏漏例。
 
     校验 1（贴边对抗，最严）：g 贴在源生成圆盘边缘（1770 m）、θ 取径向 ±8° 内 40 个偏角 ×
@@ -276,7 +283,7 @@ def verify_hearing_stats(points: Sequence[Sequence[float]],
     P = np.asarray(points, dtype=float)
     n_cases = 0
     n_fail = 0
-    worst_fail: Optional[dict] = None
+    worst_fail: dict | None = None
     edge_miss = 0
 
     # 校验 1：贴边对抗（枚举顺序：R → 方位 → 径向偏角）
@@ -287,10 +294,10 @@ def verify_hearing_stats(points: Sequence[Sequence[float]],
     edge_miss = nf1
 
     # 校验 2：精细对抗枚举（枚举顺序：R → 半径 → 方位 → 光束角）
-    g2x: List[float] = []
-    g2y: List[float] = []
-    t2: List[float] = []
-    r2_list: List[float] = []
+    g2x: list[float] = []
+    g2y: list[float] = []
+    t2: list[float] = []
+    r2_list: list[float] = []
     for R in (1000.0, 1250.0, 1500.0):
         for r in list(range(0, 1800, 300)) + [1770]:
             for k in range(48):
@@ -343,7 +350,7 @@ def verify_hearing_stats(points: Sequence[Sequence[float]],
     }
 
 
-def print_sweep_report(plan: SweepPlan, verify: Optional[Dict[str, Any]]) -> None:
+def print_sweep_report(plan: SweepPlan, verify: dict[str, Any] | None) -> None:
     """打印扫描方案与听到率统计报告（命令行 --plan-only / 每局开头使用）。"""
     print(f"扫描方案：7 覆盖基点"
           + (f" + {plan.interior_n} 内部补点" if plan.interior_n > 0 else "")
@@ -362,7 +369,7 @@ def print_sweep_report(plan: SweepPlan, verify: Optional[Dict[str, Any]]) -> Non
               f"首例漏 {verify['worst_fail']} —— 非严格保证，按实测报告")
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     # 自检：`python -m cumcm.t4.sweep` 直接打听到率统计（无需连模拟器）
     p = build_sweep_plan()
     # 批量判据的不变式核验：随机的源位置/光束角/半径上，批量与单例参考实现必须逐例同判

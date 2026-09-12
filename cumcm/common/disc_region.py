@@ -27,7 +27,7 @@
 from __future__ import annotations
 
 import math
-from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Callable, Sequence
 
 import shapely
 from shapely import Point, Polygon
@@ -48,15 +48,23 @@ class DiscConstraintMixin:
 
     WITH_OUTSIDE = False        # 子类按题意打开："收不到 ⇒ 源在圆盘外"是否为可证明约束
 
-    def __init__(self, err: float = 1.0, radius: Optional[float] = None,
-                 sides: Optional[int] = None, quad: int = 16) -> None:
+    def __init__(self, err: float = 1.0, radius: float | None = None,
+                 sides: int | None = None, quad: int = 16) -> None:
+        """初始化圆盘约束叠层，把 err / radius / sides 原样转发给宿主类
+
+        Args:
+            err: 示向度误差半宽 / 度，透传给宿主类的定位区域
+            radius: 目标圆域半径 / m；None 表示沿用宿主类的缺省值
+            sides: 目标圆域内接正多边形边数；None 表示沿用宿主类的缺省值
+            quad: 圆盘近似的正多边形精度（边数 = 4 × quad，见模块文档）
+        """
         super().__init__(err, radius, sides)
         self.quad = int(quad)                            # 圆盘近似的正多边形精度（见模块文档）
-        self._inside: List[Tuple[float, float, float]] = []      # 源在此圆盘内
-        self._outside: List[Tuple[float, float, float]] = []     # 源在此圆盘外
+        self._inside: list[tuple[float, float, float]] = []      # 源在此圆盘内
+        self._outside: list[tuple[float, float, float]] = []     # 源在此圆盘外
         self._applied_in = 0
         self._applied_out = 0
-        self._cache: Dict[str, Any] = {}
+        self._cache: dict[str, Any] = {}
 
     # ---- 硬约束 ----
     def add_inside(self, x: float, y: float, r: float) -> "DiscConstraintMixin":
@@ -80,10 +88,12 @@ class DiscConstraintMixin:
 
     # ---- 几何：楔形交（父类增量）之上再叠加圆盘约束（同样增量、惰性）----
     @property
-    def region(self):
+    def region(self) -> shapely.geometry.base.BaseGeometry:
+        """楔形交与圆盘约束叠加后的可能源集合（增量维护并缓存，见模块文档）"""
         geom = super().region
         n_in, n_out = len(self._inside), len(self._outside)
         if self._applied_in < n_in or self._applied_out < n_out:
+            # 只把新增的约束并进几何：先逐个求交"源在圆盘内"，再逐个减去"源在圆盘外"
             for x, y, r in self._inside[self._applied_in:]:
                 geom = geom.intersection(self.disc(x, y, r, False))
             self._applied_in = n_in
@@ -95,7 +105,7 @@ class DiscConstraintMixin:
         return self._region
 
     @property
-    def vertices(self):
+    def vertices(self) -> list[tuple[float, float]]:
         """区域顶点：单块取外环，多块（被圆盘外约束切开）时收集各块外环顶点。
 
         只做交集的题目区域恒为单块，走的是与父类完全相同的那条分支。
@@ -109,7 +119,7 @@ class DiscConstraintMixin:
             parts = list(geom.geoms)
         else:
             return []
-        pts: List[Tuple[float, float]] = []
+        pts: list[tuple[float, float]] = []
         for poly in parts:
             pts.extend((x, y) for x, y, *_ in poly.exterior.coords[:-1])
         if len(parts) == 1:
@@ -117,15 +127,17 @@ class DiscConstraintMixin:
         return pts
 
     @property
-    def enclosing_circle(self):
+    def enclosing_circle(self) -> tuple[float, float, float] | None:
         """区域的最小覆盖圆 (cx, cy, r)；区域为空或退化时返回 None。
 
         "真源必在区域内 ⊆ 覆盖圆内"对**任何**集合都成立（不要求凸性），故多块、非凸时依然可用
         —— 这是"走到圆心即可清除"的依据。
         """
-        def compute():
+        def compute() -> tuple[float, float, float] | None:
+            """按需算出最小覆盖圆，交由 _memo 缓存"""
             if not self.vertices:
                 return None
+            # GEOS 的最小包围圆：其质心即圆心，最小包围半径即覆盖半径
             center = shapely.minimum_bounding_circle(self.region).centroid
             return (center.x, center.y, float(shapely.minimum_bounding_radius(self.region)))
         return self._memo("mec", compute)
@@ -153,7 +165,7 @@ class DiscConstraintMixin:
         """几何签名：四项增量任一变化都要作废缓存。"""
         return (len(self._nodes), self._done, self._applied_in, self._applied_out)
 
-    def _memo(self, key: str, compute: Callable[[], Any]):
+    def _memo(self, key: str, compute: Callable[[], Any]) -> Any:
         """按几何签名缓存一个几何量（先让 `region` 追平，再取签名）。"""
         self.region                             # 先让几何追平，再取签名
         sig = self._sig()

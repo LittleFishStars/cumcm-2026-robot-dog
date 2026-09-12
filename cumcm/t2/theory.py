@@ -45,7 +45,7 @@ LS 类定位器失效、CRLB 作为性能基准）、Chen 等 2009（多观测�
 from __future__ import annotations
 
 import math
-from typing import Any, Dict, Optional, Sequence, Tuple
+from typing import Any, Sequence
 
 import numpy as np
 
@@ -57,7 +57,7 @@ __all__ = ["CITATIONS", "gamma_deg_at", "fim_two_station", "ellipse_from_fim", "
            "spearman", "verify_theory"]
 
 #: 文献信息（卷期页码按 References/ 里的原文核过；供论文参考文献表直接取用）
-CITATIONS: Dict[str, str] = {
+CITATIONS: dict[str, str] = {
     "foy1976": "W. H. Foy. Position-Location Solutions by Taylor-Series Estimation[J]. "
                "IEEE Transactions on Aerospace and Electronic Systems, 1976, AES-12(2): 187-194.",
     "chan1994": "Y. T. Chan, K. C. Ho. A Simple and Efficient Estimator for Hyperbolic "
@@ -85,7 +85,7 @@ def gamma_deg_at(g: Sequence[float], s1: Sequence[float], s2: Sequence[float]) -
 
 
 def fim_two_station(s1: Sequence[float], theta1: float, s2: Sequence[float], theta2: float,
-                    g: Sequence[float], sigma_rad: Optional[float] = None) -> np.ndarray:
+                    g: Sequence[float], sigma_rad: float | None = None) -> np.ndarray:
     """两站纯方位测向在真值 G 处的 Fisher 信息矩阵（2×2）。
 
     观测方程 θ_i = atan2(Δy, Δx) + e_i（σ = 1°），梯度 ∂θ_i/∂p = n_i / R_i（n_i 为 L.O.S. 的
@@ -111,7 +111,7 @@ def fim_two_station(s1: Sequence[float], theta1: float, s2: Sequence[float], the
     return H
 
 
-def ellipse_from_fim(H: np.ndarray) -> Dict[str, float]:
+def ellipse_from_fim(H: np.ndarray) -> dict[str, float]:
     """由 Fisher 信息矩阵给误差椭圆（1σ）：主/次半轴、主轴方向、面积、GDOP = √tr(H⁻¹)。"""
     evals, evecs = np.linalg.eigh(H)
     lam_min, lam_max = float(evals[0]), float(evals[1])
@@ -235,6 +235,7 @@ def spearman(a: np.ndarray, b: np.ndarray) -> float:
         return float("nan")
 
     def rank(x: np.ndarray) -> np.ndarray:
+        """求一维数组的平均秩（并列元素取同一平均秩）"""
         order = np.argsort(x, kind="stable")
         r = np.empty(x.size, dtype=float)
         r[order] = np.arange(x.size, dtype=float)
@@ -259,7 +260,7 @@ def spearman(a: np.ndarray, b: np.ndarray) -> float:
 
 def verify_theory(n: int = 300, seed: int = 2026,
                   err_deg: float = cfg.BEARING_ERROR_DEG,
-                  radius: float = cfg.REGION_RADIUS) -> Dict[str, Any]:
+                  radius: float = cfg.REGION_RADIUS) -> dict[str, Any]:
     """文献闭式 vs 精确集员构造的抽样对照（结论见模块开头；数字可直接写进论文）。
 
     对每个随机两站配置（源落在两条标称示向度的交点上 —— 即 CRLB 线性化的真值场景）：
@@ -318,7 +319,17 @@ def verify_theory(n: int = 300, seed: int = 2026,
     a3 = np.asarray(e3, dtype=float)
     ar = np.asarray(reg, dtype=float).reshape(-1, 4)
 
-    def _bucket(lo: float, hi: float, col: int) -> Dict[str, Any]:
+    def _bucket(lo: float, hi: float, col: int) -> dict[str, Any]:
+        """按 `ar` 第 `col` 列的取值区间 [lo, hi) 分桶统计偏差
+
+        Args:
+            lo: 分桶下界（含）
+            hi: 分桶上界（不含）
+            col: 用于分桶的列下标
+
+        Returns:
+            dict[str, Any]: 该桶的样本数与三项偏差统计；桶内无样本时只有 lo/hi/n
+        """
         m = (ar[:, col] >= lo) & (ar[:, col] < hi)
         if not bool(m.any()):
             return {"lo": lo, "hi": hi, "n": 0}
@@ -381,5 +392,5 @@ def _selfcheck(n: int = 300) -> None:
                   f"GDOP {b['gdop_median_rel_dev']*100:+6.1f}%")
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     _selfcheck()

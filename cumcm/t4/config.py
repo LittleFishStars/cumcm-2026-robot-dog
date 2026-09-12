@@ -26,14 +26,12 @@ from __future__ import annotations
 
 import math
 
-from typing import Tuple
-
 # ----------------------------------------------------------------------------
 # 题目物理设定（与问题三一致，见 cumcm.t3.config，这里按分量重述以免 t4 → t3 依赖）
 REGION_RADIUS = 1800.0          # 目标圆域半径 / m
 COVER_RADIUS = 1000.0           # 有效接收半径下界 / m（也是"全向源无信号 ⇒ 距源 > 该值"的依据）
 RECEIVE_MAX = 1500.0            # 有效接收半径上界 / m（题目给定 1000~1500）
-CHANNELS: Tuple[int, ...] = tuple(range(1, 21))     # 20 个频道
+CHANNELS: tuple[int, ...] = tuple(range(1, 21))     # 20 个频道
 COORD_LIMIT = 2.0e6             # 坐标分量绝对值上限 / m（协议规定）
 REGION_MARGIN = 1.0             # 坐标裁剪保留的数值余量 / m
 CLEAR_RADIUS = 20.0             # 清除半径 / m（光学精确定位要求 ≤ 20 m）

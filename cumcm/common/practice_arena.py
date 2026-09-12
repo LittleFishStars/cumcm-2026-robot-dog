@@ -21,7 +21,7 @@ import time
 import urllib.error
 import urllib.request
 from pathlib import Path
-from typing import Any, List, Optional, Tuple
+from typing import Any
 
 __all__ = ["PracticeArena", "free_port"]
 
@@ -47,6 +47,17 @@ class PracticeArena:
     def __init__(self, jammers_dir: Path, robot_id: str, robot_port: int = 2026,
                  console_port: int = 8090, countdown: int = 1,
                  reuse_existing: bool = True, problem_no: int = PROBLEM_NO) -> None:
+        """初始化演练场
+
+        Args:
+            jammers_dir: jammers-py 所在目录（内含 run.py）
+            robot_id: 参赛队号，传给模拟器的 --team
+            robot_port: 机器狗接口端口（模拟器监听）
+            console_port: 控制台 REST 端口；被占用时会自动向后换端口
+            countdown: 开局倒计时秒数
+            reuse_existing: 是否复用已在运行的 jammers-py 实例
+            problem_no: 题目编号（3 = 全向源，4 = 定向 + 全向混合）
+        """
         self.reuse_existing = reuse_existing
         self.jammers_dir = Path(jammers_dir).resolve()
         self.robot_id = robot_id
@@ -56,10 +67,11 @@ class PracticeArena:
         self.problem_no = int(problem_no)       # 题目编号：3 = 全向源，4 = 定向+全向混合
         self.robot_url = f"http://127.0.0.1:{robot_port}"
         self.console_url = f"http://127.0.0.1:{console_port}"
-        self._proc: Optional[subprocess.Popen] = None
+        self._proc: subprocess.Popen | None = None
 
     # ---- 生命周期 ----
     def __enter__(self) -> "PracticeArena":
+        """进入演练场：复用已有实例，或拉起一个新的 jammers-py 并等它就绪"""
         existing = self._find_existing() if self.reuse_existing else None
         if existing is not None:
             self.console_url, state = existing
@@ -91,10 +103,19 @@ class PracticeArena:
         raise TimeoutError("等待 jammers-py 控制台就绪超时")
 
     def __exit__(self, *exc: Any) -> bool:
+        """退出演练场：收掉自己拉起的进程
+
+        Args:
+            *exc: with 块内的异常三元组（本演练场不改写异常传播）
+
+        Returns:
+            bool: 恒为 False，即异常照常向外抛
+        """
         self.close()
         return False
 
     def close(self) -> None:
+        """停止本实例拉起的 jammers-py（复用的实例不动）"""
         if self._proc is None:
             return
         self._proc.terminate()
@@ -106,16 +127,28 @@ class PracticeArena:
         self._proc = None
 
     # ---- 控制台 REST ----
-    def _request(self, path: str, payload: Optional[dict] = None,
-                 base: Optional[str] = None, post: bool = False) -> dict:
+    def _request(self, path: str, payload: dict | None = None,
+                 base: str | None = None, post: bool = False) -> dict:
+        """向控制台 REST 发一次请求并返回解析后的 JSON
+
+        Args:
+            path: 接口路径，如 "/api/state"
+            payload: 请求体；None 表示无请求体
+            base: 基地址；None 表示用本实例的 console_url（探测其他端口时会显式传入）
+            post: 是否强制用 POST 方法
+
+        Returns:
+            dict: 控制台返回的 JSON
+        """
         data = None if payload is None else json.dumps(payload).encode("utf-8")
+        # 带请求体即用 POST；post=True 时即使没有请求体也发 POST（如 /api/abort、/api/clear）
         req = urllib.request.Request((base or self.console_url) + path, data=data,
                                      headers={"Content-Type": "application/json"},
                                      method="POST" if post or payload is not None else "GET")
         with urllib.request.urlopen(req, timeout=10.0) as resp:
             return json.loads(resp.read().decode("utf-8"))
 
-    def _state(self, base: str) -> Optional[dict]:
+    def _state(self, base: str) -> dict | None:
         """读取控制台状态；该地址不是 jammers-py 或未启动时返回 None。"""
         try:
             state = self._request("/api/state", base=base)
@@ -123,7 +156,7 @@ class PracticeArena:
         except Exception:
             return None
 
-    def _find_existing(self) -> Optional[Tuple[str, dict]]:
+    def _find_existing(self) -> tuple[str, dict] | None:
         """探测是否已有 jammers-py 在运行（端口按常驻优先顺序）。"""
         for port in dict.fromkeys((self.console_port, *self.REUSE_PORTS)):
             base = f"http://127.0.0.1:{port}"
@@ -133,6 +166,16 @@ class PracticeArena:
         return None
 
     def _wait_state(self, target: str, timeout: float = 30.0) -> None:
+        """轮询控制台，直到模拟器状态等于 target
+
+        Args:
+            target: 期望状态名，如 "window_open"
+            timeout: 最长等待时间 / s
+
+        Raises:
+            RuntimeError: 演练局提前进入 finished，不可能再到达 target
+            TimeoutError: 超时仍未到达 target
+        """
         deadline = time.monotonic() + timeout
         while time.monotonic() < deadline:
             state = self._request("/api/state").get("state")
@@ -144,7 +187,7 @@ class PracticeArena:
         raise TimeoutError(f"等待状态 {target} 超时")
 
     # ---- 一局演练 ----
-    def start_episode(self, seed: int) -> List[dict]:
+    def start_episode(self, seed: int) -> list[dict]:
         """按种子生成固定场景并开一局，等接口开放后返回干扰源真值。
 
         噪声种子被覆写成由 seed 派生的确定值，使整局（布局 + 噪声）完全可复现：同一个
@@ -158,7 +201,7 @@ class PracticeArena:
         # 连续多局时，上一局的会话可能尚未在模拟器侧完全释放，/api/start 会返回 409
         # Conflict；这是演练场的时序问题（非策略问题），短暂等待后重试即可。
         # 只在演练场重试 —— 官方模式保持"发一次就是一次"的语义，以免掩盖真实故障。
-        last: Optional[Exception] = None
+        last: Exception | None = None
         for attempt in range(START_RETRIES):
             try:
                 self._request("/api/start", {"problem_no": self.problem_no,

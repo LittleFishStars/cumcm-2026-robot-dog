@@ -38,7 +38,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Sequence, Tuple
+from typing import Any, Sequence
 
 import numpy as np
 import shapely
@@ -160,7 +160,7 @@ def coarse_fields(site: Sequence[float], theta1: float, sources: np.ndarray,
                   deltas2: np.ndarray, step: float = cfg.COARSE_STEP,
                   err_deg: float = cfg.BEARING_ERROR_DEG,
                   radius: float = cfg.REGION_RADIUS,
-                  receive_min: float = cfg.RECEIVE_MIN) -> Dict[str, np.ndarray]:
+                  receive_min: float = cfg.RECEIVE_MIN) -> dict[str, np.ndarray]:
     """全域粗网格上的四个场：坐标网格、到源集的最坏距离、可测性掩码、最坏定位直径。
 
     J 只在**可行点**上算 —— 不可行点根本不会成为第二检测点，算了也是浪费（可行域是圆域里
@@ -183,7 +183,7 @@ def coarse_fields(site: Sequence[float], theta1: float, sources: np.ndarray,
 # ----------------------------------------------------------------------------
 
 def closed_form_table(d: float, r2: float, gamma_deg: float, exact_radius: float,
-                      err_deg: float = cfg.BEARING_ERROR_DEG) -> Dict[str, Any]:
+                      err_deg: float = cfg.BEARING_ERROR_DEG) -> dict[str, Any]:
     """最坏情形几何上"本文闭式 / 文献 GDOP / 文献 CRLB 主半轴 / Foy 稀释式"与精确最坏半径的对照。"""
     closed = {
         "minimax_radius_m": theory.minimax_radius(d, r2, gamma_deg, err_deg),
@@ -202,7 +202,7 @@ def closed_form_table(d: float, r2: float, gamma_deg: float, exact_radius: float
 
 
 def theory_analysis(site: Sequence[float], theta1: float, sources: np.ndarray,
-                    deltas2: np.ndarray, best: Tuple[float, float], j_star: float,
+                    deltas2: np.ndarray, best: tuple[float, float], j_star: float,
                     d_lo: float, d_hi: float, eta: float,
                     err_deg: float = cfg.BEARING_ERROR_DEG,
                     radius: float = cfg.REGION_RADIUS,
@@ -211,7 +211,7 @@ def theory_analysis(site: Sequence[float], theta1: float, sources: np.ndarray,
                     probe_n: int = cfg.PROBE_N,
                     expect_step: float = cfg.EXPECT_STEP,
                     certify_max: int = cfg.CERTIFY_MAX,
-                    expect_max: int = cfg.EXPECT_MAX) -> Dict[str, Any]:
+                    expect_max: int = cfg.EXPECT_MAX) -> dict[str, Any]:
     """把文献判据（GDOP/CRLB/几何稀释）接到本文算法上，做三件事。
 
     1. **全域认证**：在可行域包围盒内按 `step`（缺省 5 m）建细网格，用解析 GDOP 场
@@ -292,9 +292,9 @@ def theory_analysis(site: Sequence[float], theta1: float, sources: np.ndarray,
 
 
 def criteria_points(site: Sequence[float], theta1: float, sources: np.ndarray,
-                    deltas2: np.ndarray, points_xy: Dict[str, Tuple[float, float]],
+                    deltas2: np.ndarray, points_xy: dict[str, tuple[float, float]],
                     j_star: float, mirror: bool = True,
-                    err_deg: float = cfg.BEARING_ERROR_DEG) -> Dict[str, Any]:
+                    err_deg: float = cfg.BEARING_ERROR_DEG) -> dict[str, Any]:
     """三个口径的最优点在同一张表上互评（最坏直径 / 期望直径 / GDOP）。
 
     `mirror=True` 时把 φ < 0 的点镜像到 +φ（解关于示向度方向严格对称，指标不变）——
@@ -302,7 +302,7 @@ def criteria_points(site: Sequence[float], theta1: float, sources: np.ndarray,
     表里的 `worst_diam_loss_pct` 就是各点相对它的损失。
     """
     ang = math.radians(float(theta1))
-    table: Dict[str, Any] = {}
+    table: dict[str, Any] = {}
     for name, (bx, by) in points_xy.items():
         phi = _rel_angle(bearing(site, (bx, by)), theta1)
         if mirror and phi < 0.0:
@@ -333,7 +333,7 @@ def refine_best(site: Sequence[float], theta1: float, sources: np.ndarray, delta
                 x0: float, y0: float, half: float = cfg.REFINE_HALF,
                 step: float = cfg.REFINE_STEP, err_deg: float = cfg.BEARING_ERROR_DEG,
                 receive_min: float = cfg.RECEIVE_MIN,
-                reduce: str = "max") -> Tuple[float, float, float]:
+                reduce: str = "max") -> tuple[float, float, float]:
     """在粗解附近做局部细化，返回 (x, y, J)。
 
     J 在最优点附近光滑、"太大/近共线"的区域被哨兵值挡住，故 25 m 粗网格必然把最优点圈进
@@ -366,17 +366,19 @@ class Band:
     """
 
     level_m: float                                  # 阈值 J ≤ level_m
-    lobes: List[Dict[str, Any]] = field(default_factory=list)
+    lobes: list[dict[str, Any]] = field(default_factory=list)
     area_m2: float = 0.0
     radial_gaps: int = 0
-    fine: Dict[str, np.ndarray] = field(default_factory=dict)   # 极坐标细网格场（放大图用）
+    fine: dict[str, np.ndarray] = field(default_factory=dict)   # 极坐标细网格场（放大图用）
 
     @property
     def r_lo(self) -> float:
+        """候选区域所有瓣的径向区间下界之最小 / m（无瓣时为 nan）"""
         return min(l["r_lo"] for l in self.lobes) if self.lobes else float("nan")
 
     @property
     def r_hi(self) -> float:
+        """候选区域所有瓣的径向区间上界之最大 / m（无瓣时为 nan）"""
         return max(l["r_hi"] for l in self.lobes) if self.lobes else float("nan")
 
     def describe(self) -> str:
@@ -391,7 +393,8 @@ class Band:
 
 
 def lens_ray_interval(site: Sequence[float], theta1: float, phi_deg: np.ndarray, d_lo: float,
-                      d_hi: float, err_deg: float, receive_min: float, radius: float):
+                      d_hi: float, err_deg: float, receive_min: float,
+                      radius: float) -> tuple[np.ndarray, np.ndarray]:
     """可行域透镜沿某个方位（绕 S1）的**精确**径向区间 (r_in, r_out) / m。
 
     透镜 = 圆域 ∩ 4 个半径 1000 m 圆盘（圆盘心为源不确定集的 4 个极点）。沿方向 u 从 S1 出发
@@ -399,6 +402,10 @@ def lens_ray_interval(site: Sequence[float], theta1: float, phi_deg: np.ndarray,
     D = proj² + r² − |w|²，w = C − S1；D < 0 表示该方位与圆盘无交）。5 个约束取交即得透镜沿该
     方位的精确区间 —— 它同时给出弧带的外缘（常被可测性限制住）与内缘（可能被两个远端圆盘
     的"阴影"顶出），也用来确定细网格的径向范围（否则放大图会漏掉透镜内侧的一半）。
+
+    Returns:
+        tuple[np.ndarray, np.ndarray]: 与 `phi_deg` 同形的径向区间下界 `r_in` 与上界 `r_out` / m；
+        该方位与透镜无交时 `r_out` 为 -inf
     """
     phi = np.asarray(phi_deg, dtype=float)
     ux, uy = np.cos(np.radians(theta1 + phi)), np.sin(np.radians(theta1 + phi))
@@ -458,7 +465,7 @@ def candidate_band(site: Sequence[float], theta1: float, sources: np.ndarray, de
     band = Band(level_m=float(level))
     for want_pos in (True, False):                            # 正/负方位各成一瓣
         cols = [k for k in range(phis.size) if (phis[k] > 0) == want_pos and phis[k] != 0.0]
-        run: List[int] = []
+        run: list[int] = []
         for k in cols:
             idx = np.flatnonzero(sel[:, k])
             if idx.size == 0:
@@ -480,9 +487,9 @@ def candidate_band(site: Sequence[float], theta1: float, sources: np.ndarray, de
     return band
 
 
-def _lobe(r: np.ndarray, phis: np.ndarray, cols: List[int], sel: np.ndarray,
+def _lobe(r: np.ndarray, phis: np.ndarray, cols: list[int], sel: np.ndarray,
           feasible: np.ndarray, theta1: float, site: Sequence[float], lim_in: np.ndarray,
-          lim_out: np.ndarray, half_r: float) -> Dict[str, Any]:
+          lim_out: np.ndarray, half_r: float) -> dict[str, Any]:
     """把一串连续方位角上的径向区间组装成一瓣弧带（外弧正序 + 内弧逆序）。
 
     边界口径：**紧邻的下一个网格点是否可行**决定该侧是被可测性限制还是被 J 限制 ——
@@ -525,10 +532,10 @@ def _polar_to_xy(r: np.ndarray, phi_deg: np.ndarray, theta1: float,
 class SolveResult:
     """问题二的完整解：最优第二检测点、最优区域（候选弧带）、可行域与全部校验。"""
 
-    site: Tuple[float, float]
+    site: tuple[float, float]
     theta1: float
     j_star: float                                   # 最优最坏定位直径 / m
-    best: Tuple[float, float]                       # 最优第二检测点坐标 / m
+    best: tuple[float, float]                       # 最优第二检测点坐标 / m
     best_r: float                                   # 到 S1 的距离 / m
     best_phi: float                                 # 相对示向度的方位差 / 度
     band: Band                                      # 候选区域（弧带）
@@ -537,10 +544,10 @@ class SolveResult:
     lens_area_m2: float
     sources: np.ndarray
     corners: np.ndarray
-    fields: Dict[str, np.ndarray]
-    scenario: Dict[str, Any]                        # 最优点的最坏情形（论文插图用）
-    checks: Dict[str, Any]
-    theory: Dict[str, Any] = field(default_factory=dict)   # 文献判据层（cumcm/t2/theory.py）
+    fields: dict[str, np.ndarray]
+    scenario: dict[str, Any]                        # 最优点的最坏情形（论文插图用）
+    checks: dict[str, Any]
+    theory: dict[str, Any] = field(default_factory=dict)   # 文献判据层（cumcm/t2/theory.py）
 
     @property
     def improvement(self) -> float:
@@ -618,7 +625,7 @@ def solve(site: Sequence[float] = cfg.DEFAULT_SITE, theta1: float = cfg.DEFAULT_
                                      "gdop": tuple(thy["points_xy"]["gdop"]),
                                      "expected": tuple(thy["points_xy"]["expected"])},
                                     float(j_star), err_deg=err_deg)
-    checks: Dict[str, Any] = {
+    checks: dict[str, Any] = {
         "scenario_exact_m": float(exact.diameter),
         "scenario_analytic_m": float(scenario["diameter"]),
         "scenario_rel_dev": abs(float(exact.diameter) - float(scenario["diameter"]))

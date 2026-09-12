@@ -33,11 +33,16 @@ class TriangulationRegion:
     SIDES = 64       # 目标圆域的内接正多边形边数，须为 4 的倍数
     TOUCH = 1.0      # 顶点贴合圆域边界的判定阈值（米）
 
-    def __init__(self, err=1.0, radius=None, sides=None):
-        """err：示向度误差半宽（度），对所有检测点相同。
+    def __init__(self, err: float = 1.0, radius: float | None = None, sides: int | None = None) -> None:
+        """构造交会定位区域
 
-        radius：目标圆域半径（米），缺省取 RADIUS（题目为 1800）。
-        sides ：目标圆域的内接正多边形边数，缺省取 SIDES，须为 4 的倍数。
+        Args:
+            err: 示向度误差半宽（度），对所有检测点相同
+            radius: 目标圆域半径（米），缺省取 RADIUS（题目为 1800）
+            sides: 目标圆域的内接正多边形边数，缺省取 SIDES，须为 4 的倍数
+
+        Raises:
+            ValueError: sides 不是 4 的倍数
         """
         self.err = float(err)
         self.radius = self.RADIUS if radius is None else float(radius)
@@ -51,14 +56,34 @@ class TriangulationRegion:
 
     # ---------- 检测点管理 ----------
 
-    def add_node(self, x, y, theta):
-        """加入一个检测点：坐标 (x, y)（米）与该点测得的示向度 theta（度）。"""
+    def add_node(self, x: float, y: float, theta: float) -> TriangulationRegion:
+        """加入一个检测点：坐标 (x, y)（米）与该点测得的示向度 theta（度）
+
+        Args:
+            x: 检测点 x 坐标 / m
+            y: 检测点 y 坐标 / m
+            theta: 该点测得的示向度 / 度（内部对 360 取模）
+
+        Returns:
+            TriangulationRegion: 自身，便于链式调用
+        """
         self._nodes.append((float(x), float(y), float(theta) % 360.0))
         return self
 
     @classmethod
-    def from_nodes(cls, nodes, err=1.0, radius=None, sides=None):
-        """由检测点列表 [(x, y, theta), ...] 构造定位区域。"""
+    def from_nodes(cls, nodes: list[tuple[float, float, float]], err: float = 1.0,
+                   radius: float | None = None, sides: int | None = None) -> TriangulationRegion:
+        """由检测点列表 [(x, y, theta), ...] 构造定位区域
+
+        Args:
+            nodes: 检测点列表，每项为 (x, y, theta)：坐标（米）与示向度（度）
+            err: 示向度误差半宽（度），含义同 `__init__`
+            radius: 目标圆域半径（米），缺省取 RADIUS
+            sides: 目标圆域的内接正多边形边数，缺省取 SIDES
+
+        Returns:
+            TriangulationRegion: 已并入全部检测点的定位区域
+        """
         region = cls(err, radius, sides)
         for x, y, theta in nodes:
             region.add_node(x, y, theta)
@@ -67,15 +92,15 @@ class TriangulationRegion:
     # ---------- 定位区域与几何量 ----------
 
     @property
-    def clip(self):
-        """目标圆域：内接正 sides 边形（顶点精确落在半径 radius 的圆上）。"""
+    def clip(self) -> Polygon:
+        """目标圆域：内接正 sides 边形（顶点精确落在半径 radius 的圆上）"""
         if self._clip is None:
             self._clip = Point(0.0, 0.0).buffer(self.radius, quad_segs=self.sides // 4)
         return self._clip
 
     @property
-    def region(self):
-        """定位区域的 shapely 几何（空区域返回空几何）。"""
+    def region(self) -> Polygon:
+        """定位区域的 shapely 几何（空区域返回空几何）"""
         if self._region is None:
             # 楔形张角为 0（err<=0）时区域退化为零面积
             self._region = self.clip if self.err > 0.0 else Polygon()
@@ -89,8 +114,8 @@ class TriangulationRegion:
         return self._region
 
     @property
-    def vertices(self):
-        """定位区域顶点坐标列表 [(x, y), ...]（统一为逆时针）；区域为空或退化时返回 []。"""
+    def vertices(self) -> list[tuple[float, float]]:
+        """定位区域顶点坐标列表 [(x, y), ...]（统一为逆时针）；区域为空或退化时返回 []"""
         region = self.region
         if region.is_empty or region.geom_type != "Polygon":
             return []
@@ -98,12 +123,12 @@ class TriangulationRegion:
         return pts if region.exterior.is_ccw else pts[::-1]
 
     @property
-    def area(self):
-        """定位区域面积（平方米）。"""
+    def area(self) -> float:
+        """定位区域面积（平方米）"""
         return float(self.region.area)
 
     @property
-    def diameter(self):
+    def diameter(self) -> float:
         """定位区域直径：区域内任意两点距离的最大值。
 
         区域是凸多边形，故直径即顶点间最大两两距离，用 numpy 的成对距离矩阵一次求出。"""
@@ -113,7 +138,7 @@ class TriangulationRegion:
         return float(np.linalg.norm(pts[:, None, :] - pts[None, :, :], axis=-1).max())
 
     @property
-    def bounded(self):
+    def bounded(self) -> bool:
         """定位是否只靠检测点就已确定（区域未被目标圆域截断）。
 
         有顶点落在圆域边界上即说明该方向约束不足（例如只测一次示向度、或检测点与干扰源近似
@@ -122,7 +147,7 @@ class TriangulationRegion:
         return bool(pts) and all(self.clip.exterior.distance(Point(*p)) > self.TOUCH for p in pts)
 
     @property
-    def enclosing_circle(self):
+    def enclosing_circle(self) -> tuple[float, float, float] | None:
         """定位区域的最小覆盖圆 (cx, cy, r)；区域为空或退化时返回 None。
 
         由 GEOS 的最小包围圆给出。问题 1 第二问"以定位区域直径为直径的圆能否覆盖此定位区域"
@@ -133,14 +158,14 @@ class TriangulationRegion:
         center = shapely.minimum_bounding_circle(self.region).centroid
         return (center.x, center.y, float(shapely.minimum_bounding_radius(self.region)))
 
-    def contains(self, p):
-        """点 p 是否落在定位区域内（圆域为内接多边形，真圆靠边的月牙不在此区域内）。"""
+    def contains(self, p: tuple[float, float]) -> bool:
+        """点 p 是否落在定位区域内（圆域为内接多边形，真圆靠边的月牙不在此区域内）"""
         return bool(self.region.covers(Point(p)))
 
     # ---------- 基础几何 ----------
 
-    def _wedge(self, x, y, theta):
-        """单个检测点的楔形多边形：以 (x, y) 为顶点的三角形，边长足以覆盖整个目标圆域。"""
+    def _wedge(self, x: float, y: float, theta: float) -> Polygon:
+        """单个检测点的楔形多边形：以 (x, y) 为顶点的三角形，边长足以覆盖整个目标圆域"""
         length = 2.0 * (hypot(x, y) + self.radius)
         a1, a2 = radians(theta - self.err), radians(theta + self.err)
         return Polygon([(x, y),
@@ -148,11 +173,12 @@ class TriangulationRegion:
                         (x + length * cos(a2), y + length * sin(a2))])
 
     @staticmethod
-    def bearing(a, b):
-        """在 a 点观测 b 点的方位角（度，[0, 360)）：x 轴正向逆时针旋转到 a→b 的夹角。"""
+    def bearing(a: tuple[float, float], b: tuple[float, float]) -> float:
+        """在 a 点观测 b 点的方位角（度，[0, 360)）：x 轴正向逆时针旋转到 a→b 的夹角"""
         return degrees(atan2(b[1] - a[1], b[0] - a[0])) % 360.0
 
-    def __repr__(self):
+    def __repr__(self) -> str:
+        """对象的可读表示：检测点数、顶点数、直径与是否仅靠检测点可确定"""
         return (f"TriangulationRegion(检测点 {len(self._nodes)} 个, 顶点 {len(self.vertices)} 个, "
                 f"直径 {self.diameter:.4f} m, 仅靠检测点可确定 {self.bounded})")
 
@@ -172,5 +198,5 @@ def _demo() -> None:
     print(f"最小覆盖圆：圆心 ({cx:.4f}, {cy:.4f})，半径 {r:.4f} m")
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     _demo()

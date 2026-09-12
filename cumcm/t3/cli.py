@@ -11,7 +11,7 @@ from __future__ import annotations
 import argparse
 import sys
 from pathlib import Path
-from typing import List, Optional, Sequence
+from typing import Sequence
 
 import numpy as np
 
@@ -23,24 +23,47 @@ from cumcm.common.sim_client import api_log as _api_log_raw
 from cumcm.t3.config import (BEARING_ERROR_DEG, CHOSEN_RING_RADIUS, CLEAR_RADIUS, COVER_RADIUS,
                              INLINE_MAX_MEC_R, INLINE_NEAR_R, INLINE_R_MAX, INLINE_R_MIN,
                              K_CLEAR_MAX, RESULTS_DIR, SEED, TRAJ_DIR)
-from cumcm.t3.covering import (CoverSolveResult, optimal_ring_radius, print_cover_report, solve_covering_circles)
+from cumcm.t3.covering import (CoverSolveResult, optimal_ring_radius, print_cover_report,
+                               solve_covering_circles)
 from cumcm.common.scanfigure import STEP_DIR_NAME, reset_dir
 from cumcm.t3.plotting import save_scan_figures, save_trajectory, truth_points
 from cumcm.t3.report import (episode_row, save_plan, save_survey, truth_check, observation_rows)
 from cumcm.t3.strategy import RobotDog
 
 
-def _api_log(args: argparse.Namespace, echo: bool):
-    """接口日志上下文（把 CLI 参数拆成公共层 api_log 所需的参数）。
+def _api_log(args: argparse.Namespace, echo: bool) -> "AbstractContextManager[ApiLog | None]":
+    """接口日志上下文（把 CLI 参数拆成公共层 api_log 所需的参数）
 
     路径优先取 --api-log；未指定时用 <save-dir>/api_calls.jsonl；显式传空串则关闭日志。
+
+    Args:
+        args: 已解析的命令行参数
+        echo: 是否把每次接口调用回显到终端
+
+    Returns:
+        AbstractContextManager[ApiLog | None]: 上下文管理器；进入时得到日志对象，
+            日志被关闭（--api-log 传空串）时为 None
     """
     return _api_log_raw(args.save_dir, args.api_log, echo)
 
 
-def _episode_printer(clear: bool):
-    """按模式打印本局小结（只在需要时输出清除相关字段）。"""
-    def show(stats: dict, check: dict, n_sources: Optional[int]) -> None:
+def _episode_printer(clear: bool) -> "Callable[[dict, dict, int | None], None]":
+    """按模式打印本局小结（只在需要时输出清除相关字段）
+
+    Args:
+        clear: 是否做了阶段二（定位与清除）；False 时只报巡视扫描相关字段
+
+    Returns:
+        Callable[[dict, dict, int | None], None]: 打印函数 show(stats, check, n_sources)
+    """
+    def show(stats: dict, check: dict, n_sources: int | None) -> None:
+        """打印一局的巡视小结与覆盖核对结果
+
+        Args:
+            stats: 本局统计（圆心数、里程、虚拟时间、测向次数、清除个数等）
+            check: 真值核对结果（定位误差、最坏最近距离等；官方模式无真值时为 None）
+            n_sources: 本局干扰源个数（官方模式无真值时为 None）
+        """
         print(f"本局：巡视 {stats['waypoints_visited']} 个圆心，里程 {stats['travel_m']:.0f} m，"
               f"虚拟时间 {stats['virtual_time_s']:.0f} s，测向 {stats['n_measure']} 次；"
               f"听到 {stats['channels_heard']}/{n_sources} 个源"
@@ -68,8 +91,8 @@ def run_practice(args: argparse.Namespace, res: CoverSolveResult, save_dir: Path
                    else default_jammers_dir())
     clear = not args.survey_only
     show = _episode_printer(clear)
-    rows: List[dict] = []
-    observations: List[dict] = []
+    rows: list[dict] = []
+    observations: list[dict] = []
     with _api_log(args, not args.quiet) as api_log, \
             PracticeArena(jammers_dir, robot_id=args.robot_id,
                           robot_port=args.robot_port, console_port=args.console_port,
@@ -217,6 +240,11 @@ def run_official(args: argparse.Namespace, res: CoverSolveResult, save_dir: Path
 
 
 def build_parser() -> argparse.ArgumentParser:
+    """构建命令行解析器
+
+    Returns:
+        argparse.ArgumentParser: 已配置演练 / 官方 / 仅规划三种模式全部选项的解析器
+    """
     p = argparse.ArgumentParser(
         description="2026 CUMCM B 题问题三（第一阶段）：1000 m 覆盖圆求解 + 依次到圆心巡视扫描")
     p.add_argument("--practice", type=int, nargs="?", const=1, default=0,
@@ -282,7 +310,7 @@ def build_parser() -> argparse.ArgumentParser:
     return p
 
 
-def main(argv: Optional[Sequence[str]] = None) -> int:
+def main(argv: Sequence[str] | None = None) -> int:
     """按模式分派：`--practice` → 本地演练；`--plan-only` → 只求覆盖圆；其余 → 官方模拟器。
 
     即 `python T3.py` 不带任何参数时**直接连官方模拟器**（缺省 http://127.0.0.1:2026）跑完一局。
@@ -332,5 +360,5 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     return 0
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     raise SystemExit(main())

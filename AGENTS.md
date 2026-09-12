@@ -91,3 +91,57 @@
   this reason: replacing `np.hypot` by `sqrt(x²+y²)` in the T2 diameter pair loop (last-bit drift in
   `t2_second_site.json`).
 - Design rationale lives in the module docstrings and `README.md`.
+
+## 代码风格（沿用作者在 `~/Projects` 下个人项目的约定）
+
+本仓库所有 Python 代码统一按下面这套约定书写。它不是外部规范，而是作者自己在
+`~/Projects/python/MBridge`、`~/Projects/python/GNNU_API`、`~/Projects/python/CPUISEditor`
+等项目里一贯的写法，新代码与改动都照此办理。
+
+- **docstring**：模块、类、函数、方法都有中文 docstring。一句话摘要写成一行、**结尾不加句号**
+  （如 `"""构建命令行解析器"""`）；需要说明参数/返回值时接 Google 风格段：
+
+  ```python
+  """登陆验证
+
+  Args:
+      student_id: 学号
+      password: 统一验证平台密码
+
+  Returns:
+      tuple[bool, Any]: 是否成功与结果数据
+  """
+  ```
+
+  段内 4 空格缩进，写作 `名字: 说明`、`类型: 说明`。现有模块 docstring 里的数学推导、约束条件与
+  踩过的坑属于**内容**，不要为了"简洁"压缩掉。
+- **类型注解**：函数/方法一律标注参数与返回值，`__init__` 标 `-> None`，内部 `_helper` 同样标注。
+  **只用内建泛型与 `|`**：`list[float]`、`tuple[float, float]`、`dict[str, Any]`、`float | None`，
+  不写 `typing.List/Dict/Tuple/Optional/Union`（`typing` 里只留 `Any`、`Sequence`、`Callable`、
+  `Iterator`、`TextIO`、`NamedTuple` 这类没有内建替身的名字）。numpy 数组用 `np.ndarray`、shapely
+  几何用 `Polygon`/`BaseGeometry`、matplotlib 轴用 `Axes`。跨模块类型只引用本文件已导入的名字，
+  否则用字符串前向引用（`"SimClient"`）——**不要为了写注解新增运行时 import**（分层依赖是硬约定）。
+- **注释**：不明显的语句上方加一行中文注释说明"做什么/为什么"；日志、报错与打印文本一律中文。
+- **导入**：stdlib → 第三方 → 本地包，三组之间空一行；只用绝对导入（`from cumcm.common.x import y`）。
+- **命名与格式**：模块/函数/变量 snake_case，类 PascalCase，内部符号 `_` 前缀，常量全大写；
+  字符串统一双引号，唯一例外是 `if __name__ == '__main__':` 写成单引号（沿用作者个人项目习惯）；
+  行长 ≤ 110 字符；不留行尾空白、不写制表符。
+- **入口**：可直接运行的模块写 `if __name__ == '__main__':`，命令行解析统一用 `argparse`。
+
+**风格改动同样受"优化不变量"约束**：纯风格改动（补注解、补 docstring、加注释、折行）后，
+`T2.py`、`T3.py --plan-only`、`T4.py --plan-only` 的产物必须与改动前逐字节一致，自检
+（`cumcm.analysis.undefined_names` 等）必须全过。**类型注解与 docstring 不得改变任何表达式、
+字面量、控制流或输出文本。**
+
+验证这类改动的做法（本仓库没有测试套件，靠下面三条证据）：
+
+1. **全量自检 + 产物零改动**：跑完五条自检与 `T2.py`、`T3.py --plan-only`、`T4.py --plan-only`，
+   要求 `git status --porcelain -- results paper/t2/figures` 为空——空就说明产物与改动前逐字节一致。
+2. **AST 归一化审计**：把 `HEAD` 版与工作区版都解析成 AST，剥离 docstring、函数签名注解、带注解
+   赋值的注解、类型别名与 import 名单后比对 `ast.dump`，必须完全相同（注释本就不进 AST）。这一步能
+   证明"只有注解/docstring/注释/导入写法变了"。为折行而提取局部变量之类的改动会被它标出来，属正常，
+   但必须再用第 3 条单独验证。
+3. **真题 A/B**：出现过语句层改动的文件，用 `--practice N --seed 0`（官方模拟器绝不参与）在
+   两种版本下各跑一次同一 seed，比对 `--save-dir` 里的 `t3_survey.json`、`t3_observations.csv`
+   （T4 同理）与 stdout；产物必须逐字节一致。stdout 里每次调用的墙钟毫秒数本就随机，比对时按
+   `（N ms` 归一化即可。

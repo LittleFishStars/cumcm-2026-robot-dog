@@ -20,7 +20,7 @@ from __future__ import annotations
 
 import math
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Any, Sequence
 
 import numpy as np
 
@@ -41,13 +41,20 @@ __all__ = ["truth_points", "draw_trajectory", "save_trajectory", "save_scan_figu
 _DIR_RAY_M = 260.0
 
 
-def _draw_beams(ax, sources: Sequence[Dict[str, Any]], th: np.ndarray) -> None:
-    """定向源画 ±90° 波束扇形（用沿波束方向的两条半径 + 弧近似）。"""
+def _draw_beams(ax: "Axes", sources: Sequence[dict[str, Any]], th: np.ndarray) -> None:
+    """定向源画 ±90° 波束扇形（用沿波束方向的两条半径 + 弧近似）
+
+    Args:
+        ax: matplotlib 轴对象
+        sources: 真值源列表（定向源须带 kind="directional" 与 direction_deg）
+        th: 圆周角度采样数组（统一绘图辅助函数签名保留，本函数未用到）
+    """
     for s in sources:
         if s.get("kind") != "directional" or s.get("direction_deg") is None:
             continue
         a = math.radians(s["direction_deg"])
         lo, hi = a - math.radians(DIR_BEAM_HALF_DEG), a + math.radians(DIR_BEAM_HALF_DEG)
+        # 扇形边界折线 = 圆心 → 波束角范围内的圆弧（半径取接收半径上界）→ 回到圆心
         xx = np.concatenate([[s["x"]], s["x"] + RECEIVE_MAX * np.cos(np.linspace(lo, hi, 41)),
                              [s["x"]]])
         yy = np.concatenate([[s["y"]], s["y"] + RECEIVE_MAX * np.sin(np.linspace(lo, hi, 41)),
@@ -55,10 +62,10 @@ def _draw_beams(ax, sources: Sequence[Dict[str, Any]], th: np.ndarray) -> None:
         ax.fill(xx, yy, color=C_SRC, alpha=0.10, lw=0.0, zorder=1.2)
 
 
-def draw_trajectory(out_path: Path, actions: Sequence[Dict[str, Any]],
+def draw_trajectory(out_path: Path, actions: Sequence[dict[str, Any]],
                     plan: SweepPlan, order: Sequence[int] = (),
-                    sources: Sequence[Dict[str, Any]] = (),
-                    title: Optional[str] = None) -> Path:
+                    sources: Sequence[dict[str, Any]] = (),
+                    title: str | None = None) -> Path:
     """画一局的轨迹图并落盘（PNG）。"""
     setup_mpl_env()
     import matplotlib
@@ -131,11 +138,11 @@ def draw_trajectory(out_path: Path, actions: Sequence[Dict[str, Any]],
     return out_path
 
 
-def save_trajectory(save_dir: Path, name: str, actions: Sequence[Dict[str, Any]],
+def save_trajectory(save_dir: Path, name: str, actions: Sequence[dict[str, Any]],
                     plan: SweepPlan, order: Sequence[int] = (),
-                    sources: Sequence[Dict[str, Any]] = (),
-                    title: Optional[str] = None,
-                    traj_dir: str = TRAJ_DIR) -> List[Path]:
+                    sources: Sequence[dict[str, Any]] = (),
+                    title: str | None = None,
+                    traj_dir: str = TRAJ_DIR) -> list[Path]:
     """落盘一局的轨迹：PNG（图）与 CSV（轨迹表），返回已写出的文件列表。"""
     return _save_trajectory(
         save_dir, name, actions,
@@ -143,10 +150,10 @@ def save_trajectory(save_dir: Path, name: str, actions: Sequence[Dict[str, Any]]
         traj_dir)
 
 
-def save_scan_figures(save_dir: Path, name: str, steps: Sequence[Dict[str, Any]],
+def save_scan_figures(save_dir: Path, name: str, steps: Sequence[dict[str, Any]],
                       plan: SweepPlan, order: Sequence[int] = (),
-                      sources: Sequence[Dict[str, Any]] = (),
-                      step_dir: str = STEP_DIR_NAME) -> List[Path]:
+                      sources: Sequence[dict[str, Any]] = (),
+                      step_dir: str = STEP_DIR_NAME) -> list[Path]:
     """把一局内**每一步扫描测量**各画一张结果图，落在 <save-dir>/<step_dir>/ 下。
 
     文件名形如 `ep01_s00_起点全频道扫描.png`、`ep01_s04_测量位置4.png`，排序后与执行顺序一致。
@@ -155,7 +162,7 @@ def save_scan_figures(save_dir: Path, name: str, steps: Sequence[Dict[str, Any]]
     """
     out_dir = save_dir / step_dir
     out_dir.mkdir(parents=True, exist_ok=True)
-    paths: List[Path] = []
+    paths: list[Path] = []
     for k, raw in enumerate(steps):
         out = scan_figure_path(out_dir, name, k, raw)
         try:

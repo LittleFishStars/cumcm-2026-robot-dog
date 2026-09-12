@@ -20,7 +20,7 @@ no_signal 尤其宝贵：它把"什么都没听到"变成实质的排除约束�
 
 from __future__ import annotations
 
-from typing import NamedTuple, Optional
+from typing import NamedTuple
 
 from cumcm.common.disc_region import DiscConstraintMixin
 from cumcm.t1 import TriangulationRegion
@@ -52,7 +52,7 @@ class Meas(NamedTuple):
     x: float
     y: float
     outcome: str                        # direction / near / no_signal
-    theta: Optional[float] = None       # 仅 direction 时有值
+    theta: float | None = None       # 仅 direction 时有值
     stage: str = "survey"
 
 
@@ -85,12 +85,12 @@ class ProbRegion(DiscConstraintMixin, TriangulationRegion):
 
     WITH_OUTSIDE = True
 
-    def __init__(self, err: float = 1.0, radius: Optional[float] = None,
-                 sides: Optional[int] = None, quad: int = EXCL_QUAD) -> None:
+    def __init__(self, err: float = 1.0, radius: float | None = None,
+                 sides: int | None = None, quad: int = EXCL_QUAD) -> None:
         """err / radius / sides 见父类；quad 为圆盘近似的正多边形精度（见 config.EXCL_QUAD）。"""
         super().__init__(err, radius, sides, quad)
 
     @property
-    def diameter(self):
+    def diameter(self) -> float:
         """区域直径 / m：父类按顶点算最远点对（非凸多块时是保守上界，见类文档）。"""
         return self._memo("diameter", lambda: TriangulationRegion.diameter.fget(self))

@@ -51,7 +51,14 @@ def main() -> None:
     with PracticeArena(Path(__file__).resolve().parent / "jammers-py", robot_id="A",
                        robot_port=a.robot_port, console_port=a.console_port,
                        reuse_existing=False, problem_no=4) as arena:
-        def run(label: str, points: np.ndarray, seeds):
+        def run(label: str, points: np.ndarray, seeds: list[int]) -> None:
+            """跑一组布局：逐 seed 演练并打印耗时、里程与顺路清除结果
+
+            Args:
+                label: 打印用的方案名
+                points: 访问点坐标数组
+                seeds: 演练用的随机种子列表
+            """
             plan = make_plan(points)
             for sd in seeds:
                 arena.start_episode(sd)
@@ -78,5 +85,5 @@ def main() -> None:
                     assemble(z["pts"][i]), a.seeds)
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()

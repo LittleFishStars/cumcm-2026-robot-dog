@@ -20,7 +20,7 @@ from __future__ import annotations
 import math
 import re
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Sequence
 
 import numpy as np
 
@@ -38,11 +38,11 @@ from cumcm.t3.covering import CoverPlan
 __all__ = ["truth_points", "draw_trajectory", "save_trajectory", "save_scan_figures"]
 
 
-def draw_trajectory(out_path: Path, actions: Sequence[Dict[str, Any]],
+def draw_trajectory(out_path: Path, actions: Sequence[dict[str, Any]],
                     plan: CoverPlan, order: Sequence[int] = (),
-                    sources: Sequence[Dict[str, Any]] = (),
-                    title: Optional[str] = None,
-                    figsize: Tuple[float, float] = (9.0, 7.6)) -> Path:
+                    sources: Sequence[dict[str, Any]] = (),
+                    title: str | None = None,
+                    figsize: tuple[float, float] = (9.0, 7.6)) -> Path:
     """把一局的轨迹画成图并存盘（格式由后缀决定，.png / .pdf）。
 
     - `actions`：逐次动作记录（RobotDog.actions），含测向与清除的落点、结果类型、虚拟时刻；
@@ -131,11 +131,11 @@ def draw_trajectory(out_path: Path, actions: Sequence[Dict[str, Any]],
     return out_path
 
 
-def save_trajectory(save_dir: Path, name: str, actions: Sequence[Dict[str, Any]],
+def save_trajectory(save_dir: Path, name: str, actions: Sequence[dict[str, Any]],
                     plan: CoverPlan, order: Sequence[int] = (),
-                    sources: Sequence[Dict[str, Any]] = (),
-                    title: Optional[str] = None,
-                    traj_dir: str = TRAJ_DIR) -> List[Path]:
+                    sources: Sequence[dict[str, Any]] = (),
+                    title: str | None = None,
+                    traj_dir: str = TRAJ_DIR) -> list[Path]:
     """落盘一局的轨迹：同名 PNG（图）与 CSV（轨迹表），返回已写出的文件列表。
 
     轨迹表让"图上每个点"都能与过程日志逐点对账（序号、动作类型、阶段、坐标、结果、频道、
@@ -147,10 +147,10 @@ def save_trajectory(save_dir: Path, name: str, actions: Sequence[Dict[str, Any]]
         traj_dir)
 
 
-def save_scan_figures(save_dir: Path, name: str, steps: Sequence[Dict[str, Any]],
+def save_scan_figures(save_dir: Path, name: str, steps: Sequence[dict[str, Any]],
                       plan: CoverPlan, order: Sequence[int] = (),
-                      sources: Sequence[Dict[str, Any]] = (),
-                      step_dir: str = STEP_DIR_NAME) -> List[Path]:
+                      sources: Sequence[dict[str, Any]] = (),
+                      step_dir: str = STEP_DIR_NAME) -> list[Path]:
     """把一局内**每一步扫描**各画一张结果图，落在 <save-dir>/<step_dir>/ 下。
 
     文件名形如 `ep01_s00_起点全频道扫描.png`、`ep01_s03_巡视站3.png`：局号 + 步序，排序后
@@ -161,8 +161,8 @@ def save_scan_figures(save_dir: Path, name: str, steps: Sequence[Dict[str, Any]]
     out_dir.mkdir(parents=True, exist_ok=True)
     wp = [tuple(map(float, c)) for c in plan.waypoints]
     # 各站"已访问"集合：到第 i 步时，计划顺序里前 i 个站已走过（起点扫描不含任何站）
-    visited: List[int] = []
-    paths: List[Path] = []
+    visited: list[int] = []
+    paths: list[Path] = []
     for k, raw in enumerate(steps):
         idx = int(raw.get("index", k))
         if idx > 0:                                  # 第 idx 个巡视站访问完，加进已访问集合
@@ -185,7 +185,7 @@ def save_scan_figures(save_dir: Path, name: str, steps: Sequence[Dict[str, Any]]
     return paths
 
 
-def _waypoint_of_label(label: str, order: Sequence[int], step_i: int) -> Optional[int]:
+def _waypoint_of_label(label: str, order: Sequence[int], step_i: int) -> int | None:
     """从步骤标签里取出圆心编号（标签形如 "巡视站 3（圆心 5）"）。取不到时按顺序退推。"""
     m = re.search(r"圆心\s*(\d+)", label)
     if m:

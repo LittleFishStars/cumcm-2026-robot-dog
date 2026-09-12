@@ -30,7 +30,7 @@ from cumcm.common.sim_client import (API_LOG_NAME, BASE_URL, ROBOT_ID, ApiLog,
 __all__ = ["ROBOT_ID", "BASE_URL", "API_LOG_NAME", "Simulator", "ms_since",
            "api_brief", "ApiLog", "api_log", "RecordedSim"]
 
-if __name__ == "__main__":                   # 保留原有自检：连一次模拟器走通进出场
+if __name__ == '__main__':                   # 保留原有自检：连一次模拟器走通进出场
     sim = Simulator()
     print(sim.enter())
     print(sim.exit())

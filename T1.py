@@ -26,5 +26,5 @@ from cumcm.t1.triangulation import TriangulationRegion, _demo
 __all__ = ["TriangulationRegion"]
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     _demo()

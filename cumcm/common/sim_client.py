@@ -31,7 +31,7 @@ import urllib.request
 from collections import defaultdict
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Callable, Dict, Iterator, Optional, TextIO
+from typing import Any, Callable, Iterator, TextIO
 
 __all__ = ["ROBOT_ID", "BASE_URL", "API_LOG_NAME", "Simulator", "ApiLog", "RecordedSim",
            "api_brief", "ms_since", "api_log"]
@@ -46,12 +46,29 @@ class Simulator:
 
     def __init__(self, robot_id: str = ROBOT_ID, base_url: str = BASE_URL,
                  timeout: float = 5.0) -> None:
+        """初始化模拟器接口封装
+
+        Args:
+            robot_id: 参赛队号，必须与模拟器登录的队号一致
+            base_url: 模拟器地址（只监听本机回环）
+            timeout: 单次 HTTP 请求超时 / s
+        """
         self.robot_id = robot_id
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout
         self._seq = 0
 
-    def _post(self, path: str, request_id: Optional[str] = None, **fields: Any) -> dict:
+    def _post(self, path: str, request_id: str | None = None, **fields: Any) -> dict:
+        """POST 一个接口并解析返回的 JSON
+
+        Args:
+            path: 接口路径，如 "/measure"
+            request_id: 断线重试时传入原 request_id 以复用原请求；None 表示按序号新生成
+            **fields: 该接口的业务字段，直接并入请求体
+
+        Returns:
+            dict: 模拟器返回的 JSON 响应
+        """
         self._seq += 1
         payload = {
             "arena_id": "default",
@@ -68,18 +85,22 @@ class Simulator:
         with urllib.request.urlopen(request, timeout=self.timeout) as response:
             return json.loads(response.read().decode("utf-8"))
 
-    def enter(self, request_id: Optional[str] = None) -> dict:
+    def enter(self, request_id: str | None = None) -> dict:
+        """进入模拟器（/enter），此后开始占用现实时间预算"""
         return self._post("/enter", request_id)
 
     def measure(self, x: float, y: float, channel: int,
-                request_id: Optional[str] = None) -> dict:
+                request_id: str | None = None) -> dict:
+        """在 (x, y) 处测量频道 channel 的信号（/measure）"""
         return self._post("/measure", request_id, position={"x": x, "y": y}, channel=channel)
 
     def clear(self, x: float, y: float, channel: int,
-              request_id: Optional[str] = None) -> dict:
+              request_id: str | None = None) -> dict:
+        """在 (x, y) 处对频道 channel 执行清除（/clear）"""
         return self._post("/clear", request_id, position={"x": x, "y": y}, channel=channel)
 
-    def exit(self, request_id: Optional[str] = None) -> dict:
+    def exit(self, request_id: str | None = None) -> dict:
+        """退出模拟器（/exit）并结束计时"""
         return self._post("/exit", request_id)
 
 
@@ -126,18 +147,24 @@ class ApiLog:
     路径为 --api-log 指定的文件，或 <save-dir>/api_calls.jsonl。
     """
 
-    def __init__(self, path: Path, echo: Optional[Callable[[str], None]] = None) -> None:
+    def __init__(self, path: Path, echo: Callable[[str], None] | None = None) -> None:
+        """初始化接口日志
+
+        Args:
+            path: 日志文件路径（JSONL，一行一次调用）
+            echo: 每条记录的单行摘要回调；None 表示不回显
+        """
         self.path = Path(path)
-        self._fh: Optional[TextIO] = None
+        self._fh: TextIO | None = None
         self._echo = echo
         self._t0 = time.monotonic()
-        self.counts: Dict[str, int] = defaultdict(int)
+        self.counts: dict[str, int] = defaultdict(int)
 
     def elapsed(self) -> float:
         """自日志建立起的秒数（单调时钟），用于记录各次调用的相对时刻。"""
         return time.monotonic() - self._t0
 
-    def _ensure_open(self, ok: bool, rec: Dict[str, Any]) -> TextIO:
+    def _ensure_open(self, ok: bool, rec: dict[str, Any]) -> TextIO:
         """本轮第一次落盘时决定打开方式（说明见类文档：成功过就重写，纯失败则追加）。"""
         if self._fh is None:
             self.path.parent.mkdir(parents=True, exist_ok=True)
@@ -148,7 +175,7 @@ class ApiLog:
                 self._fh = self.path.open("w", encoding="utf-8")
         return self._fh
 
-    def write(self, rec: Dict[str, Any], line: str) -> None:
+    def write(self, rec: dict[str, Any], line: str) -> None:
         """落盘一条调用记录，并把单行摘要交给终端。"""
         fh = self._ensure_open(bool(rec.get("ok")), rec)
         self.counts[rec["call"]] += 1
@@ -164,13 +191,14 @@ class ApiLog:
             print(f"接口调用日志：共 {sum(self.counts.values())} 次（{detail}）→ {self.path}")
 
     def close(self) -> None:
+        """关闭日志文件句柄（从未落盘过则什么都不做）"""
         if self._fh is not None:
             self._fh.close()
             self._fh = None
 
 
 @contextmanager
-def api_log(save_dir: str, raw: Optional[str], echo: bool) -> Iterator[Optional[ApiLog]]:
+def api_log(save_dir: str, raw: str | None, echo: bool) -> Iterator[ApiLog | None]:
     """接口日志的上下文：进入时建文件，退出时关闭。
 
     路径优先用 raw（--api-log）；未指定时用 <save-dir>/api_calls.jsonl；显式传空串则关闭日志。
@@ -192,30 +220,41 @@ class RecordedSim:
     """
 
     def __init__(self, sim: Simulator, log: ApiLog, episode: int = 0) -> None:
+        """初始化记录代理
+
+        Args:
+            sim: 被代理的 Simulator 实例
+            log: 调用落盘用的 ApiLog
+            episode: 局号，参与生成 request_id，保证跨局不重复
+        """
         self._sim = sim
         self._log = log
         self.episode = episode
         self.seq = 0
 
     def enter(self) -> dict:
+        """记录并转发 /enter 调用"""
         return self._call("/enter", {}, lambda rid: self._sim.enter(request_id=rid))
 
     def measure(self, x: float, y: float, channel: int) -> dict:
+        """记录并转发 /measure 调用"""
         return self._call("/measure", {"x": x, "y": y, "channel": int(channel)},
                           lambda rid: self._sim.measure(x, y, int(channel), request_id=rid))
 
     def clear(self, x: float, y: float, channel: int) -> dict:
+        """记录并转发 /clear 调用"""
         return self._call("/clear", {"x": x, "y": y, "channel": int(channel)},
                           lambda rid: self._sim.clear(x, y, int(channel), request_id=rid))
 
     def exit(self) -> dict:
+        """记录并转发 /exit 调用"""
         return self._call("/exit", {}, lambda rid: self._sim.exit(request_id=rid))
 
-    def _call(self, call: str, params: Dict[str, Any], send: Callable[[str], dict]) -> dict:
+    def _call(self, call: str, params: dict[str, Any], send: Callable[[str], dict]) -> dict:
         """执行一次调用并记录：先落请求与时刻，再按成功/异常分别补全结果。"""
         self.seq += 1
         rid = f"{call.strip('/')}-{self.episode}-{self.seq}"
-        rec: Dict[str, Any] = {"episode": self.episode, "seq": self.seq, "call": call,
+        rec: dict[str, Any] = {"episode": self.episode, "seq": self.seq, "call": call,
                                "request_id": rid, "at_s": round(self._log.elapsed(), 3),
                                **params}
         where = ("" if "channel" not in rec

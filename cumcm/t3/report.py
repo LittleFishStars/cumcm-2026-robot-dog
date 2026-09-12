@@ -12,7 +12,7 @@ from __future__ import annotations
 import csv
 import json
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Any, Sequence
 
 import numpy as np
 
@@ -23,16 +23,16 @@ from cumcm.t3.covering import CoverPlan, CoverSolveResult
 from cumcm.t3.regions import Meas, Obs
 
 
-def truth_check(truth: Optional[Sequence[dict]], plan: CoverPlan,
-                obs: Dict[int, List[Obs]], cleared: set,
-                tracks: Optional[Dict[int, Dict[str, Any]]] = None) -> Dict[str, Any]:
+def truth_check(truth: Sequence[dict] | None, plan: CoverPlan,
+                obs: dict[int, list[Obs]], cleared: set,
+                tracks: dict[int, dict[str, Any]] | None = None) -> dict[str, Any]:
     """逐源核对（仅演练模式拿得到真值）：
 
     * 覆盖保证：源到最近覆盖圆圆心的距离是否 ≤ 1000 m、它的频道是否真的被听到；
     * 清除结果：清除点与真值的距离（定位误差）、是否落在 20 m 清除半径内。
     """
     tracks = tracks or {}
-    rows: List[Dict[str, Any]] = []
+    rows: list[dict[str, Any]] = []
     for j in truth or []:
         p = (float(j["position"]["x"]), float(j["position"]["y"]))
         d_near = float(np.linalg.norm(plan.waypoints - np.asarray(p), axis=1).min())
@@ -70,7 +70,7 @@ def truth_check(truth: Optional[Sequence[dict]], plan: CoverPlan,
 # ----------------------------------------------------------------------------
 # 本地演练场：拉起 jammers-py 并用其控制台 REST 开一局
 
-def save_plan(res: CoverSolveResult, save_dir: Path) -> List[Path]:
+def save_plan(res: CoverSolveResult, save_dir: Path) -> list[Path]:
     """覆盖圆方案落盘：JSON（含校验与对照）+ CSV（圆心坐标）。"""
     save_dir.mkdir(parents=True, exist_ok=True)
     json_path = save_dir / PLAN_JSON
@@ -86,10 +86,10 @@ def save_plan(res: CoverSolveResult, save_dir: Path) -> List[Path]:
     return [json_path, csv_path]
 
 
-def summarize(rows: Sequence[dict]) -> Dict[str, Any]:
+def summarize(rows: Sequence[dict]) -> dict[str, Any]:
     """整批演练的阶段二汇总：清除率、时间、定位误差、清除方式分布。"""
     src = [s for r in rows for s in r.get("truth_check", {}).get("sources", ())]
-    methods: Dict[str, int] = {}
+    methods: dict[str, int] = {}
     for s in src:
         methods[str(s.get("method"))] = methods.get(str(s.get("method")), 0) + 1
     errs = [s["localize_err_m"] for s in src if s.get("localize_err_m") is not None]
@@ -128,8 +128,8 @@ def summarize(rows: Sequence[dict]) -> Dict[str, Any]:
     }
 
 
-def save_survey(save_dir: Path, rows: List[dict], observations: List[dict],
-                plan_json: Dict[str, Any], meta: Optional[dict] = None) -> List[Path]:
+def save_survey(save_dir: Path, rows: list[dict], observations: list[dict],
+                plan_json: dict[str, Any], meta: dict | None = None) -> list[Path]:
     """巡视扫描结果落盘：逐局统计 JSON + 逐条观测 CSV。
 
     `meta` 说明这次运行的来源（mode 取 practice / official，另含地址、队号、局数等）。
@@ -160,9 +160,9 @@ def save_survey(save_dir: Path, rows: List[dict], observations: List[dict],
     return [json_path, csv_path]
 
 
-def episode_row(ep: int, seed: Optional[int], truth: Optional[Sequence[dict]],
+def episode_row(ep: int, seed: int | None, truth: Sequence[dict] | None,
                 dog: RobotDog,
-                stats: Dict[str, Any], check: Dict[str, Any]) -> Dict[str, Any]:
+                stats: dict[str, Any], check: dict[str, Any]) -> dict[str, Any]:
     """单局汇总行：把引擎统计、真值核对与逐频道档案合成一行（供 JSON / 绘图使用）。
 
     `seed` 在演练模式下是本局的随机种子；官方模式的场景由平台生成、不受我们控制，故传 None。
@@ -186,7 +186,7 @@ def episode_row(ep: int, seed: Optional[int], truth: Optional[Sequence[dict]],
         "cleared_channels": sorted(dog.cleared),
     }
 
-def observation_rows(ep: int, plan: CoverPlan, meas: Dict[int, List[Meas]]) -> List[dict]:
+def observation_rows(ep: int, plan: CoverPlan, meas: dict[int, list[Meas]]) -> list[dict]:
     """把本局全部测量整理成 CSV 行（含 no_signal，并附"测量点到最近圆心的距离"）。"""
     rows = []
     for ch, ml in sorted(meas.items()):

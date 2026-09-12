@@ -19,7 +19,7 @@ from __future__ import annotations
 import argparse
 import math
 import time
-from typing import List, Optional, Sequence, Tuple
+from typing import Sequence
 
 import numpy as np
 import torch
@@ -51,7 +51,21 @@ def assemble(outer: np.ndarray) -> np.ndarray:
 # 向量化蒙特卡洛缺听率（含 7 基点结构）
 # --------------------------------------------------------------------------
 def fast_miss(pts: Sequence[Sequence[float]], n: int = 30_000,
-              seed: int = 0) -> Tuple[float, float]:
+              seed: int = 0) -> tuple[float, float]:
+    """向量化评估一个布局的缺听率，返回 (定向缺听, 全向缺听)
+
+    与 `nn_layout.fast_miss` 同一口径：定向源需半圆盘命中，全向源只需圆盘命中；
+    场景为 |g| 面积均匀到 1770、θ 均匀、R ∈ [1000, 1500]。pts 一般已由 assemble 拼成
+    "原点 + 7 基点 + 外圈点"的完整布局。
+
+    Args:
+        pts: (N, 2) 测量点坐标
+        n: 蒙特卡洛算例数
+        seed: 随机种子
+
+    Returns:
+        tuple[float, float]: 定向缺听率与全向缺听率
+    """
     P = np.asarray(pts, dtype=float)
     rng = np.random.default_rng(seed)
     g_r = 1770.0 * np.sqrt(rng.random(n))
@@ -60,10 +74,12 @@ def fast_miss(pts: Sequence[Sequence[float]], n: int = 30_000,
     th = rng.random(n) * 2.0 * math.pi
     U = np.stack((np.cos(th), np.sin(th)), axis=1)
     Rv = rng.uniform(1000.0, 1500.0, n)
+    # 位移向量 (n, N, 2)；dist2 / proj 是它的平方距离与沿源朝向的投影，均为 (n, N)
     D = G[:, None, :] - P[None, :, :]
     dist2 = np.einsum("ijk,ijk->ij", D, D)
     in_rad = dist2 <= Rv[:, None] * Rv[:, None] + 1e-9
     proj = np.einsum("ijk,ik->ij", D, U)
+    # 半圆盘命中：落在有效接收半径内，且沿源朝向的投影非负
     dir_hit = in_rad & (proj >= -1e-9)
     return 1.0 - dir_hit.any(axis=1).mean(), 1.0 - in_rad.any(axis=1).mean()
 
@@ -102,6 +118,18 @@ def gen_outer(n: int, seed: int = 1) -> np.ndarray:
 
 
 def label_outer(configs: np.ndarray, mc_n: int, seed: int = 7) -> np.ndarray:
+    """为 (M, 12, 2) 的外圈配置批量打标签：返回 (M, 2) = [定向缺听, 全向缺听]
+
+    每条配置先按"非零槽位"截出实际外圈点，再拼上原点与 7 基点后做蒙特卡洛评估。
+
+    Args:
+        configs: (M, 12, 2) 外圈槽位，不足 12 个点的配置用 0 补齐
+        mc_n: 每条样本的蒙特卡洛算例数
+        seed: 随机种子基值（第 i 条用 seed + i*7）
+
+    Returns:
+        np.ndarray: (M, 2) 缺听率标签
+    """
     M = len(configs)
     lab = np.empty((M, 2), dtype=float)
     for i in range(M):
@@ -114,13 +142,30 @@ def label_outer(configs: np.ndarray, mc_n: int, seed: int = 7) -> np.ndarray:
 # 代理（输入 12 槽位外圈点，输出 log1p 缺听）
 # --------------------------------------------------------------------------
 class Net(nn.Module):
-    def __init__(self, n_in: int, h1: int = 128, h2: int = 128):
+    """两层 MLP：输入 (24,)（12 个外圈槽位归一化坐标）→ 输出 (2,) = 定向/全向缺听率。"""
+
+    def __init__(self, n_in: int, h1: int = 128, h2: int = 128) -> None:
+        """构造两层 MLP
+
+        Args:
+            n_in: 输入维度（= OUTER_SLOT * 2）
+            h1: 第一隐藏层宽度
+            h2: 第二隐藏层宽度
+        """
         super().__init__()
         self.net = nn.Sequential(nn.Linear(n_in, h1), nn.ReLU(),
                                  nn.Linear(h1, h2), nn.ReLU(),
                                  nn.Linear(h2, 2))
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """前向传播：外圈槽位特征 → 两个头的缺听率预测
+
+        Args:
+            x: (B, n_in) 外圈槽位特征张量
+
+        Returns:
+            torch.Tensor: (B, 2) 定向 / 全向缺听率（log1p 尺度）
+        """
         return self.net(x)
 
 
@@ -131,7 +176,20 @@ def featurize(outer: np.ndarray) -> np.ndarray:
 
 def train_net(X: np.ndarray, Y: np.ndarray, epochs: int = 200,
               batch: int = 256, lr: float = 1.5e-3, dev: str = "cpu"
-              ) -> Tuple[nn.Module, List[float]]:
+              ) -> tuple[nn.Module, list[float]]:
+    """Adam 训练代理网络，返回 (网络, 每 epoch 平均损失)
+
+    Args:
+        X: (M, n_in) 归一化外圈槽位特征
+        Y: (M, 2) 目标值（log1p 缺听率）
+        epochs: 训练轮数
+        batch: 批大小
+        lr: 学习率
+        dev: 计算设备
+
+    Returns:
+        tuple[nn.Module, list[float]]: 训练好的网络与逐 epoch 平均损失
+    """
     n = X.shape[0]
     net = Net(X.shape[1]).to(dev)
     opt = torch.optim.Adam(net.parameters(), lr=lr)
@@ -159,6 +217,14 @@ def train_net(X: np.ndarray, Y: np.ndarray, epochs: int = 200,
 # GA：固定 7 基点，优化 k 个外圈点（k 由 --ga-outer 给定）
 # --------------------------------------------------------------------------
 def route_of(layout: np.ndarray) -> float:
+    """从原点出发、访问全部测量点的最短开放路径里程（确定性最近邻 + 2-opt）
+
+    Args:
+        layout: (N, 2) 布局，按约定第 0 个点是原点
+
+    Returns:
+        float: 路径总里程 / m
+    """
     pts = np.asarray(layout, dtype=float)
     D = dist_matrix(pts, (0.0, 0.0))
     order = two_opt_greedy(two_opt_first(nearest_order(pts, start=(0.0, 0.0)), D), D)
@@ -173,7 +239,7 @@ def route_of(layout: np.ndarray) -> float:
 def ga_outer(net: nn.Module, k_outer: int, n_pop: int = 200, n_elite: int = 12,
              n_gen: int = 30, mc_elite: int = 200_000, w_omni: float = 0.5,
              w_edge: float = 0.4, w_route: float = 0.0003, seed: int = 9,
-             dev: str = "cpu", log_every: int = 5) -> Tuple[np.ndarray, dict]:
+             dev: str = "cpu", log_every: int = 5) -> tuple[np.ndarray, dict]:
     """代理引导 + 精英保真的进化搜索：个体 = k 个外圈点。
 
     精英精评目标 = 定向缺听 + w·全向 + w·贴边 + w·路线/1000（听率主导、路线平局打破）。
@@ -195,7 +261,7 @@ def ga_outer(net: nn.Module, k_outer: int, n_pop: int = 200, n_elite: int = 12,
             pop[i, :, 0] = rrr * np.cos(aaa)
             pop[i, :, 1] = rrr * np.sin(aaa)
     feats = np.empty((n_pop, OUTER_SLOT * 2), dtype=np.float32)
-    best: Optional[np.ndarray] = None
+    best: np.ndarray | None = None
     best_score = float("inf")
     rec: dict = {"history": [], "elite": []}
     for gen in range(n_gen):
@@ -260,7 +326,17 @@ def ga_outer(net: nn.Module, k_outer: int, n_pop: int = 200, n_elite: int = 12,
     return best, rec
 
 
-def validate(outer: np.ndarray, mc_n: int = 400_000, seed: int = 2026):
+def validate(outer: np.ndarray, mc_n: int = 400_000, seed: int = 2026) -> dict:
+    """精确验证：返回 {定向缺听/全向缺听/贴边漏/TSP 路程}
+
+    Args:
+        outer: (k, 2) 外圈点；原点与 7 基点由 assemble 补上
+        mc_n: 蒙特卡洛算例数
+        seed: 随机种子
+
+    Returns:
+        dict: 定向缺听率、全向缺听率、贴边对抗漏例数与 TSP 路程 / m
+    """
     lay = assemble(outer)
     dm, om = fast_miss(lay, n=mc_n, seed=seed)
     hit, _ = _hit_cases(lay, *adversarial_cases(360, 40, wrap=False))
@@ -269,6 +345,7 @@ def validate(outer: np.ndarray, mc_n: int = 400_000, seed: int = 2026):
 
 
 def main() -> None:
+    """命令行入口：生成/载入数据 → 训练代理 → GA 搜索外圈摆位 → 精确复核"""
     ap = argparse.ArgumentParser()
     ap.add_argument("--gen", type=int, default=0)
     ap.add_argument("--mc-n", type=int, default=30_000)
@@ -327,5 +404,5 @@ def main() -> None:
           f"贴边 {v['edge_miss']} TSP {v['route_m']:.0f} m（{time.time()-t0:.0f}s）")
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()

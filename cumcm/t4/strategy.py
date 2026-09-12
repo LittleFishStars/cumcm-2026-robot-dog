@@ -34,7 +34,8 @@ from cumcm.common.routing import dist_matrix, exact_open_order
 from cumcm.common.sim_client import RecordedSim
 from cumcm.t4.config import (BEARING_ERROR_DEG, CHANNELS, CLEAR_RADIUS, CLIP_ERR,
                              CLIP_SIDES, HOMING_CAP, HOMING_MAX, HOMING_STEP,
-                             INLINE_MAX_MEC_R, INLINE_NEAR_R, INLINE_R_MAX, INLINE_R_MIN,
+                             INLINE_MAX_MEC_R, INLINE_NEAR_R, INLINE_OUTER_R_M,
+                             INLINE_R_MAX, INLINE_R_MIN,
                              K_CLEAR_MAX, K_COVER_SAMPLES, K_COVER_STEP_MIN, NEAR_RADIUS,
                              OBS_CAP, RECEIVE_MAX, REFINE_MAX, REGION_MARGIN, REGION_RADIUS, SAFETY_MARGIN,
                              SIDE_SCAN_DIAM, SWEEP_OPP_RADIUS, TOL, TRY_CLEAR_RADIUS)
@@ -68,16 +69,27 @@ class RobotDog:
                  sweep_opp_radius: float = SWEEP_OPP_RADIUS,
                  inline_r_min: float = INLINE_R_MIN,
                  inline_r_max: float = INLINE_R_MAX,
+                 inline_r_min_in: Optional[float] = None,
+                 inline_r_max_in: Optional[float] = None,
+                 inline_r_min_out: Optional[float] = None,
+                 inline_r_max_out: Optional[float] = None,
                  inline_near_r: float = INLINE_NEAR_R,
                  inline_max_mec_r: float = INLINE_MAX_MEC_R,
+                 inline_outer_r: float = INLINE_OUTER_R_M,
                  api_log=None) -> None:
         self.sim = sim if api_log is None else RecordedSim(sim, api_log, episode)
         self.verbose = verbose
         self.clear_enabled = bool(clear)
         self.k_clear_max = int(k_clear_max)
         self.sweep_opp_radius = float(sweep_opp_radius)   # 顺路补测半径 / m
-        self.inline_r_min = float(inline_r_min)           # 前向顺路半径下界 / m
+        self.inline_r_min = float(inline_r_min)           # 前向顺路半径下界 / m（内外组缺省源自它）
         self.inline_r_max = float(inline_r_max)           # 前向顺路半径上界 / m
+        # 内圈 / 外圈前向半径：None 时跟随全局 inline_r_min/r_max（2026-09-12 内外分组）
+        self.inline_r_min_in = float(inline_r_min if inline_r_min_in is None else inline_r_min_in)
+        self.inline_r_max_in = float(inline_r_max if inline_r_max_in is None else inline_r_max_in)
+        self.inline_r_min_out = float(inline_r_min if inline_r_min_out is None else inline_r_min_out)
+        self.inline_r_max_out = float(inline_r_max if inline_r_max_out is None else inline_r_max_out)
+        self.inline_outer_r = float(inline_outer_r)       # 内外圈分界：本站距原点 > 该值按外圈
         self.inline_near_r = float(inline_near_r)         # 近距顺路清除半径 / m
         self.inline_max_mec_r = float(inline_max_mec_r)   # 参与顺路的区域最大 mec 半径 / m
         self._logfile = open(logfile, "w", encoding="utf-8") if logfile else None
@@ -487,19 +499,24 @@ class RobotDog:
                         est: Sequence[float]) -> Optional[Tuple[float, float, float]]:
         """估计点 est 是否落在「本站→圆心」与「下一站→圆心」两条连线之间的扇区内。
 
-        判据（以区域圆心为参照的极角扇区，半径限定 [INLINE_R_MIN, INLINE_R_MAX]）：
+        判据（以区域圆心为参照的极角扇区，半径按**本站内外圈**分别限定）：
           · 方位：est 与圆心的连线方向 th_est 位于 th_at 与 th_next 夹出的**较短弧**上，即
                 ang_diff(th_est, th_at) + ang_diff(th_est, th_next) == ang_diff(th_at, th_next)
             （三角不等式取等；ang_diff ∈ [0,180]，较短弧是唯一候选）；
-          · 半径：INLINE_R_MIN ≤ r_est ≤ INLINE_R_MAX（下界承接原"排除近圆心点"的语义并入
-            判据本身，上界原 1500 → 搜索最优 1700，比"两站所在半径"更宽）。
+          · 半径：本站为内圈（距原点 ≤ inline_outer_r）用 [INLINE_R_MIN_IN, INLINE_R_MAX_IN]，
+            外圈用 [INLINE_R_MIN_OUT, INLINE_R_MAX_OUT]（下界承接原"排除近圆心点"语义并入
+            判据；外圈点 1850 m，上界放宽到 1900 不挡贴边源）。
         反侧点（th_est 与 th_at 差 180°）由三角不等式排除；必须用角度而不用 sin（|sin 180°|=0
         会把反侧点误判成同向）。返回 (短弧进度 0~1, 距圆心半径, 与 th_at 的角度差)。
         """
+        if math.hypot(at[0], at[1]) > self.inline_outer_r:   # 本站为外圈点
+            r_min, r_max = self.inline_r_min_out, self.inline_r_max_out
+        else:                                                # 本站为内圈点
+            r_min, r_max = self.inline_r_min_in, self.inline_r_max_in
         r_est = math.hypot(est[0], est[1])
-        if r_est < self.inline_r_min - 1e-6:
+        if r_est < r_min - 1e-6:
             return None                              # 距原点太近，不在前向清的范围
-        if r_est > self.inline_r_max + 1e-6:
+        if r_est > r_max + 1e-6:
             return None                              # 超出半径上界
         th_at = self._polar_deg(at)
         th_next = self._polar_deg(next_wp)
@@ -634,9 +651,15 @@ class RobotDog:
         picked.sort(key=lambda p: (p[0], p[1]))  # 沿扇区方位由近到远依次清
         th_a = self._polar_deg(at)
         th_b = self._polar_deg(next_wp)
+        if math.hypot(at[0], at[1]) > self.inline_outer_r:
+            r_min, r_max = self.inline_r_min_out, self.inline_r_max_out
+            ring = "外圈"
+        else:
+            r_min, r_max = self.inline_r_min_in, self.inline_r_max_in
+            ring = "内圈"
         self.log(f"    [顺路清除] 本站 ({at[0]:.0f}, {at[1]:.0f}) → 下一站"
-                 f" ({next_wp[0]:.0f}, {next_wp[1]:.0f})：方位扇区 {th_a:.0f}° ~ {th_b:.0f}°、"
-                 f"半径 {self.inline_r_min:.0f}~{self.inline_r_max:.0f} m、区域覆盖圆半径"
+                 f" ({next_wp[0]:.0f}, {next_wp[1]:.0f})：方位扇区 {th_a:.0f}° ~ {th_b:.0f}°"
+                 f"（{ring}）、半径 {r_min:.0f}~{r_max:.0f} m、区域覆盖圆半径"
                  f" ≤ {self.inline_max_mec_r:.0f} m，有 {len(picked)} 个估计点"
                  + (f"（跳过 {n_too_big} 个区域过大的频道）" if n_too_big else ""))
         n = 0

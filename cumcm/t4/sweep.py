@@ -13,7 +13,10 @@ _in_directional_coverage —— 这就是"搜索不到还有可能是方向不�
 
   1. **原点**：起点全频道扫描（位置成本为零）；
   2. **7 个覆盖基点** = 问题三巡视站（cumcm.t3.config.SURVEY_CENTERS，直接复用，全向覆盖保证）；
-  3. **12 个均匀方位外圈点**，半径 OUTER_RING_RAD = 1850 m（MID_RING_N = 0，不加内部补点）。
+  3. **12 个均匀方位外圈点**，半径 OUTER_RING_RAD = 1850 m（MID_RING_N = 0，不加内部补点），
+     起始方位自 0° 旋转 OUTER_RING_ROT_DEG = 7.5°（2026-09-12 定案：与内圈基点方位错开，
+     方位互补；两组 seed A/B 复核 0°→7.5°：seed 2026-2030 时间持平、误差 8.61→7.15 m，
+     seed 2031-2035 时间 6858→6411 s（−447 s）、里程 −1880 m）。
 
 为什么外圈取 1850 m、12 个方位（这是对"7+21 中点外推"布局的结构优化）：
 
@@ -47,7 +50,7 @@ import numpy as np
 from cumcm.common.routing import dist_matrix, nearest_order, two_opt_first, two_opt_greedy
 from cumcm.t3.config import SURVEY_CENTERS
 from cumcm.t4.config import (MID_RING_N, MID_RING_RAD, MID_RING_ROT_DEG,
-                             OUTER_RING_N, OUTER_RING_RAD)
+                             OUTER_RING_N, OUTER_RING_RAD, OUTER_RING_ROT_DEG)
 
 
 def measure_layout() -> List[Tuple[float, float]]:
@@ -57,7 +60,8 @@ def measure_layout() -> List[Tuple[float, float]]:
     256/256 全清）；比曾用的 23 点版（+3 内部补点，听率 99.9974%）少 ~34 次测向、快 80 s。
     """
     base = np.asarray(SURVEY_CENTERS, dtype=float)
-    ang = np.arange(OUTER_RING_N, dtype=float) * (2.0 * math.pi / OUTER_RING_N)
+    ang = np.arange(OUTER_RING_N, dtype=float) * (2.0 * math.pi / OUTER_RING_N) \
+        + math.radians(OUTER_RING_ROT_DEG)   # 外圈起始旋转角：与内圈基点方位错开（2026-09-12）
     ring = np.stack((OUTER_RING_RAD * np.cos(ang), OUTER_RING_RAD * np.sin(ang)), axis=1)
     mid_pts = np.empty((0, 2))
     if MID_RING_N > 0:                        # MID_RING_N=0 时无内部补点（20 点定案）

@@ -81,6 +81,10 @@ def run_practice(args: argparse.Namespace, plan: SweepPlan, verify: dict, save_d
                            clear=clear, k_clear_max=args.k_clear_max,
                        inline_r_min=args.inline_r_min,
                        inline_r_max=args.inline_r_max,
+                       inline_r_min_in=args.inline_r_min_in,
+                       inline_r_max_in=args.inline_r_max_in,
+                       inline_r_min_out=args.inline_r_min_out,
+                       inline_r_max_out=args.inline_r_max_out,
                        inline_near_r=args.inline_near_r,
                        inline_max_mec_r=args.inline_max_mec_r,
                        api_log=api_log)
@@ -164,6 +168,10 @@ def run_official(args: argparse.Namespace, plan: SweepPlan, verify: dict, save_d
                        clear=not args.survey_only, k_clear_max=args.k_clear_max,
                        inline_r_min=args.inline_r_min,
                        inline_r_max=args.inline_r_max,
+                       inline_r_min_in=args.inline_r_min_in,
+                       inline_r_max_in=args.inline_r_max_in,
+                       inline_r_min_out=args.inline_r_min_out,
+                       inline_r_max_out=args.inline_r_max_out,
                        inline_near_r=args.inline_near_r,
                        inline_max_mec_r=args.inline_max_mec_r,
                        api_log=api_log)
@@ -231,9 +239,20 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--k-clear-max", type=int, default=K_CLEAR_MAX,
                    help=f"试清未中后最多再补清几个点（缺省 {K_CLEAR_MAX}）")
     p.add_argument("--inline-r-min", type=float, default=INLINE_R_MIN,
-                   help=f"站点间前向顺路清除的估计点半径**下界** / m（缺省 {INLINE_R_MIN:.0f}）")
+                   help=f"站点间前向顺路清除的估计点半径**下界** / m（缺省 {INLINE_R_MIN:.0f}；"
+                        f"未单独指定内外圈时先作用于两组）")
     p.add_argument("--inline-r-max", type=float, default=INLINE_R_MAX,
                    help=f"站点间前向顺路清除的估计点半径**上界** / m（缺省 {INLINE_R_MAX:.0f}）")
+    p.add_argument("--inline-r-min-in", type=float, default=None,
+                   help="内圈站（距原点≤1800）前向顺路半径下界 / m（None=跟随 --inline-r-min）")
+    p.add_argument("--inline-r-max-in", type=float, default=None,
+                   help="内圈站前向顺路半径上界 / m（None=跟随 --inline-r-max）")
+    p.add_argument("--inline-r-min-out", type=float, default=None,
+                   help="外圈站（距原点>1800，即 1850 m 外圈点）前向顺路半径下界 / m"
+                        "（None=跟随 --inline-r-min）")
+    p.add_argument("--inline-r-max-out", type=float, default=None,
+                   help="外圈站前向顺路半径上界 / m（None=跟随 --inline-r-max；外圈点 1850 m，"
+                        "建议上界放宽到 ~1900 不挡贴边源）")
     p.add_argument("--inline-near-r", type=float, default=INLINE_NEAR_R,
                    help=f"每站到站后的近距顺路清除半径 / m（缺省 {INLINE_NEAR_R:.0f}）")
     p.add_argument("--inline-max-mec-r", type=float, default=INLINE_MAX_MEC_R,

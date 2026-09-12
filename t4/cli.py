@@ -253,7 +253,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--robot-id", default=ROBOT_ID, help="参赛队号（须与模拟器一致）")
     p.add_argument("--timeout", type=float, default=5.0, help="HTTP 超时 / s")
     p.add_argument("--jammers-dir", default=None,
-                   help="jammers-py 目录（缺省为本仓库根目录下的 jammers-py/）")
+                   help="jammers-py 目录（缺省为本仓库根目录下的 resources/jammers-py/）")
     p.add_argument("--console-port", type=int, default=8090,
                    help="演练时 jammers-py 控制台端口（缺省 8090，被占用则自动顺延）")
     p.add_argument("--robot-port", type=int, default=2026,

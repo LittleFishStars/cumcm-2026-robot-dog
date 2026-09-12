@@ -272,7 +272,7 @@ def build_parser() -> argparse.ArgumentParser:
                         "里程 ~6207 m）；optimized = 数值优化的最短路径布局（余量 ~5 m，"
                         "里程 ~6167 m）。仅当未用六边形族时生效")
     p.add_argument("--jammers-dir", default=None,
-                   help="jammers-py 目录（缺省为本仓库根目录下的 jammers-py/）")
+                   help="jammers-py 目录（缺省为本仓库根目录下的 resources/jammers-py/）")
     p.add_argument("--console-port", type=int, default=8090,
                    help="演练时 jammers-py 控制台端口（缺省 8090，被占用则自动顺延）")
     p.add_argument("--robot-port", type=int, default=2026,

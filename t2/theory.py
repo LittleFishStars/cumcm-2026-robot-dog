@@ -1,7 +1,7 @@
 """问题二的文献判据层：两站纯方位测向的 Fisher 信息 / CRLB 误差椭圆、GDOP 与几何稀释。
 
 **这一层是干什么的**。问题二问的是"第二个检测点放哪"，文献里对口的正是"bearing-only 最优布站"
-——本模块把那些判据按本机 `References/` 里能读到的原文实现出来，与本文的精确集员判据逐项对照，
+——本模块把那些判据按本机 `resources/References/` 里能读到的原文实现出来，与本文的精确集员判据逐项对照，
 回答三个写论文必须回答的问题：
 
 1. 文献的 GDOP/CRLB 判据**能不能直接用来选点**？
@@ -36,7 +36,7 @@ Foy 1976（几何稀释现象与"极端射线之间再加测向无用"）、任�
 （双站测向误差椭圆长轴/短轴/面积闭式，即两站 CRLB 椭圆）、Chan & Ho 1994（坏 GDOP 下
 LS 类定位器失效、CRLB 作为性能基准）、Chen 等 2009（多观测器 bearings-only 观测点/轨迹优化，
 期望 RMS 准则）。清单里的 E3 Zhao 2012、E4 廖海军 2008、E6 王琦 2016、E5 殷赞、E7 郭永宁
-五篇 PDF **在本机 `References/` 与 `2 题/` 目录中不存在**（`2 题/` 整个目录缺失），
+五篇 PDF **在本机 `resources/References/` 与 `2 题/` 目录中不存在**（`2 题/` 整个目录缺失），
 故只按清单转述、不引具体公式，避免编造。
 
 自检：`python -m t2.theory`
@@ -56,7 +56,7 @@ __all__ = ["CITATIONS", "gamma_deg_at", "fim_two_station", "ellipse_from_fim", "
            "crlb_major", "crlb_area", "gdop", "foy_rmec", "minimax_radius", "radius_field",
            "spearman", "verify_theory"]
 
-#: 文献信息（卷期页码按 References/ 里的原文核过；供论文参考文献表直接取用）
+#: 文献信息（卷期页码按 resources/References/ 里的原文核过；供论文参考文献表直接取用）
 CITATIONS: dict[str, str] = {
     "foy1976": "W. H. Foy. Position-Location Solutions by Taylor-Series Estimation[J]. "
                "IEEE Transactions on Aerospace and Electronic Systems, 1976, AES-12(2): 187-194.",

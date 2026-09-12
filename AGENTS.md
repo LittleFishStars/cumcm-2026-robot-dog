@@ -52,12 +52,13 @@
 - `uv run python -m analysis.undefined_names` — static scan of every repo `.py` for names read
   but never bound / parameters that silently do not exist (the de-facto lint).
 
-## Local simulator (`jammers-py/`)
+## Local simulator (`resources/jammers-py/`)
 
-- `jammers-py/` is the local replica simulator used by `--practice`.
+- `resources/jammers-py/` is the local replica simulator used by `--practice` (`common/paths.py`
+  resolves it via the `JAMMERS_REL_DIR` constant; `--jammers-dir` overrides it).
 - It is **not tracked by git** and may be absent in a fresh clone; if missing, only the offline
   commands above run. If present, `--practice` and ground-truth checks work.
-- `uv run python -m simulator --help` or `cd jammers-py; uv run python run.py`.
+- `uv run python -m simulator --help` or `cd resources/jammers-py; uv run python run.py`.
 
 ## Running against the official simulator
 

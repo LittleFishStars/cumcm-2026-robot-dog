@@ -19,20 +19,22 @@ t4/        问题四（定向 + 全向混合，确定性策略）：config / swe
 analysis/  静态检查：undefined_names（漏定义/缺失参数扫描）
 （六个包都直接放在仓库根，不再套一层包名；每个题目包都带 `__main__.py`，所以
 `python -m t3 --practice 3` 就是原来的 `python T3.py --practice 3`，根目录里不再有薄入口脚本。）
-jammers-py/  本地演练场（复刻模拟器；data/behavior-logs/ 会随每次演练累积日志，可随时清空）
+resources/   本机材料（都不入库，见 .gitignore）：
+  jammers-py/  本地演练场（复刻模拟器；data/behavior-logs/ 会随每次演练累积日志，可随时清空）
+  Problem/     赛题材料
+  References/  参考文献（PDF）
 results/     运行产物，按各题分成独立子树（**不按运行模式分家**：一个目录 = 最新一次运行）：
   t2/        问题二方案（python -m t2）：适合度图 PNG/PDF、全域逐格适合度表 CSV、结论与校验 JSON
   t3/        确定性方案（python -m t3）：覆盖圆方案、巡视汇总、逐条观测、接口日志、总轨迹图、逐步扫描图
   t4/        问题四方案（python -m t4）：扫描方案（7 覆盖基点 + 12 外圈点、含听到率统计）、
              逐局统计、观测明细、接口日志、轨迹图与逐步扫描图
 reports/     方案说明与结果报告
-References/  参考文献（PDF）
-Problem/     赛题材料（已在 .gitignore 中，不入库）
 ```
 
 > `results/` 是**求解产物**：删掉后重跑命令即可原样重建（同 seed 逐字节一致，唯一例外是
 > `api_calls.jsonl` 里带现实时间戳）。
-> `jammers-py/` 与 `References/` 不是代码依赖，只在本地演练/撰写论文时需要。
+> `resources/` 下的演练场与文献不是代码依赖，只在本地演练（`--practice` 会自动去
+> `resources/jammers-py/` 找模拟器）与撰写论文时需要。
 > 论文用图随论文存放：`paper/t2/figures/`（`python -m t2` 直接写出）与 `paper/t4/figures/`
 > （由 `paper/t4/make_figures.py` 读当前 `results/t4/` 生成，图里数字不写死；早期的
 > `figures/` 目录与 `figures_t4*.py` 生成脚本已按用户要求删除）。

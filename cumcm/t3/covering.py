@@ -584,7 +584,8 @@ def print_cover_report(res: CoverSolveResult) -> None:
                  if abs(d - optimal_ring_radius()) < 1e-6 else ""))
     else:
         print(f"参考最坏最近距离 = {res.analytic_worst:.3f} m（一般布局无 d 的闭式，"
-              f"由 config.SURVEY_WORST_M 记录，来源见该常量注释）")
+              f"由 config.{('SURVEY_WORST_UNIFORM' if res.use_uniform else 'SURVEY_WORST_M')} "
+              f"记录，来源见该常量注释）")
     print(f"实算最坏最近距离 = {res.worst_distance:.3f} m @ "
           f"({res.worst_point[0]:.1f}, {res.worst_point[1]:.1f})"
           + (f"；另一族最坏点在 ρ = d/√3 = {d / math.sqrt(3):.1f} m 的角平分线方向上"

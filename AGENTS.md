@@ -137,9 +137,13 @@
 
 验证这类改动的做法（本仓库没有测试套件，靠下面三条证据）：
 
-1. **全量自检 + 产物零改动**：改动前存基线 `find results -type f | sort | xargs sha256sum > /tmp/base.sha256`，
-   跑完五条自检与 `python -m t2`、`python -m t3 --plan-only`、`python -m t4 --plan-only` 后
-   `sha256sum -c /tmp/base.sha256` 必须全部 OK（`results/` 已不入库，不能再用 `git status` 判断）。
+1. **全量自检 + 产物零改动**：改动前在工作区内存基线
+   `find results -type f | sort | xargs sha256sum > .results.sha256`，跑完五条自检与
+   `python -m t2`、`python -m t3 --plan-only`、`python -m t4 --plan-only` 后
+   `sha256sum -c .results.sha256` 必须全部 OK，最后删掉这个基线文件。
+   注意两点：`results/` 已不入库，不能再用 `git status` 判断；基线要放工作区内（本机的 `/tmp`
+   在每条命令之间会被清空，写 `/tmp` 会立刻丢），中英文 locale 下 `sha256sum -c` 分别打印
+   `OK` / `成功`，脚本里判断时两者都要认。
 2. **AST 归一化审计**：把 `HEAD` 版与工作区版都解析成 AST，剥离 docstring、函数签名注解、带注解
    赋值的注解、类型别名与 import 名单后比对 `ast.dump`，必须完全相同（注释本就不进 AST）。这一步能
    证明"只有注解/docstring/注释/导入写法变了"。为折行而提取局部变量之类的改动会被它标出来，属正常，

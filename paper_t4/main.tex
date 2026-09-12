@@ -1,0 +1,157 @@
+% !TEX program = xelatex
+% =============================================================================
+%  问题四（CUMCM 2026 B 题）完整实现方案
+%  在 paper_t4/ 目录下运行：xelatex main.tex（跑两遍解决交叉引用/目录）
+%  图片相对路径 ../figures/ 指向仓库 figures/（矢量 PDF + 两张 NN 对比 PNG）
+%  字体：ctex fontset=fandol（TeX Live 自带开源中文字体，Arch 开箱即用）
+% =============================================================================
+\documentclass[fontset=fandol, 12pt, a4paper]{ctexart}
+
+% ---------- 页面：A4，上下左右 2.5cm ----------
+\usepackage[a4paper, top=2.5cm, bottom=2.5cm, left=2.5cm, right=2.5cm]{geometry}
+
+% ---------- 数学 ----------
+\usepackage{amsmath}
+
+% ---------- 字体（fontspec + ctex，xelatex 编译） ----------
+% 中文宋体/黑体/楷体由 ctex 的 fontset=fandol 自动设置（FandolSong / FandolHei / FandolKai）。
+\IfFontExistsTF{Times New Roman}{\setmainfont{Times New Roman}}{}
+
+% ---------- 正文：12.05pt，首行缩进 2em，两端对齐，行距 0.72em ----------
+\linespread{1.43}
+\setlength{\parindent}{2em}
+
+% ---------- 标题编号（\ctexset 配置） ----------
+\ctexset{
+  section/number       = \chinese{section},
+  subsection/number    = \arabic{section}.\arabic{subsection},
+  subsubsection/number = \arabic{section}.\arabic{subsection}.\arabic{subsubsection},
+}
+
+% ---------- 标题格式（titlesec 配置） ----------
+\usepackage{titlesec}
+\titleformat{\section}
+  {\centering\fontsize{17.3pt}{20.8pt}\heiti\bfseries}
+  {\chinese{section}、}{1em}{}
+\titleformat{\subsection}
+  {\fontsize{14.45pt}{17.4pt}\heiti\bfseries}
+  {\arabic{section}.\arabic{subsection}}{1em}{}
+\titleformat{\subsubsection}
+  {\fontsize{12.05pt}{14.5pt}\heiti\bfseries}
+  {\arabic{section}.\arabic{subsection}.\arabic{subsubsection}}{1em}{}
+\titlespacing{\section}       {0pt}{1.25em}{0.82em}
+\titlespacing{\subsection}    {0pt}{1.15em}{0.55em}
+\titlespacing{\subsubsection} {0pt}{1.15em}{0.55em}
+
+% ---------- 目录（tocloft 点线引导） ----------
+\usepackage{tocloft}
+\renewcommand{\cftsecfont}{\heiti\bfseries}
+\renewcommand{\cftsecpagefont}{\heiti\bfseries}
+\renewcommand{\cftsecleader}{\cftdotfill{\cftdotsep}}
+\renewcommand{\cftsubsecleader}{\cftdotfill{\cftdotsep}}
+\renewcommand{\cftsubsubsecleader}{\cftdotfill{\cftdotsep}}
+
+% ---------- 表格、图片与代码 ----------
+\usepackage{graphicx}   % 图片支持
+\usepackage{booktabs}   % 三线表
+\usepackage{float}      % [H] 立即放置浮动体
+\usepackage{array}
+\usepackage{xcolor}
+\usepackage{listings}
+\lstset{
+  basicstyle=\ttfamily\small,
+  backgroundcolor=\color{black!3},
+  frame=single,
+  framesep=6pt,
+  rulecolor=\color{black!30},
+  framerule=0.8pt,
+  breaklines=true,
+  showstringspaces=false,
+  columns=fullflexible,
+  keepspaces=true,
+}
+
+% ---------- 页码：底部居中 ----------
+\pagestyle{plain}
+
+% ---------- 自定义命令 ----------
+\newcommand{\papertitle}[1]{%
+  \thispagestyle{empty}%
+  \begin{center}
+    {\fontsize{17.3pt}{22pt}\bfseries #1}
+  \end{center}
+  \vspace{1em}
+}
+\newcommand{\abstractcn}[2]{%
+  \thispagestyle{empty}%
+  \begin{center}{\fontsize{14pt}{17pt}\bfseries 摘要}\end{center}
+  #1\par
+  \vspace{1em}
+  {\heiti\bfseries 关键字：}#2\par
+  \newpage
+}
+\makeatletter
+\newcommand{\tocpage}{%
+  \setcounter{page}{1}%
+  \begin{center}
+    {\fontsize{17.3pt}{20.8pt}\heiti\bfseries 目录}
+  \end{center}
+  \vspace{0.5em}
+  \@starttoc{toc}%
+  \newpage
+}
+\makeatother
+\newcommand{\referencescn}{%
+  \addcontentsline{toc}{section}{参考文献}%
+  \input{references}%
+}
+\newcommand{\appendixcn}{%
+  \section*{附录 A\quad 核心代码}%
+  \addcontentsline{toc}{section}{附录 A\quad 核心代码}%
+  \input{sections/A_code}%
+}
+
+\begin{document}
+
+% 封面（不编号）
+\papertitle{定向 + 全向混合干扰源的搜索与清除\\\vspace{0.4em}\large 完整实现方案（问题四）}
+
+% 摘要页（不编号）
+\abstractcn{%
+  本文给出 2026 年 CUMCM B 题问题四"定向 + 全向混合干扰源搜索与清除"的完整实现方案：
+  在机器狗 $5$ m/s 移动、每频道测向 $5$ s、虚拟时间上限 $100$ h 的约束下，以清除率
+  $100\%$ 且虚拟总耗时最短为目标，完成"检测—定位—清除"全流程。针对定向源"只在波束
+  $\pm90^\circ$ 内有信号、背光侧返回 \texttt{no\_signal}"的特性，将检测布局建模为
+  \textbf{半圆盘命中}问题，定案 \textbf{原点 + 7 覆盖基点 + 12 均匀方位外圈点（半径
+  $1850$ m）} 共 $20$ 个测量位置：$422.5$ 万例三重口径（真实随机 $400$ 万 $+$ 贴边对抗
+  $4.3$ 万 $+$ 精细对抗 $18$ 万）实测听到率 $99.9884\%$、贴边对抗 0 漏、访问里程
+  $17\,019$ m。定位只用 \texttt{direction}/\texttt{near} 两类硬约束求交
+  （\texttt{no\_signal} 不作为约束），配合示向度交会补测；清除以"途中顺路清除（站间
+  方位扇区）+ 就近试清 + 兜底逼近"三级机制完成。$20$ 局固定 seed 演练
+  \textbf{$256/256$ 全清、0 失败}，平均虚拟耗时 $6850$ s（$\approx 114$ min）、测向
+  $251$ 次/局、清除点定位误差均值 $7.27$ m（全部 $\le 20$ m）。时间优化逐旋钮验证并
+  收敛到 $6850$ s 实测下界，神经网络独立搜索交叉验证该下界可信；全程确定性可复现、
+  离线模拟器对拍证据链完整。%
+}{%
+  机器狗搜索清除 \quad 定向干扰源 \quad 半圆盘覆盖 \quad 交会定位 \quad 顺路清除 \quad 时间最优%
+}
+
+% 目录页（页码从 1 开始）
+\tocpage
+
+\input{sections/1_restatement}
+\input{sections/2_analysis}
+\input{sections/3_assumptions}
+\input{sections/4_symbols}
+\input{sections/5_problem1}
+\input{sections/6_problem2}
+\input{sections/7_problem3}
+\input{sections/8_sensitivity}
+\input{sections/9_evaluation}
+
+\newpage
+\referencescn
+\newpage
+\appendixcn
+
+\end{document}

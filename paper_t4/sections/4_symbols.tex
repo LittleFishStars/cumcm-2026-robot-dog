@@ -1,0 +1,27 @@
+\section{符号说明}
+
+\begin{table}[H]
+  \centering
+  \caption{主要符号说明}
+  \begin{tabular}{ccc}
+    \toprule
+    \textbf{符号} & \textbf{含义} & \textbf{单位} \\
+    \midrule
+    $g$                  & 干扰源位置向量 & m \\
+    $p$                  & 机器狗测量位置向量 & m \\
+    $\theta$             & 定向源波束方向（未知） & $^\circ$ \\
+    $u(\theta)$          & 波束方向单位向量 $(\cos\theta,\sin\theta)$ & --- \\
+    $R$                  & 源接收半径，$R\in[1000,1500]$（未知） & m \\
+    $H(g,\theta,R)$      & 检测区半圆盘：$|p-g|\le R$ 且 $(p-g)\cdot u(\theta)\ge 0$ & --- \\
+    $\mathcal{P}$        & 测量点集合（20 点定案） & --- \\
+    $r_{\mathrm{outer}}$ & 外圈半径 $1850$ m；$n_{\mathrm{outer}}=12$ 个均匀方位点 & m \\
+    $d_{\mathrm{scan}}$  & 检测扫描路线里程 $17019$ m & m \\
+    $T_{\mathrm{virt}}$  & 虚拟总耗时（移动 + 测向 + 清除） & s \\
+    $n_{\mathrm{df}}$    & 测向次数（20 局均值 $251$ 次/局） & 次 \\
+    $e_{\mathrm{loc}}$   & 清除点定位误差（均值 $7.27$ m，上限 $19.80$ m） & m \\
+    $\eta$               & 听到率（$422.5$ 万例 $99.9884\%$） & --- \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+其余参数在正文首次出现处说明。全部常量集中在 \texttt{cumcm/t4/config.py}，可用于复现。

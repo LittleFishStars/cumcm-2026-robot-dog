@@ -1,0 +1,63 @@
+\section{定位与清除策略}
+
+\label{sec:localization}
+
+\subsection{定位区域：只用 \texttt{direction} / \texttt{near} 两类硬约束}
+
+对已听到的频道，定位区域 $S(c)$ 由两类约束求交：
+
+\begin{equation}
+  S(c) = \bigcap_{i=1}^{m} K(p_i, \psi_i) \;\cap\; D(c),
+  \label{eq:region}
+\end{equation}
+其中 $K(p_i,\psi_i)$ 是第 $i$ 条示向度 $\psi_i$（含 $\pm1^\circ$ 误差带）从测量点
+$p_i$ 出发的\textbf{楔形}（顶角 $2^\circ$、深至接收半径）与圆域的交；$D(c)$ 是该频道
+的接收半径内包（由"曾在某点听到 $\Rightarrow$ 距该点 $\le 1500$ m"推导）。\texttt{no\_signal}
+\textbf{一律不作为区域约束}——问题四中它可能只是方向不对，无法转成"圆盘外"硬约束（区域类型
+\texttt{DirProbRegion}，实现见 \texttt{cumcm/t4/regions.py}）。
+
+\subsection{补测选点：示向度交会几何}
+
+每个测量位置对"尚未定位充分"的频道测向，示向度误差 $\pm1^\circ$ 固定，系统偏差可被
+多视角抵消。补测点按文献准则选取（示向度 Fisher 信息 / 交会几何度量，与问题三同源，
+\texttt{t3.probing} 薄转发）：\textbf{新示向度方向尽量垂直于已有示向度}，使两条射线
+交会区最小。每源最多采集 $4$ 条示向度（\texttt{OBS\_CAP}=4，实测折中：既弥补"半圆盘内
+可测点少"的多视角需求，又为收尾定位保留预算）。
+
+\paragraph{清除途中的顺路补测。} 对"直径比较大"（最小覆盖圆半径 $>100$ m）的频道，每次
+清除动作后顺路补测一次——机器狗本来就站在该频道估计点附近，多一条不同角度的射线立即
+缩小定位区域。定向源只有迎光侧可测，这条补测常是交会定位的关键第二视角（20 局平均每局
+顺路补测 $1.6$ 次，机制净收益为负成本）。
+
+\subsection{清除机制}
+
+\paragraph{(a) 途中顺路清除（最高频、最省）。} 机器狗从本站走向下一站的途中，把
+"本站→圆心"与"下一站→圆心"夹出的方位扇区内的未清频道估计点顺路试清（起点→第一站退化
+为 $\pm 2^\circ$ 兜底扇形；距圆心 $<600$ m 的估计点留给收尾专程清除，避免偏离路线）。
+命中白捡时间、未中只花 $3$ s，且命中后后续测量点不再测该频道。实测 20 局合计命中
+$157$、未中 $72$——这是把"专程跑一趟"变成"路过顺手清"的核心机制。
+
+\paragraph{(b) 就近试清（\texttt{try}）。} 定位区域最小覆盖圆半径 $\le 400$ m 时直接试清；
+未中则用至多 $K=4$ 个半径 $20$ m 的圆覆盖定位区域（\texttt{K\_COVER\_SAMPLES}=40 采样格），
+逐点试清（\texttt{try-refined}）。
+
+\paragraph{(c) 兜底逼近（\texttt{homing}）。} 沿示向度方向逐步逼近，直至进清除半径
+$\le 20$ m：每一轮按最坏情况沿当前方向前进 $R_{\min}$（保守 $1000$ m 上界），近距后精确
+定位清除。作为"多视角交会失效"（如只有一条示向度、区域无法收敛）时的保底手段。
+
+\begin{table}[H]
+  \centering
+  \caption{20 局实测清除方法分布（合计 256 个源，全部清除、0 失败）}
+  \label{tab:methods}
+  \begin{tabular}{lrrr}
+    \toprule
+    \textbf{方法} & \textbf{命中数} & \textbf{占比} & \textbf{说明} \\
+    \midrule
+    \texttt{inline}（途中顺路清除） & $157$ & $61\%$ & 站间路过顺手清，最省 \\
+    \texttt{try}（就近试清）        & $86$  & $34\%$ & 最小覆盖圆 $\le 400$ m 直接试清 \\
+    \texttt{homing}（兜底逼近）     & $12$  & $5\%$  & 沿示向度逼近 \\
+    \texttt{try-refined}（K 圆覆盖）& $1$   & $<1\%$ & 定位区域多圆覆盖试清 \\
+    \texttt{failed}                 & $0$   & $0\%$  & --- \\
+    \bottomrule
+  \end{tabular}
+\end{table}

@@ -45,7 +45,7 @@ B = r₂ε/sin γ）；对 (a, b) ∈ {±ε}² 取两两最大距离，即得以
 from __future__ import annotations
 
 import math
-from typing import Any, Dict, Optional, Sequence, Tuple
+from typing import Any, Dict, Sequence, Tuple
 
 import numpy as np
 import shapely
@@ -61,20 +61,54 @@ from cumcm.t2.config import (BEARING_ERROR_DEG, D_HI, D_LO, DIAM_SENTINEL, PARAL
 # 取 1e-6° 对应的横向偏差在 4 km 尺度上不足 0.1 mm，不会把真正的域外点算进来。
 WEDGE_TOL_DEG = 1e-6
 
-__all__ = ["in_wedge", "quad_diameters", "quad_polygon", "exact_region", "exact_diameter",
-           "analytic_diameter", "corner_sources", "feasible_lens", "worst_case_scenario",
-           "worst_source_distance", "worst_diameters_all", "verify_analytic", "unit"]
+__all__ = ["in_wedge", "quad_diameters", "quad_diameters_batch", "quad_polygon", "exact_region",
+           "exact_diameter", "analytic_diameter", "corner_sources", "feasible_lens",
+           "worst_case_scenario", "worst_source_distance", "worst_diameters_all",
+           "verify_analytic", "unit"]
+
+# 标量单位向量的小缓存：详见 unit() 的说明
+_UNIT_SCALAR_CACHE: Dict[float, Tuple[float, float]] = {}
+
+
+def _cos_sin_scalar(theta_deg: float) -> Tuple[float, float]:
+    """标量方位角 → (cos, sin)，带缓存（选点循环里同一批角度会被反复用到）。"""
+    hit = _UNIT_SCALAR_CACHE.get(theta_deg)
+    if hit is None:
+        if len(_UNIT_SCALAR_CACHE) > 8192:       # 只服务"反复出现的少数角度"，不做无界增长
+            _UNIT_SCALAR_CACHE.clear()
+        a = np.radians(np.asarray(theta_deg, dtype=float))
+        hit = (float(np.cos(a)), float(np.sin(a)))
+        _UNIT_SCALAR_CACHE[theta_deg] = hit
+    return hit
+
+
+def _cos_sin(theta_deg):
+    """方位角（度）→ (cos, sin)。标量返回一对 float（带缓存），数组返回两个同形数组。
+
+    与 `unit` 的唯一区别是不把结果 `stack` 成 `(..., 2)`：热点里的调用方本来就分别要用 cos 与
+    sin（叉积），而 `np.stack` 在大数组上约 110 ns/元素、比一次 `np.cos` 还贵。数值与 `unit`
+    完全相同（同一批浮点运算，只是不装箱）。
+    """
+    if np.ndim(theta_deg) == 0:
+        return _cos_sin_scalar(float(theta_deg))
+    a = np.radians(np.asarray(theta_deg, dtype=float))
+    return np.cos(a), np.sin(a)
 
 
 def unit(theta_deg):
     """方位角（度）对应的单位向量；标量返回 (ux, uy) 二元组，数组返回 (..., 2) 数组。
 
     角度约定同 `cumcm.common.geometry.bearing`（x 轴正向为 0、逆时针为正）。
+
+    标量走一层缓存：选点优化里 `in_wedge` 要被调用上万次，传进去的楔形边界角却只有少数几个
+    固定值（θ₁ ± err 等），而每次 numpy 标量三角函数（radians/cos/sin 各建一个 0 维数组）要
+    约 40 µs —— 缓存后只剩一次字典查找。数组入参不缓存（既无法用 float 作键，结果也可能很大）。
+    缓存内容与直接计算逐位相同，故不影响任何数值。
     """
-    a = np.radians(np.asarray(theta_deg, dtype=float))
+    c, s = _cos_sin(theta_deg)
     if np.ndim(theta_deg) == 0:
-        return float(np.cos(a)), float(np.sin(a))
-    return np.stack([np.cos(a), np.sin(a)], axis=-1)
+        return c, s
+    return np.stack([c, s], axis=-1)
 
 
 def in_wedge(px: np.ndarray, py: np.ndarray, apex: Sequence[float], theta_lo: float,
@@ -84,50 +118,105 @@ def in_wedge(px: np.ndarray, py: np.ndarray, apex: Sequence[float], theta_lo: fl
     用两个叉积判：点在 theta_lo 的逆时针一侧、且在 theta_hi 的顺时针一侧。tol_deg 为正时把
     边界向外放宽（数值容差），落在边界上的点算"在内"。
     """
-    ua = np.asarray(unit(theta_lo), dtype=float)          # 标量给 (2,)，数组给 (N, 2)
-    ub = np.asarray(unit(theta_hi), dtype=float)
-    ax, ay = ua[..., 0], ua[..., 1]
-    bx, by = ub[..., 0], ub[..., 1]
+    ax, ay = _cos_sin(theta_lo)                            # 标量给 float 对，数组给同形数组对
+    bx, by = _cos_sin(theta_hi)
     vx = np.asarray(px, dtype=float) - np.asarray(apex[0], dtype=float)
     vy = np.asarray(py, dtype=float) - np.asarray(apex[1], dtype=float)
     c1 = ax * vy - ay * vx                       # cross(d_lo, v) ≥ 0：在 d_lo 逆时针侧
     c2 = bx * vy - by * vx                       # cross(d_hi, v) ≤ 0：在 d_hi 顺时针侧
-    slack = math.sin(math.radians(tol_deg)) * np.hypot(vx, vy)
+    if tol_deg == 0.0:                           # 无容差：不必算模长（tol=0 时 slack 恒为 0）
+        return (c1 >= 0.0) & (c2 <= 0.0)
+    slack = math.sin(math.radians(tol_deg)) * _norm2(vx, vy)
     return (c1 >= -slack) & (c2 <= slack)
 
 
-def _candidate_points(site: Sequence[float], theta1: float, sx: np.ndarray, sy: np.ndarray,
-                      theta2: np.ndarray, err_deg: float):
-    """两个楔形之交的**候选顶点**与各自的"是否同时在两个楔形内"掩码。
+def _norm2(x: np.ndarray, y: np.ndarray) -> np.ndarray:
+    """sqrt(x² + y²)（|x|,|y| 都在 1e4 量级、离上溢下溢极远，故不必用更慢的 `np.hypot`）。"""
+    return np.sqrt(x * x + y * y)
+
+
+def _candidate_points_batch(site: Sequence[float], theta1: float, sx: np.ndarray, sy: np.ndarray,
+                            theta2_batch: np.ndarray, err_deg: float):
+    """**一批**楔形方向下，两楔形之交的候选顶点与各自的"是否同时在两个楔形内"掩码。
 
     交区域的顶点只可能来自两类点：①两条边界射线的交点（4 个组合）；②某个楔形的顶点（检测点
     本身）落在另一个楔形内时，它就是交区域的一个顶点（此时交区域是三边形而不是四边形 ——
     源离一个检测点很近、两条射线近同向时就是这样）。两类都取上，再用"在两楔形内"筛掉
     延长线上的伪交点，剩下的点都落在交区域内，其两两最大距离即直径。
+
+    `theta2_batch` 形状 `(B, N)`（B 个候选方向、N 个候选点），返回 `P` 形状 `(6, B, N, 2)`
+    与 `keep` 形状 `(6, B, N)`。单点情形（`_candidate_points`）就是 B = 1 的特例：两条路径
+    共用同一套算式，故"向量化前后逐元素一致"是构造上的保证，而不是巧合。
     """
     x1, y1 = float(site[0]), float(site[1])
     sx = np.asarray(sx, dtype=float)
     sy = np.asarray(sy, dtype=float)
-    theta2 = np.asarray(theta2, dtype=float)
-    wx, wy = sx - x1, sy - y1
+    theta2_batch = np.asarray(theta2_batch, dtype=float)
+    shape = theta2_batch.shape
+    wx = np.broadcast_to(sx, shape) - x1
+    wy = np.broadcast_to(sy, shape) - y1
     pts = []
+    # θ₂ ± err 的单位向量只算一次：原先把 (sa, sb) 四个组合各算一遍，其中两个是重复的
+    bs = (_cos_sin(theta2_batch - err_deg), _cos_sin(theta2_batch + err_deg))
     for sa in (-err_deg, err_deg):
         ax, ay = unit(theta1 + sa)
-        for sb in (-err_deg, err_deg):
-            u2 = np.asarray(unit(theta2 + sb), dtype=float)
-            bx = np.broadcast_to(u2[..., 0], sx.shape)
-            by = np.broadcast_to(u2[..., 1], sx.shape)
+        for bx, by in bs:
             den = ax * by - ay * bx
             safe = np.where(np.abs(den) < PARALLEL_EPS, np.nan, den)
             t = (wx * by - wy * bx) / safe
             pts.append((x1 + t * ax, y1 + t * ay))
-    pts.append((np.full_like(sx, x1), np.full_like(sy, y1)))     # 楔形 1 的顶点
-    pts.append((sx, sy))                                         # 楔形 2 的顶点
-    P = np.stack([np.stack([p[0], p[1]], axis=-1) for p in pts], axis=0)      # (6, N, 2)
+    pts.append((np.full_like(theta2_batch, x1), np.full_like(theta2_batch, y1)))   # 楔形 1 的顶点
+    pts.append((np.broadcast_to(sx, shape), np.broadcast_to(sy, shape)))           # 楔形 2 的顶点
+    P = np.stack([np.stack([p[0], p[1]], axis=-1) for p in pts], axis=0)
     keep = (in_wedge(P[..., 0], P[..., 1], site, theta1 - err_deg, theta1 + err_deg, WEDGE_TOL_DEG)
-            & in_wedge(P[..., 0], P[..., 1], (sx, sy), theta2 - err_deg, theta2 + err_deg,
-                       WEDGE_TOL_DEG))
+            & in_wedge(P[..., 0], P[..., 1], (sx, sy), theta2_batch - err_deg,
+                       theta2_batch + err_deg, WEDGE_TOL_DEG))
     return P, keep
+
+
+def _candidate_points(site: Sequence[float], theta1: float, sx: np.ndarray, sy: np.ndarray,
+                      theta2: np.ndarray, err_deg: float):
+    """单点情形的候选顶点（`_candidate_points_batch` 的 B = 1 特例）。"""
+    P, keep = _candidate_points_batch(site, theta1, sx, sy,
+                                      np.asarray(theta2, dtype=float)[None, :], err_deg)
+    return P[:, 0], keep[:, 0]
+
+
+def _max_pair_distance(P: np.ndarray, keep: np.ndarray, sentinel: float) -> np.ndarray:
+    """候选顶点两两距离的最大值（区域是凸的，故这就是直径）；`P` 形状 (6, ..., 2)。
+
+    只用两处逐位不变的提速：索引外提（`P[i][..., 0]` 只取一次）+ `np.maximum(..., out=)` 原地
+    更新，省掉每个点对一次临时数组。实测（真实最大分块 6×210×712）：21.8 → 21.5 ms/次。
+    试过但**否决**的写法：掩码全为假时跳过整个点对（原式此时只写入 0.0，而 `best` 初值 0 且
+    始终非负，故数学上确为空操作）—— 那多出的 `keep[i] & keep[j]` 布尔归约比省下的 hypot 更贵，
+    实测 21.5 → 24.0 ms/次，故不做。
+
+    距离仍用 `np.hypot` 算 —— 试过"先在平方距离上取最大、最后开一次方"（快约 3 倍），代价是
+    距离的舍入差最后 1 位（hypot 多做一次规格化），会让 `t2_second_site.json` 里的浮点尾数变成
+    另一个值；本项目的验收口径是"同一 seed 逐字节一致"，故这里选择保守的 hypot。
+    """
+    shape = P.shape[1:-1]
+    best = np.zeros(shape, dtype=float)
+    for i in range(P.shape[0]):
+        pi0, pi1 = P[i][..., 0], P[i][..., 1]
+        for j in range(i + 1, P.shape[0]):
+            d = np.hypot(pi0 - P[j][..., 0], pi1 - P[j][..., 1])
+            np.maximum(best, np.where(keep[i] & keep[j], d, 0.0), out=best)
+    return np.where(np.isnan(best), sentinel, best)
+
+
+def quad_diameters_batch(site: Sequence[float], theta1: float, sx: np.ndarray, sy: np.ndarray,
+                         theta2_batch: np.ndarray, err_deg: float = BEARING_ERROR_DEG,
+                         sentinel: float = DIAM_SENTINEL) -> np.ndarray:
+    """**一批**方向 `(B, N)` 对应的定位四边形直径，返回 `(B, N)`；单位米。
+
+    与 `quad_diameters` 逐元素同一套算式（后者是 B = 1 的特例）。存在的理由：选点代价函数要对
+    "源采样点 × δ₂ 误差"的整套组合求最坏，逐组合调用一次 Python 函数时开销全在调用上（实测单次
+    调用只有几百微秒的有效计算、却要 2 ms 以上），把组合按批喂进来能把这一层摊掉。
+    """
+    P, keep = _candidate_points_batch(site, theta1, sx, sy, np.asarray(theta2_batch, dtype=float),
+                                      err_deg)
+    return _max_pair_distance(P, keep, sentinel)
 
 
 def quad_diameters(site: Sequence[float], theta1: float,
@@ -139,14 +228,14 @@ def quad_diameters(site: Sequence[float], theta1: float,
     区域是凸的，故直径 = 区域内任意两点距离的最大值 = 候选顶点两两距离的最大值。两射线近
     共线（交区域退化为一条细带、面积趋零）时返回哨兵值：数值上等价于"无穷大"（无法定位），
     但保证后续统计与出图都是有限数。
+
+    `theta2` 给 `(B, N)` 时按批处理（等价于逐行调用本函数，见 `quad_diameters_batch`）。
     """
-    P, keep = _candidate_points(site, theta1, sx, sy, theta2, err_deg)
-    best = np.zeros(np.shape(sx), dtype=float)
-    for i in range(P.shape[0]):
-        for j in range(i + 1, P.shape[0]):
-            d = np.hypot(P[i][..., 0] - P[j][..., 0], P[i][..., 1] - P[j][..., 1])
-            best = np.maximum(best, np.where(keep[i] & keep[j], d, 0.0))
-    return np.where(np.isnan(best), sentinel, best)
+    theta2_arr = np.asarray(theta2, dtype=float)
+    if theta2_arr.ndim > 1:
+        return quad_diameters_batch(site, theta1, sx, sy, theta2_arr, err_deg, sentinel)
+    P, keep = _candidate_points(site, theta1, sx, sy, theta2_arr, err_deg)
+    return _max_pair_distance(P, keep, sentinel)
 
 
 def quad_polygon(site: Sequence[float], theta1: float, s2: Sequence[float], theta2: float,
@@ -362,6 +451,19 @@ def _selfcheck(n: int = 400) -> None:
           f"中位 {rep['formula_median_rel_dev']:.3%}，90 分位 {rep['formula_p90_rel_dev']:.3%}，"
           f"<1% 占 {rep['formula_frac_below_1pct']:.0%}，最大 {rep['formula_max_abs_rel_dev']:.2%}"
           f"（极端构型：某检测点落入另一楔形内、区域退化为三角形）")
+
+    # 批处理路径与逐行调用必须逐位一致 —— 问题二的选点代价函数走批量路径（见 cumcm.t2.score
+    # 的 worst_case_diameters），这条不变式一旦破了，"优化前后结果不变"就无从谈起
+    rng = np.random.default_rng(7)
+    bx1, by1 = float(rng.uniform(-300.0, 300.0)), float(rng.uniform(-300.0, 300.0))
+    th1 = float(rng.uniform(0.0, 360.0))
+    bxp = rng.uniform(-2000.0, 2000.0, 64)
+    byp = rng.uniform(-2000.0, 2000.0, 64)
+    bth2 = rng.uniform(0.0, 360.0, (5, 64))
+    batch = quad_diameters_batch((bx1, by1), th1, bxp, byp, bth2)
+    rows = np.stack([quad_diameters((bx1, by1), th1, bxp, byp, bth2[i]) for i in range(bth2.shape[0])])
+    print(f"  批量直径 vs 逐行调用：逐位一致 {bool(np.array_equal(batch, rows))}"
+          f"（{bth2.shape[0]} 行 × {bxp.size} 个候选点）")
 
     # 可行域透镜：边界上的点最坏距离应恰为 1000 m，外扩的点则应超过 1000 m
     lens = feasible_lens((0.0, 0.0), 0.0)

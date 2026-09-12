@@ -22,18 +22,19 @@ _in_directional_coverage —— 这就是"搜索不到还有可能是方向不�
 
   * **半径 1850 m**：任意源的迎光区在源前方 [|g|, |g|+R] 纵深；源最远半径 1770，所以**任意
     贴边源**的迎光区内沿 = 1770 m，外圈设在其内侧 1850 m 时径向偏差 < 80 m。原"中点外推"
-    布局把多数点推到 2270 m，反而离内部源的迎光面太远（实测只剩 99.81%）；1850 m 单圈、
-    12 个方位同时覆盖贴边源与内部半径源的迎光区，加 3 个内部补点（r = 850 m）收窄内部方向
-    空隙后，实测 **~99.997%**（400 万算例、4 seed 稳健，贴边对抗 4.3 万例 0 漏）；
+    布局把多数点推到 2270 m，反而离内部源的迎光面太远（实测只剩 99.81%）；1850 m 单圈 +
+    12 个方位同时覆盖贴边源与内部半径源的迎光区，实测 **99.9891%**（4 224 640 个算例、漏
+    460，其中贴边对抗 4.3 万例 0 漏）；
   * **12 个方位（间隔 30°）**：相邻外圈点最大距离 ≈ 1850·sin15° ≈ 479 m < 接收半径一半，
     任何方向的源都能被方向差 ≤ 15° 的外圈点听到。**为什么不是更少的点**：试过 11 点
     （间隔 32.7°、布局路线 16 725 m），但方位间隔变宽使顺路清除的方位扇区也变宽、绕路更多，
     实战总里程反升 464 m——12 点是"减少路程"的实战最优；
-  * **里程**：20 个测量位置的最短开放路径 17 019 m —— 比"7+21 中点外推"（29 点、21 580 m）
-    省 21%，还少 9 个测量位置。
+  * **里程**：20 个测量位置的最短开放路径 16 995.65 m（外圈起始角 7.5° 与内圈错开）—— 比
+    "7+21 中点外推"（29 点、21 580 m）省 21%，还少 9 个测量位置。
   * **为什么不加内部补点（20 点定案）**：曾试过加 3 个内部补点（r = 850 m，23 个位置）把听率
-    提到 99.9974%，但 20 局演练实测多 ~34 次测向、慢 80 s；20 点版听率 99.9885%（400 万 MC
-    + 贴边对抗 0 漏）对每局 16 个源的实战任务 20 局实测 256/256 全清，耗时与完成率双优。
+    提到 99.9974%，但 20 局演练实测多 ~34 次测向、慢 80 s；20 点版听率 99.9891%（422.5 万
+    算例、漏 460；贴边对抗 0 漏）对每局 16 个源的实战任务 20 局实测 256/256 全清，耗时与完成
+    率双优。
 
 仍是**非严格保证**（残余漏例约 0.01%），论文按实测统计报告（verify_hearing_stats），不声称
 严格不漏。
@@ -43,6 +44,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass, field
+from functools import lru_cache
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
@@ -56,8 +58,8 @@ from cumcm.t4.config import (MID_RING_N, MID_RING_RAD, MID_RING_ROT_DEG,
 def measure_layout() -> List[Tuple[float, float]]:
     """20 个测量位置：原点 + 7 覆盖基点 + 12 均匀方位外圈点（MID_RING_N=0 无内部补点）。
 
-    定案布局（见模块文档）：听率 99.9885% + 贴边对抗 0 漏 + 20 局演练 6 850 s（20 局
-    256/256 全清）；比曾用的 23 点版（+3 内部补点，听率 99.9974%）少 ~34 次测向、快 80 s。
+    定案布局（见模块文档）：听率 99.9891% + 贴边对抗 0 漏 + 20 局演练 6 445 s、24 392 m
+    （20 局 256/256 全清）；比曾用的 23 点版（+3 内部补点，该轮听率 99.9974%）少 ~34 次测向。
     """
     base = np.asarray(SURVEY_CENTERS, dtype=float)
     ang = np.arange(OUTER_RING_N, dtype=float) * (2.0 * math.pi / OUTER_RING_N) \
@@ -135,7 +137,12 @@ def build_sweep_plan() -> SweepPlan:
 
 
 def _hit_report(pts: np.ndarray, g: np.ndarray, theta_rad: float, R: float) -> Tuple[bool, float]:
-    """单个算例：是否存在测量点在（距离 ≤ R 且 在光束内）；返回 (命中?, 命中深度 |m−g|/R)。"""
+    """单个算例：是否存在测量点在（距离 ≤ R 且 在光束内）；返回 (命中?, 命中深度 |m−g|/R)。
+
+    保留为**单例参考实现**：批量路径（`_hit_cases`）必须与它逐例等价，`python -m cumcm.t4.sweep`
+    的随机对照就是这么核的。热点不在这里 —— 整套统计有 422 万个算例，逐个调用本函数时开销全在
+    numpy 调用本身（每个算例只算 20 个点），故统计走批量路径。
+    """
     d = pts - g
     r2 = np.einsum("ij,ij->i", d, d)
     ok = (r2 <= R * R + 1e-9) & (
@@ -143,6 +150,87 @@ def _hit_report(pts: np.ndarray, g: np.ndarray, theta_rad: float, R: float) -> T
     if not ok.any():
         return False, math.inf
     return True, float(np.sqrt(r2[ok]).min() / R)
+
+
+def _hit_cases(pts: np.ndarray, gx: np.ndarray, gy: np.ndarray, theta: np.ndarray,
+               R: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+    """**一批**算例的命中掩码与命中深度；逐例与 `_hit_report` 同一套算式（逐元素对应）。
+
+    批量口径与逐例完全一致的三处细节：距离仍是"两分量平方和"（与 `einsum` 两次乘加同序）；
+    命中深度仍是"先取命中点里最小的 r²，再开一次方除以 R"（开方单调，故 √(min r²) = min √(r²)）；
+    判定用的容差项 1e-9 原样保留。
+    """
+    pts = np.asarray(pts, dtype=float)
+    dx = pts[None, :, 0] - np.asarray(gx, dtype=float)[:, None]
+    dy = pts[None, :, 1] - np.asarray(gy, dtype=float)[:, None]
+    r2 = dx * dx + dy * dy
+    rr = np.asarray(R, dtype=float)[:, None]
+    el = np.asarray(theta, dtype=float)
+    ok = (r2 <= rr * rr + 1e-9) & (dx * np.cos(el)[:, None] + dy * np.sin(el)[:, None] >= -1e-9)
+    hit = ok.any(axis=1)
+    depth = np.sqrt(np.where(ok, r2, np.inf).min(axis=1)) / np.asarray(R, dtype=float)
+    return hit, depth
+
+
+def _scan_cases(pts: np.ndarray, gx: np.ndarray, gy: np.ndarray, theta: np.ndarray,
+                R: np.ndarray, chunk: int = 20_000) -> Tuple[int, int, Optional[dict]]:
+    """按**枚举顺序**分批扫描算例，返回 (算例数, 漏例数, 首个漏例描述)。
+
+    首个漏例取"顺序上最早的那个"，与原先逐例扫描的口径一致（报告里的 `worst_fail`）。
+
+    `chunk` 只影响一次批处理多大、不改变任何数值：批太大时中间数组超出 CPU 缓存，元素处理
+    反而变慢。本机实测 422 万算例的自检耗时：200 000 → 2.8 s、50 000 → 2.2 s、
+    **20 000 → 1.5 s**、5 000 → 1.6 s，故取 20 000。
+    """
+    gx = np.asarray(gx, dtype=float)
+    n_cases = n_fail = 0
+    worst: Optional[dict] = None
+    for i in range(0, gx.size, chunk):
+        hit, _ = _hit_cases(pts, gx[i:i + chunk], gy[i:i + chunk], theta[i:i + chunk],
+                            R[i:i + chunk])
+        n_cases += int(hit.size)
+        miss = ~hit
+        n_miss = int(miss.sum())
+        n_fail += n_miss
+        if n_miss and worst is None:
+            k = int(np.argmax(miss))                      # 本批里第一个漏例
+            worst = {"g": [float(gx[i + k]), float(gy[i + k])],
+                     "theta_deg": round(math.degrees(float(theta[i + k])), 1),
+                     "R_m": float(R[i + k])}
+    return n_cases, n_fail, worst
+
+
+@lru_cache(maxsize=8)
+def adversarial_cases(n_azi: int = 360, n_off: int = 40, radius: float = 1770.0,
+                      Rs: Sequence[float] = (1000.0, 1250.0, 1500.0),
+                      span_deg: float = 8.0, wrap: bool = True
+                      ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """贴边对抗算例 `(gx, gy, θ/rad, R)`：源贴在源生成圆盘边缘、θ 取径向 ±span/2 内的偏角。
+
+    枚举顺序是 R → 方位 → 偏角，与原先的双层循环完全一致（`wrap=True` 时 θ 取模 2π，与
+    `verify_hearing_stats` 的贴边对抗口径相同；布局搜索里的快速子集版不取模，故用 `wrap=False`）。
+
+    结果按参数缓存（返回的是**共享的只读数组**，调用方不要就地修改）：算例集合只与参数有关、
+    与测量点布局无关，而布局搜索会拿同一批算例评估成千上万个候选布局。
+    """
+    gx: List[float] = []
+    gy: List[float] = []
+    th: List[float] = []
+    rr: List[float] = []
+    for R in Rs:
+        for ka in range(int(n_azi)):
+            a = 2.0 * math.pi * ka / n_azi
+            cx = radius * math.cos(a)
+            cy = radius * math.sin(a)
+            for ko in range(int(n_off)):
+                off = (ko / (n_off - 1) - 0.5) * span_deg
+                t = a + math.radians(off)
+                gx.append(cx)
+                gy.append(cy)
+                th.append(t % (2.0 * math.pi) if wrap else t)
+                rr.append(R)
+    return (np.asarray(gx, dtype=float), np.asarray(gy, dtype=float),
+            np.asarray(th, dtype=float), np.asarray(rr, dtype=float))
 
 
 def verify_hearing_stats(points: Sequence[Sequence[float]],
@@ -157,41 +245,48 @@ def verify_hearing_stats(points: Sequence[Sequence[float]],
 
     返回：{n_cases, n_fail, hear_rate, worst_fail(首例漏例), mc_miss, edge_miss}。
     注意这是**统计**口径（本布局仍非严格 0 漏），调用方不得把它当"严格不漏"使用。
+
+    422 万个算例按批（5 万例一批）过 `_hit_cases`：逐例调用时每个算例只算 20 个测量点、时间
+    几乎全花在 numpy 调用开销上，批量后同一份算式快一个数量级；枚举顺序与随机数抽取顺序都
+    保持不变，故统计口径（含"首个漏例"）与逐例完全一致。
     """
     P = np.asarray(points, dtype=float)
-    n_fail = 0
     n_cases = 0
+    n_fail = 0
     worst_fail: Optional[dict] = None
     edge_miss = 0
 
-    def _case(g, t, R):
-        nonlocal n_fail, n_cases, worst_fail
-        ok, _ = _hit_report(P, np.asarray(g, float), t, R)
-        n_cases += 1
-        if not ok:
-            n_fail += 1
-            if worst_fail is None:
-                worst_fail = {"g": [float(g[0]), float(g[1])],
-                              "theta_deg": round(math.degrees(t), 1), "R_m": float(R)}
+    # 校验 1：贴边对抗（枚举顺序：R → 方位 → 径向偏角）
+    n1, nf1, w1 = _scan_cases(P, *adversarial_cases(360, 40))
+    n_cases += n1
+    n_fail += nf1
+    worst_fail = w1
+    edge_miss = nf1
 
-    for R in (1000.0, 1250.0, 1500.0):
-        for r in (1770.0,):
-            for ka in range(360):
-                a = 2.0 * math.pi * ka / 360
-                g0 = np.array([r * math.cos(a), r * math.sin(a)])
-                for ko in range(40):
-                    off = (ko / 39.0 - 0.5) * 8.0
-                    _case(g0, (a + math.radians(off)) % (2.0 * math.pi), R)
-    edge_miss = n_fail
-
+    # 校验 2：精细对抗枚举（枚举顺序：R → 半径 → 方位 → 光束角）
+    g2x: List[float] = []
+    g2y: List[float] = []
+    t2: List[float] = []
+    r2_list: List[float] = []
     for R in (1000.0, 1250.0, 1500.0):
         for r in list(range(0, 1800, 300)) + [1770]:
             for k in range(48):
                 a = 2.0 * math.pi * k / 48
-                g0 = np.array([r * math.cos(a), r * math.sin(a)])
+                gx = r * math.cos(a)
+                gy = r * math.sin(a)
                 for t in (2.0 * math.pi * kk / 180 for kk in range(180)):
-                    _case(g0, t, R)
+                    g2x.append(gx)
+                    g2y.append(gy)
+                    t2.append(t)
+                    r2_list.append(R)
+    n2, nf2, w2 = _scan_cases(P, g2x, g2y, np.asarray(t2, dtype=float),
+                              np.asarray(r2_list, dtype=float))
+    n_cases += n2
+    n_fail += nf2
+    if worst_fail is None:
+        worst_fail = w2
 
+    # 校验 3：蒙特卡洛（抽取顺序与原先逐例循环完全一致：g_r → g_a → θ → R）
     rng = np.random.default_rng(seed)
     mc_miss = 0
     for _ in range(max(1, mc_n // 1000)):
@@ -200,15 +295,17 @@ def verify_hearing_stats(points: Sequence[Sequence[float]],
         gs = np.stack((g_r * np.cos(g_a), g_r * np.sin(g_a)), axis=1)
         th = rng.random(1000) * 2.0 * math.pi
         RR = rng.uniform(1000.0, 1500.0, 1000)
-        for g, t, R in zip(gs, th, RR):
-            ok, _ = _hit_report(P, g, t, R)
-            n_cases += 1
-            if not ok:
-                n_fail += 1
-                mc_miss += 1
-                if worst_fail is None:
-                    worst_fail = {"g": [float(g[0]), float(g[1])],
-                                  "theta_deg": round(math.degrees(t), 1), "R_m": float(R)}
+        hit, _ = _hit_cases(P, gs[:, 0], gs[:, 1], th, RR)
+        miss = ~hit
+        n_miss = int(miss.sum())
+        n_cases += int(hit.size)
+        n_fail += n_miss
+        mc_miss += n_miss
+        if n_miss and worst_fail is None:
+            k = int(np.argmax(miss))
+            worst_fail = {"g": [float(gs[k, 0]), float(gs[k, 1])],
+                          "theta_deg": round(math.degrees(float(th[k])), 1),
+                          "R_m": float(RR[k])}
 
     return {
         "n_cases": n_cases,
@@ -245,5 +342,17 @@ def print_sweep_report(plan: SweepPlan, verify: Optional[Dict[str, Any]]) -> Non
 if __name__ == "__main__":
     # 自检：`python -m cumcm.t4.sweep` 直接打听到率统计（无需连模拟器）
     p = build_sweep_plan()
+    # 批量判据的不变式核验：随机的源位置/光束角/半径上，批量与单例参考实现必须逐例同判
+    rng = np.random.default_rng(11)
+    gx = rng.uniform(-1800.0, 1800.0, 200)
+    gy = rng.uniform(-1800.0, 1800.0, 200)
+    th = rng.uniform(0.0, 2.0 * math.pi, 200)
+    RR = rng.uniform(1000.0, 1500.0, 200)
+    batch_hit, _ = _hit_cases(p.points, gx, gy, th, RR)
+    ref = np.array([_hit_report(p.points, np.array([x, y]), t, r)[0]
+                    for x, y, t, r in zip(gx, gy, th, RR)])
+    same_trig = np.array_equal(np.cos(th), np.array([math.cos(float(t)) for t in th]))
+    print(f"  批量判据 vs 单例参考：逐例一致 {bool(np.array_equal(batch_hit, ref))}（200 个随机算例）；"
+          f"np.cos 与 math.cos 在这批角度上逐位一致 {bool(same_trig)}")
     v = verify_hearing_stats(p.points)
     print_sweep_report(p, v)

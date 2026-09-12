@@ -32,14 +32,15 @@ Windows 机器
 
 ### 1.2 Python 环境
 
-1. 从 python.org 安装 **Python 3.12 或 3.13**（勾选 *Add python.exe to PATH*）。
+1. 从 python.org 安装 **Python 3.14**（`pyproject.toml` 要求 `>=3.14`；勾选 *Add python.exe to PATH*）。
 2. 安装依赖：
 
 ```powershell
-pip install numpy matplotlib
+pip install numpy matplotlib shapely
 ```
 
-（`matplotlib` 只用于每局结束后的轨迹图；不装也能完成测试，只是不出图。）
+（`matplotlib` 只用于每局结束后的轨迹图，不装也能完成测试、只是不出图；`shapely` 只被问题二的
+几何自检用到，不跑 `T2.py` 可以不装。）
 
 ### 1.3 拷贝程序文件
 
@@ -56,7 +57,7 @@ cumcm\        求解实现（common / t1 / t3 / t4 / analysis 五个子包）
 `ModuleNotFoundError: No module named 'cumcm'`。
 
 不需要拷贝 `jammers-py/`（本地演练用的复刻模拟器，官方平台上用不到）、不需要 `results/`、
-`figures/`、`reports/`、`__pycache__/`。
+`reports/`、`paper/`、`__pycache__/`。
 
 拷贝后自检（在 `D:\cumcm\` 下执行）：
 

@@ -6,34 +6,37 @@
 ## 目录结构
 
 ```
-T1.py / T2.py / T3.py / T4.py / T4_figures.py
-                                                                  顶层薄入口（只调用 cumcm.*，用法不变）
+T1.py / T2.py / T3.py / T4.py
+                                                             顶层薄入口（只调用 cumcm.*，用法不变）
 sim_api.py                                                  模拟器接口的兼容垫片
 cumcm/
   common/    跨题通用：geometry 几何、routing 路线算子、sim_client 接口、practice_arena 演练场、
-             plotting 绘图、records 落盘、paths 路径、console 控制台
+             plotting 绘图、scanfigure/trajfigure 逐局出图、records 落盘、paths 路径、console 控制台
   t1/        问题一：交会定位区域 TriangulationRegion
   t2/        问题二：第二个检测点的选择与候选区域（config / region 几何底座 / score 最坏情况
              最小化 / report / plotting 适合度图 / cli）
   t3/        问题三主线（确定性策略）：config / covering / regions / probing / strategy /
              report / plotting / cli
-  t4/        问题四（定向 + 全向混合，确定性策略）：config / sweep（7 基点 + 3 内点 + 12 外圈点扫描）/ regions /
-             probing / strategy / report / plotting / cli
-  analysis/  验证与出图：figures_t4（论文图表，问题四）
+  t4/        问题四（定向 + 全向混合，确定性策略）：config / sweep（7 覆盖基点 + 12 外圈点 =
+             20 个测量位置，含听到率统计）/ regions / probing / strategy / nn_layout* 布局搜索 /
+             report / plotting / cli
+  analysis/  静态检查：undefined_names（漏定义/缺失参数扫描）
 jammers-py/  本地演练场（复刻模拟器；data/behavior-logs/ 会随每次演练累积日志，可随时清空）
 results/     运行产物，按各题分成独立子树（**不按运行模式分家**：一个目录 = 最新一次运行）：
   t2/        问题二方案（T2.py）：适合度图 PNG/PDF、全域逐格适合度表 CSV、结论与校验 JSON
   t3/        确定性方案（T3.py）：覆盖圆方案、巡视汇总、逐条观测、接口日志、总轨迹图、逐步扫描图
-  t4/        问题四方案（T4.py）：扫描方案（复用 7 覆盖基点 + 3 内点 + 12 外圈点、含听到率统计）、
+  t4/        问题四方案（T4.py）：扫描方案（7 覆盖基点 + 12 外圈点、含听到率统计）、
              逐局统计、观测明细、接口日志、轨迹图与逐步扫描图
-figures/     论文用图表 PDF 与背后的数据 CSV
 reports/     方案说明与结果报告
 References/  参考文献（PDF）
 Problem/     赛题材料（已在 .gitignore 中，不入库）
 ```
 
-> `results/` 与 `figures/` 是**求解产物**：删掉后重跑命令即可原样重建（同 seed 逐字节一致）。
+> `results/` 是**求解产物**：删掉后重跑命令即可原样重建（同 seed 逐字节一致，唯一例外是
+> `api_calls.jsonl` 里带现实时间戳）。
 > `jammers-py/` 与 `References/` 不是代码依赖，只在本地演练/撰写论文时需要。
+> 论文用图由 `paper/*/` 内的 LaTeX/TikZ 与 `paper/t2/figures/` 提供（早期的 `figures/` 目录与
+> `figures_t4*.py` 生成脚本已按用户要求删除）。
 
 ## 依赖与运行
 
@@ -41,10 +44,17 @@ Problem/     赛题材料（已在 .gitignore 中，不入库）
 uv sync                              # 或 pip install -e .
 .venv/bin/python T1.py               # 问题一示例
 .venv/bin/python T3.py               # 官方模式：连 http://127.0.0.1:2026 跑完一局
-.venv/bin/python T3.py --plan-only   # 只求覆盖圆方案（不连任何模拟器）
+.venv/bin/python T3.py --plan-only   # 只求覆盖圆方案（不连任何模拟器，本机约 0.6 s）
 .venv/bin/python T3.py --practice 3  # 本地演练 3 局（结果落 results/t3/）
+.venv/bin/python T4.py --plan-only   # 只求扫描方案 + 听到率统计（不连模拟器，本机约 1.7 s）
+.venv/bin/python T4.py --practice 3  # 问题四本地演练 3 局（结果落 results/t4/）
 .venv/bin/python -m cumcm.t3.covering   # 覆盖圆方案自检（旋转不破坏保证 / 密集扇区选向 / 最少圆数）
+.venv/bin/python -m cumcm.t4.sweep      # 扫描方案自检（批量判据 vs 单例参考 + 听到率统计）
+.venv/bin/python -m cumcm.analysis.undefined_names   # 静态检查：漏定义 / 缺失参数（扫全仓 .py）
 ```
+
+多局演练时用 `--no-reuse --robot-port 2111 --console-port 8091` 一类参数占用专用端口，避免接管
+正在运行的 `jammers-py`；不同的 A/B 组合必须给各自的 `--save-dir`（一个目录 = 最新一次运行）。
 
 `T3.py` 不加参数即连官方模拟器，三种模式共用同一次覆盖圆求解
 与同一份策略代码，差别只在"场景从哪来"：官方模式与演练**写同一目录**（`results/t3/`）
@@ -93,7 +103,7 @@ d = d_min = 1122.9558 m 时也是 6737.73 m（`--hex-layout` 保留作对照）�
 同 seed 配对实测（各 10 局、均 131/131 全清）：虚拟时间 4008 → **3796 s**（省 212.1 s，5.3%，
 t = 3.97），里程 16419 → **15038 m**（省 1381 m，8.4%，t = 5.90）。
 
-## 问题二：第二个检测点怎么选（`T2.py`，不连模拟器，约 15 s）
+## 问题二：第二个检测点怎么选（`T2.py`，不连模拟器，本机约 15 s）
 
 只有一次测向（S₁、θ₁，误差 ±1°）时，源的可能位置是一个以 S₁ 为顶点、长 1500 m、张角 2° 的
 窄楔形（下界 5 m 来自附录 2(9)"近距测不到示向度"，上界 1500 m 来自接收半径上限）。第二点要
@@ -136,3 +146,16 @@ t = 3.97），里程 16419 → **15038 m**（省 1381 m，8.4%，t = 5.90）。
 分层规则见 `cumcm/__init__.py`：依赖只能向下（common ← t1/t2/t3/t4 ← analysis），
 严禁下层反向导入上层；t2/t3/t4 是并列叶子，t2 复用 t1 的定位区域口径（同一套楔形交，
 t2 只是把它向量化到成千上万个候选点），t4 复用 t3 时只 import 其纯函数模块 `t3.probing`。
+
+## 问题四：定向源 + 全向源混合（`T4.py`）
+
+扫描阶段用 20 个测量位置（原点 + 问题三的 7 个覆盖基点 + 12 个均匀方位外圈点 r = 1850 m），
+扫完即对每个源取"最近一次测向"三角定位；定向源按 180° 光束建模，半圆盘命中率经 422 万算例
+统计校验（贴边对抗 0 漏、蒙特卡洛漏 320/400 万，**非严格保证**），方案与统计数字见
+`reports/RESULTS_REPORT_T4.md`，模块文档见 `cumcm/t4/sweep.py`。
+
+```bash
+.venv/bin/python T4.py --plan-only     # 只求扫描方案（约 1.7 s）
+.venv/bin/python T4.py --practice 20 --seed 0 --no-reuse --robot-port 2112 --console-port 8092
+.venv/bin/python drv_speed.py          # 布局调参驱动（GA + 代理模型，可选，需要 torch）
+```

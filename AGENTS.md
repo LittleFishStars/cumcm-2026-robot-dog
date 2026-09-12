@@ -5,21 +5,26 @@
 ## Repo layout
 
 - Git repo root is **this** directory (`cumcm-2026-robot-dog/`). Run all commands from here.
-- Top-level `T1.py` / `T2.py` / `T3.py` / `sim_api.py` / `T4.py` / `T4_figures.py`
+- Top-level `T1.py` / `T2.py` / `T3.py` / `T4.py` / `sim_api.py` / `drv_speed.py`
   are thin shims. Real code is in `cumcm/` (`common`, `t1`, `t2`, `t3`, `t4`, `analysis`). Edit the
   package, not the shims; keep the same CLI behavior.
 - Layering is a hard convention: deps only point down `common <- t1/t2/t3/t4 <- analysis`
   (`t2` may import `t1` — same wedge-intersection duct, vectorized; `t4` may import `t1` and
   `t3.probing`).
   Never import upward (e.g. `common` must not import `t3`).
-- `results/` and `figures/` are **committed solve artifacts** (not gitignored). Running the code
-  regenerates them in place, and the same `--seed` is byte-identical. Expect a dirty tree after a run;
-  do not commit regenerated artifacts unless asked.
+- `results/` holds **committed solve artifacts** (not gitignored): the six T2 files, the T3 plan +
+  per-episode CSV/JSON + `scan/` + `trajectory/`, and the T4 analogue. Running the code regenerates
+  them in place, and the same `--seed` is byte-identical — the only exception is `api_calls.jsonl`,
+  which carries wall-clock timestamps. Expect a dirty tree after a run; the committed artifacts are
+  the **latest** run, so refresh them deliberately rather than mixing runs.
+- The old `figures/` directory and the `figures_t4*.py` / `T4_figures.py` generators were deleted at
+  the user's request; paper figures now come from `paper/*/` (TikZ/LaTeX) and `paper/t2/figures/`.
 
 ## Setup / environment
 
-- `pyproject.toml` requires **Python >= 3.14** and uses the Tsinghua PyPI mirror. This is
-  authoritative — `reports/OFFICIAL_PLATFORM_GUIDE.md` still says 3.12/3.13 (stale).
+- `pyproject.toml` requires **Python >= 3.14** and uses the Tsinghua PyPI mirror; the official
+  platform guide (`reports/OFFICIAL_PLATFORM_GUIDE.md`) was aligned to 3.14 + numpy/matplotlib/
+  shapely.
 - Use `uv sync` then `uv run python <script>`. README's `.venv/bin/python` is POSIX-only; on Windows
   use `uv run` or `.venv\Scripts\python.exe`. Prefer `python -X utf8 ...` so Chinese output renders.
 
@@ -34,6 +39,12 @@
   the exact set-membership worst-case bound; prints per-γ and per-r₂/d deviation buckets).
 - `uv run python T3.py --plan-only` — solve the 7 cover circles; no simulator, no ground truth.
 - `uv run python -m cumcm.t3.covering` — cover-layout self-check (rotation/selection/min-circle).
+- `uv run python T4.py --plan-only` — solve the 20 measurement positions + hearing-rate statistics
+  (~2 s; writes `results/t4/t4_sweep_plan.json` + `t4_sweep_points.csv`).
+- `uv run python -m cumcm.t4.sweep` — problem 4 scan self-check (batched hearing predicate vs the
+  single-case reference, then the 4.2 M-case statistics without touching any simulator).
+- `uv run python -m cumcm.analysis.undefined_names` — static scan of every repo `.py` for names read
+  but never bound / parameters that silently do not exist (the de-facto lint).
 
 ## Local simulator (`jammers-py/`)
 
@@ -60,10 +71,18 @@
 
 ## Verification (no test/lint/CI exists)
 
-- There is no test suite, linter config, or CI workflow. Treat `python -m cumcm.t3.covering`,
-  `python -m cumcm.t2.region` and byte-identical fixed-seed reruns as the checks. `T2.py` is fully
+- There is no test suite, linter config, or CI workflow. The checks are: the module self-checks
+  (`cumcm.t2.region`, `cumcm.t2.theory`, `cumcm.t3.covering`, `cumcm.t4.sweep`,
+  `cumcm.analysis.undefined_names`) and byte-identical fixed-seed reruns. `T2.py` is fully
   deterministic (no RNG): its six outputs are byte-identical across runs, and every run self-checks
   the analytic geometry against shapely (max rel. dev ~1e-15), a 3x-refined discretization,
   the literature CRLB/GDOP closed forms, and a 5 m global GDOP-prefiltered certification of
   the optimum.
+- **Optimization invariant:** performance work must keep the artifacts byte-identical. The batched
+  hot paths (`t2.region.quad_diameters_batch` / `t2.score.worst_case_diameters`, `t3.covering`
+  distance kernels, `t4.sweep._hit_cases`) are built so each element performs exactly the same
+  floating-point operations as the scalar reference; `T2.py`, `T3.py --plan-only` and
+  `T4.py --plan-only` outputs stay byte-identical before/after. Deviations that were rejected for
+  this reason: replacing `np.hypot` by `sqrt(x²+y²)` in the T2 diameter pair loop (last-bit drift in
+  `t2_second_site.json`).
 - Design rationale lives in the module docstrings and `README.md`.

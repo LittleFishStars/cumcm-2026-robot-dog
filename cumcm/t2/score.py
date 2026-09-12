@@ -48,13 +48,22 @@ from cumcm.common.geometry import bearing
 from cumcm.t1 import TriangulationRegion
 from cumcm.t2 import config as cfg
 from cumcm.t2 import theory
-from cumcm.t2.region import (corner_sources, exact_region, feasible_lens, quad_diameters,
+from cumcm.t2.region import (corner_sources, exact_region, feasible_lens, quad_diameters_batch,
                              quad_polygon, verify_analytic, worst_case_scenario,
                              worst_diameters_all, worst_source_distance)
 
 __all__ = ["Band", "SolveResult", "source_samples", "delta2_grid", "worst_case_diameters",
            "suitability", "coarse_fields", "refine_best", "candidate_band", "solve",
            "scenario_quad"]
+
+
+# 批量喂给 quad_diameters_batch 的"组合 × 候选点"元素个数上限。它不改变任何数值（批内每行
+# 与逐组合调用逐元素同值），只决定一次批处理多大 —— 而这个大小对速度影响很大：批太大时中间
+# 数组超出 CPU 缓存，`in_wedge` 的元素处理反而变慢。本机实测（完整 `T2.py`，16 核无其他负载）：
+#   元素上限  150 000 → 16.5 s；20 000 → 12.9 s；**6 000 → 12.3 s**；3 000 → 12.4 s；1 500 → 12.8 s
+# 取 6 000（约等于细网格 700 多个候选点时 8 行、粗网格 41 个点时 146 行），既在缓存友好的平台
+# 区内，也不至于把 Python 层调用次数放得太大。
+_COMBO_CHUNK_ELEMS = 6_000
 
 
 # ----------------------------------------------------------------------------
@@ -102,25 +111,36 @@ def worst_case_diameters(site: Sequence[float], sx: np.ndarray, sy: np.ndarray, 
     `reduce="max"` 是本文的 minimax 口径（保证最坏情况）；`reduce="mean"` 是文献常用的**期望**
     口径（Chen 等 2009 用期望滤波 RMS 位置误差），两者给出的最优第二检测点可能不同 ——
     这正是 `theory_analysis` 要量化对照的东西。
+
+    实现上把"源采样点 × δ₂"的整套组合（约 2 万行）**按批**送进 `quad_diameters_batch`：逐组合
+    调用 `quad_diameters` 时单次调用只有几百微秒的有效计算、却要 2 ms 以上的调用开销，这一层
+    摊掉后同一份算式的耗时降到原来的几分之一。批内每行与逐组合调用逐元素同值（见
+    `cumcm.t2.region._candidate_points_batch`）；`reduce="mean"` 时仍**逐行累加**，故求和顺序
+    与原先完全一致，结果逐位不变。
     """
     sx = np.asarray(sx, dtype=float).ravel()
     sy = np.asarray(sy, dtype=float).ravel()
+    if reduce not in ("max", "mean"):
+        raise ValueError(f"reduce 只能是 'max' 或 'mean'，收到 {reduce!r}")
+    src = np.asarray(sources, dtype=float)
+    d2s = np.asarray(deltas2, dtype=float)
+    # 行序 = 原先的双重循环顺序（源采样点在外、δ₂ 在内），保证 mean 的逐行累加与原先同序
+    w2 = np.degrees(np.arctan2(src[:, 1][:, None] - sy[None, :],
+                               src[:, 0][:, None] - sx[None, :])) % 360.0          # (M, N)
+    combos = (w2[:, None, :] + d2s[None, :, None]).reshape(-1, sx.size)           # (M·K, N)
+    rows = int(_COMBO_CHUNK_ELEMS // max(sx.size, 1))
+    rows = max(1, min(rows, combos.shape[0]))
     if reduce == "mean":
         acc = np.zeros(sx.shape, dtype=float)
-        n = 0
-        for gx, gy in np.asarray(sources, dtype=float):
-            w2 = np.degrees(np.arctan2(gy - sy, gx - sx)) % 360.0
-            for d2 in np.asarray(deltas2, dtype=float):
-                acc += quad_diameters(site, theta1, sx, sy, w2 + d2, err_deg)
-                n += 1
-        return acc / max(n, 1)
-    if reduce != "max":
-        raise ValueError(f"reduce 只能是 'max' 或 'mean'，收到 {reduce!r}")
+        for i in range(0, combos.shape[0], rows):
+            block = quad_diameters_batch(site, theta1, sx, sy, combos[i:i + rows], err_deg)
+            for r in range(block.shape[0]):        # 逐行累加：与原先的求和顺序逐位一致
+                acc += block[r]
+        return acc / max(combos.shape[0], 1)
     best = np.zeros(sx.shape, dtype=float)
-    for gx, gy in np.asarray(sources, dtype=float):
-        w2 = np.degrees(np.arctan2(gy - sy, gx - sx)) % 360.0
-        for d2 in np.asarray(deltas2, dtype=float):
-            best = np.maximum(best, quad_diameters(site, theta1, sx, sy, w2 + d2, err_deg))
+    for i in range(0, combos.shape[0], rows):
+        block = quad_diameters_batch(site, theta1, sx, sy, combos[i:i + rows], err_deg)
+        best = np.maximum(best, block.max(axis=0))     # 取最大：与逐组合取最大逐位同值（无非结合性）
     return best
 
 

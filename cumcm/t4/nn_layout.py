@@ -25,6 +25,7 @@ import torch.nn as nn
 
 from cumcm.common.routing import (dist_matrix, nearest_order, two_opt_first,
                                   two_opt_greedy)
+from cumcm.t4.sweep import _hit_cases, adversarial_cases
 
 MAX_R = 2270.0               # 自由点允许的最大半径（原布局外推点最远 2270）
 MC_N_DEFAULT = 20_000        # 每条训练样本的蒙特卡洛算例数
@@ -236,22 +237,13 @@ def _edge_miss_fast(layout: np.ndarray, n_azi: int = 90,
     """贴边对抗缺听（子集版）：g 贴 1770 边缘、径向 ±8° 内偏角、R 三档。
 
     返回漏例数（归一化 0~1，按总例数）。与 validate() 的口径一致但抽样更密省。
+
+    算例集合由 `cumcm.t4.sweep.adversarial_cases` 按参数缓存（与布局无关），判据走批量路径，
+    故 GA 里成千次评估不再各自重建算例、也不再逐算例调 numpy。
     """
     P = np.vstack([np.zeros(2), np.asarray(layout, dtype=float)])
-    miss = 0
-    total = 0
-    for R in (1000.0, 1250.0, 1500.0):
-        for ka in range(n_azi):
-            a = 2.0 * math.pi * ka / n_azi
-            g = np.array([1770.0 * math.cos(a), 1770.0 * math.sin(a)])
-            for ko in range(n_off):
-                t = a + math.radians((ko / (n_off - 1) - 0.5) * 8.0)
-                d = P - g
-                ok = ((np.einsum("ij,ij->i", d, d) <= R * R + 1e-9)
-                      & (d[:, 0] * math.cos(t) + d[:, 1] * math.sin(t) >= -1e-9)).any()
-                miss += int(not ok)
-                total += 1
-    return miss / total
+    hit, _ = _hit_cases(P, *adversarial_cases(n_azi=int(n_azi), n_off=int(n_off), wrap=False))
+    return float((~hit).sum()) / float(hit.size)
 
 
 def ga_search(net: nn.Module, n_free: int, n_pop: int = 300,
@@ -378,19 +370,9 @@ def validate(layout: np.ndarray, mc_n: int = 400_000, seed: int = 2026):
     """精确验证：返回 {定向缺听/全向缺听/贴边漏/TSP 路程}。"""
     dm, om = fast_miss(layout, n=mc_n, seed=seed)
     P = np.vstack([np.zeros(2), layout])
-    edge = 0
-    for R in (1000.0, 1250.0, 1500.0):
-        for ka in range(360):
-            a = 2.0 * math.pi * ka / 360
-            g = np.array([1770.0 * math.cos(a), 1770.0 * math.sin(a)])
-            for ko in range(40):
-                t = a + math.radians((ko / 39.0 - 0.5) * 8.0)
-                d = P - g
-                ok = ((np.einsum("ij,ij->i", d, d) <= R * R + 1e-9)
-                      & (d[:, 0] * math.cos(t) + d[:, 1] * math.sin(t) >= -1e-9)).any()
-                if not ok:
-                    edge += 1
-    return {"dir_miss": dm, "omni_miss": om, "edge_miss": edge, "route_m": route_of(layout)}
+    hit, _ = _hit_cases(P, *adversarial_cases(360, 40, wrap=False))
+    return {"dir_miss": dm, "omni_miss": om, "edge_miss": int((~hit).sum()),
+            "route_m": route_of(layout)}
 
 
 def main() -> None:

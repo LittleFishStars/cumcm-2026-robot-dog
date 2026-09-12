@@ -241,7 +241,8 @@ def region_samples(step: float, n_boundary: int) -> np.ndarray:
     ax = np.arange(-REGION_RADIUS, REGION_RADIUS + TOL, step)
     gx, gy = np.meshgrid(ax, ax)
     pts = np.stack((gx.ravel(), gy.ravel()), axis=1)
-    pts = pts[np.linalg.norm(pts, axis=1) <= REGION_RADIUS + TOL]
+    # 圆域判据用平方距离（同 cover_counts：TOL 余量远大于浮点末位，逐点同判）
+    pts = pts[(pts[:, 0] * pts[:, 0] + pts[:, 1] * pts[:, 1]) <= (REGION_RADIUS + TOL) ** 2]
     t = np.linspace(0.0, 2.0 * math.pi, n_boundary, endpoint=False)
     ring = np.stack((REGION_RADIUS * np.cos(t), REGION_RADIUS * np.sin(t)), axis=1)
     return np.vstack([pts, ring])
@@ -249,12 +250,25 @@ def region_samples(step: float, n_boundary: int) -> np.ndarray:
 
 def nearest_distances(points: np.ndarray, waypoints: np.ndarray,
                       chunk: int = 200_000) -> np.ndarray:
-    """每个采样点到最近圆心的距离（分块计算，避免大矩阵占内存）。"""
-    out = np.empty(len(points), dtype=float)
-    for i in range(0, len(points), chunk):
-        blk = points[i:i + chunk]
-        d = np.linalg.norm(blk[:, None, :] - waypoints[None, :, :], axis=2)
-        out[i:i + chunk] = d.min(axis=1)
+    """每个采样点到最近圆心的距离（分块计算，避免大矩阵占内存）。
+
+    实现上是"逐圆心一列、比平方距离、最后只对 N 个最小值开方"：
+      * 不构造 `(N, n_circles, 2)` 三维临时数组，也不在对轴长约 2 的轴上做 `np.linalg.norm`
+        的多维归约（那种归约要按行走通用累加路径，实测比逐列循环慢数倍）；
+      * 开方放在最后 —— 开方单调，故 √(min d²) = min √(d²) 逐位相同，只是把 7N 次开方
+        省成 N 次。
+    """
+    pts = np.asarray(points, dtype=float)
+    wp = np.asarray(waypoints, dtype=float)
+    out = np.empty(pts.shape[0], dtype=float)
+    for i in range(0, pts.shape[0], chunk):
+        blk = pts[i:i + chunk]
+        best2 = np.full(blk.shape[0], np.inf, dtype=float)
+        for cx, cy in wp:
+            dx = blk[:, 0] - cx
+            dy = blk[:, 1] - cy
+            np.minimum(best2, dx * dx + dy * dy, out=best2)
+        out[i:i + chunk] = np.sqrt(best2)
     return out
 
 
@@ -321,12 +335,24 @@ def worst_candidates_general(centers: np.ndarray,
 
 def cover_counts(points: np.ndarray, waypoints: np.ndarray, radius: float,
                  chunk: int = 200_000) -> np.ndarray:
-    """每个采样点被几个覆盖圆同时覆盖（覆盖重数）。"""
-    out = np.empty(len(points), dtype=np.int64)
-    for i in range(0, len(points), chunk):
-        blk = points[i:i + chunk]
-        d = np.linalg.norm(blk[:, None, :] - waypoints[None, :, :], axis=2)
-        out[i:i + chunk] = (d <= radius + TOL).sum(axis=1)
+    """每个采样点被几个覆盖圆同时覆盖（覆盖重数）。
+
+    判据写成"平方距离 ≤ (r + TOL)²"：两侧都非负、且 TOL 的余量（d 上 1e-9、d² 上 2e-6）比
+    浮点最后一位（d = 1000 处约 1e-13）大七个数量级，故与"距离 ≤ r + TOL"逐点同判。好处是不必
+    对每个点都开方，也避免构造 `(N, n_circles, 2)` 三维临时数组。
+    """
+    pts = np.asarray(points, dtype=float)
+    wp = np.asarray(waypoints, dtype=float)
+    lim = (float(radius) + TOL) ** 2
+    out = np.empty(pts.shape[0], dtype=np.int64)
+    for i in range(0, pts.shape[0], chunk):
+        blk = pts[i:i + chunk]
+        cnt = np.zeros(blk.shape[0], dtype=np.int64)
+        for cx, cy in wp:
+            dx = blk[:, 0] - cx
+            dy = blk[:, 1] - cy
+            cnt += (dx * dx + dy * dy) <= lim
+        out[i:i + chunk] = cnt
     return out
 
 

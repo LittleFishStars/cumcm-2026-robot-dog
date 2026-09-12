@@ -28,6 +28,7 @@ import torch.nn as nn
 from cumcm.common.routing import (dist_matrix, nearest_order, two_opt_first,
                                   two_opt_greedy)
 from cumcm.t3.config import SURVEY_CENTERS
+from cumcm.t4.sweep import _hit_cases, adversarial_cases
 
 MAX_R = 2270.0
 OUTER_SLOT = 12            # 代理输入固定 12 个外圈点（不足补 0、多余截断）
@@ -68,21 +69,11 @@ def fast_miss(pts: Sequence[Sequence[float]], n: int = 30_000,
 
 
 def _edge_miss_fast(outer: np.ndarray, n_azi: int = 90, n_off: int = 24) -> float:
-    P = assemble(outer)
-    miss = 0
-    total = 0
-    for R in (1000.0, 1250.0, 1500.0):
-        for ka in range(n_azi):
-            a = 2.0 * math.pi * ka / n_azi
-            g = np.array([1770.0 * math.cos(a), 1770.0 * math.sin(a)])
-            for ko in range(n_off):
-                t = a + math.radians((ko / (n_off - 1) - 0.5) * 8.0)
-                d = P - g
-                ok = ((np.einsum("ij,ij->i", d, d) <= R * R + 1e-9)
-                      & (d[:, 0] * math.cos(t) + d[:, 1] * math.sin(t) >= -1e-9)).any()
-                miss += int(not ok)
-                total += 1
-    return miss / total
+    """贴边对抗缺听（子集版）：算例与判据都来自 `cumcm.t4.sweep`（按参数缓存的算例集合 +
+    批量判据），与 `nn_layout._edge_miss_fast` 同源，数值口径逐例一致。"""
+    hit, _ = _hit_cases(assemble(outer),
+                        *adversarial_cases(n_azi=int(n_azi), n_off=int(n_off), wrap=False))
+    return float((~hit).sum()) / float(hit.size)
 
 
 # --------------------------------------------------------------------------
@@ -272,19 +263,9 @@ def ga_outer(net: nn.Module, k_outer: int, n_pop: int = 200, n_elite: int = 12,
 def validate(outer: np.ndarray, mc_n: int = 400_000, seed: int = 2026):
     lay = assemble(outer)
     dm, om = fast_miss(lay, n=mc_n, seed=seed)
-    P = lay
-    edge = 0
-    for R in (1000.0, 1250.0, 1500.0):
-        for ka in range(360):
-            a = 2.0 * math.pi * ka / 360
-            g = np.array([1770.0 * math.cos(a), 1770.0 * math.sin(a)])
-            for ko in range(40):
-                t = a + math.radians((ko / 39.0 - 0.5) * 8.0)
-                d = P - g
-                ok = ((np.einsum("ij,ij->i", d, d) <= R * R + 1e-9)
-                      & (d[:, 0] * math.cos(t) + d[:, 1] * math.sin(t) >= -1e-9)).any()
-                edge += int(not ok)
-    return {"dir_miss": dm, "omni_miss": om, "edge_miss": edge, "route_m": route_of(lay)}
+    hit, _ = _hit_cases(lay, *adversarial_cases(360, 40, wrap=False))
+    return {"dir_miss": dm, "omni_miss": om, "edge_miss": int((~hit).sum()),
+            "route_m": route_of(lay)}
 
 
 def main() -> None:

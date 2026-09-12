@@ -331,6 +331,7 @@ def draw_criteria(out_path: Path, result: SolveResult, dpi: int = cfg.DPI,
       （双对数），给出 Spearman 秩相关 —— 说明它**适合做快筛**（秩几乎一致）但**不能当硬界**
       （点云整体在对角线下方，即 GDOP 低估最坏直径）。
     """
+    setup_mpl_env()          # 必须在 import matplotlib 之前：配置目录只在首次导入时读取一次
     try:
         import matplotlib
         matplotlib.use("Agg")

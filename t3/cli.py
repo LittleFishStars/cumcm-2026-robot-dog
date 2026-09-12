@@ -3,7 +3,7 @@
 * `run_practice` —— 本地演练模式：用 jammers-py 生成固定场景，能拿到真值，可核对覆盖保证；
 * `run_official` —— 正式模式：连官方模拟器，真值不可见，策略完全相同。
 
-顶层 T3.py 只调用本模块的 main()，故命令行用法与拆分前一致。
+命令行入口就是本模块（`python -m t3`），用法与拆分前一致。
 """
 
 from __future__ import annotations
@@ -313,7 +313,7 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: Sequence[str] | None = None) -> int:
     """按模式分派：`--practice` → 本地演练；`--plan-only` → 只求覆盖圆；其余 → 官方模拟器。
 
-    即 `python T3.py` 不带任何参数时**直接连官方模拟器**（缺省 http://127.0.0.1:2026）跑完一局。
+    即 `python -m t3` 不带任何参数时**直接连官方模拟器**（缺省 http://127.0.0.1:2026）跑完一局。
     三种模式共用同一次覆盖圆求解与同一份策略代码，差别只在
     "场景从哪来"与"结果写哪去"。
     """

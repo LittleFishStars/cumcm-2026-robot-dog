@@ -3,7 +3,7 @@
 * `run_practice` —— 本地演练：jammers-py 生成**问题四场景**（定向 + 全向混合），能拿到真值；
 * `run_official` —— 正式模式：连官方模拟器，真值不可见，策略完全相同。
 
-顶层 T4.py 只调用本模块的 main()，用法与 T3.py 保持一致（--practice / --plan-only / 无参数
+命令行入口就是本模块（`python -m t4`），用法与 `python -m t3` 保持一致（--practice / --plan-only / 无参数
 即连官方模拟器）。
 """
 

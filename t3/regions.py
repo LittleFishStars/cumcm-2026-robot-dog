@@ -78,7 +78,7 @@ class ProbRegion(DiscConstraintMixin, TriangulationRegion):
     非凸与多块。减去若干圆盘后区域可能不再凸、甚至裂成多块，`vertices` 按"整个几何"处理：
     收集各分块的外环顶点，故直径与最小覆盖圆都覆盖全部可能位置（最远点对必在顶点上），判据只
     会更保守 —— 安全。但"直径 < 40 m ⇒ 最小覆盖圆半径 < 20 m"依赖凸性、非凸时不再成立，故
-    T3.py 的清除判据一律直接用最小覆盖圆半径（见 RobotDog._precise），不用直径。
+    本包的清除判据一律直接用最小覆盖圆半径（见 RobotDog._precise），不用直径。
 
     本题的 no_signal 是可证明约束，故 `WITH_OUTSIDE = True`（问题四相反，见 t4.regions）。
     """

@@ -16,7 +16,7 @@
 语义：区域已被圆域截断，故 area / diameter / enclosing_circle 都是截断后的有限值；bounded
 另行回答"定位是否只靠检测点就确定了"——有顶点落在圆域边界上（约束不足）时为 False。
 
-依赖 shapely>=2.1、numpy；命令行入口见顶层 T1.py。
+依赖 shapely>=2.1、numpy；命令行入口：`python -m t1`。
 """
 
 from math import atan2, cos, degrees, hypot, radians, sin

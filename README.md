@@ -144,7 +144,7 @@ t = 3.97），里程 16419 → **15038 m**（省 1381 m，8.4%，t = 5.90）。
 全部结论与自检数字在 `results/t2/t2_second_site.json`。模型、算法、校验、文献依据与灵敏度的
 完整说明见 `reports/问题二第二检测点候选区域.md`。
 
-分层规则见 `__init__.py`：依赖只能向下（common ← t1/t2/t3/t4 ← analysis），
+分层规则见 `AGENTS.md`（Repo layout）：依赖只能向下（common ← t1/t2/t3/t4 ← analysis），
 严禁下层反向导入上层；t2/t3/t4 是并列叶子，t2 复用 t1 的定位区域口径（同一套楔形交，
 t2 只是把它向量化到成千上万个候选点），t4 复用 t3 时只 import 其纯函数模块 `t3.probing`。
 

@@ -1,12 +1,12 @@
 """问题二的命令行入口：一条命令给出最优第二检测点、候选区域与适合度图。
 
-    python T2.py                                    # 缺省：S1 = 原点、θ1 = 0°
-    python T2.py --site 200 -300 --bearing 45       # 换个第一检测点与示向度
-    python T2.py --eta 0.05                         # 候选区域收紧到 J ≤ 1.05 J*
-    python T2.py --d-lo 800 --d-hi 1200             # 若先前还测到了大致距离，可收窄源不确定集
-    python T2.py --no-plot                          # 只算数与文件（无 matplotlib 时也能跑）
+    python -m t2                                    # 缺省：S1 = 原点、θ1 = 0°
+    python -m t2 --site 200 -300 --bearing 45       # 换个第一检测点与示向度
+    python -m t2 --eta 0.05                         # 候选区域收紧到 J ≤ 1.05 J*
+    python -m t2 --d-lo 800 --d-hi 1200             # 若先前还测到了大致距离，可收窄源不确定集
+    python -m t2 --no-plot                          # 只算数与文件（无 matplotlib 时也能跑）
 
-顶层 `T2.py` 只是薄壳，真正实现在 `t2/`。
+命令行入口就是本模块（`python -m t2`，或 `python -m t2.cli`）。
 """
 
 from __future__ import annotations
@@ -23,14 +23,14 @@ __all__ = ["build_parser", "main"]
 
 
 def build_parser() -> argparse.ArgumentParser:
-    """构造命令行解析器（T2.py 的全部选项，缺省值取自 `t2.config`）
+    """构造命令行解析器（问题二的全部选项，缺省值取自 `t2.config`）
 
     Returns:
         argparse.ArgumentParser: 已注册 --site/--bearing/--eta/--d-lo/--d-hi/--verify/
         --save-dir/--no-plot/--no-csv/--quiet 的解析器
     """
     p = argparse.ArgumentParser(
-        prog="T2.py",
+        prog="python -m t2",
         description="CUMCM 2026 B 问题二：第二个检测点的选择与候选区域（最坏情况最小化）")
     p.add_argument("--site", nargs=2, type=float, metavar=("X", "Y"),
                    default=list(cfg.DEFAULT_SITE),

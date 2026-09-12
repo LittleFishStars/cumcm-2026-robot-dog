@@ -1,35 +1,33 @@
-# 虚拟环境与缓存
+# 虚拟环境与 Python 缓存
 .venv/
 .uv-cache/
 __pycache__/
 *.py[cod]
 
-# IDE
+# 编辑器与系统
 .idea/
+Thumbs.db
+desktop.ini
 
-# 竞赛题目材料（如需入库请手动 git add -f resources/Problem/）
-resources/Problem/
+# 本机材料：一律不入库（确实要入库时用 git add -f）
+#   jammers-py/   本地演练场（复刻模拟器，--practice 自动拉起；上游产物，非本仓库代码）
+#   Problem/      赛题材料
+#   References/   参考文献 PDF（53 M，撰写论文时本地查阅用）
+resources/
 
-# 机器狗运行日志（接口层自动记录，不入库）
-logs/*.jsonl
+# 求解产物不在此列：results/ 是入库的交付物（同 seed 逐字节可复现，见 AGENTS.md）
 
-# 验证脚本 F 组的暂存目录（正常跑完会自删，异常中断时兜底）
-.tmp_verify/
-
-# 模拟器运行痕迹（每次演练自动重建，非源码/交付物）
-resources/jammers-py/data/behavior-logs/
-resources/jammers-py/data/practice-statistics-queue.sqlite3
-
-# 本地演练场（复刻模拟器，仅用于 --practice 时自动拉起；上游产物，非本仓库代码）
-# 交付与复现都不需要它：官方模式连真机，--plan-only 连不到模拟器也能跑
-resources/jammers-py/
-
-# 参考文献 PDF（53 M，撰写论文时本地查阅用；体积不适合入库）
-# README 与 reports/ 里引用的结论都写了出处，不依赖这些 PDF 文件本身
-resources/References/
-
-# LaTeX 编译中间产物（交付物是 .tex 源码与编译好的 main.pdf）
+# LaTeX 编译中间产物（交付物是 .tex 源码与编译好的 PDF）
 *.aux
 *.toc
 *.out
 *.synctex.gz
+*.fls
+*.fdb_latexmk
+*.bbl
+*.blg
+*.nav
+*.snm
+*.vrb
+*.bcf
+*.run.xml

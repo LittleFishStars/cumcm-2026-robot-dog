@@ -68,7 +68,7 @@ def truth_check(truth: Optional[Sequence[dict]], plan: CoverPlan,
 
 
 # ----------------------------------------------------------------------------
-# 本地演练场：拉起 jammers-py 并用其控制台 REST 开一局（与 T3_ga.py 同源实现）
+# 本地演练场：拉起 jammers-py 并用其控制台 REST 开一局
 
 def save_plan(res: CoverSolveResult, save_dir: Path) -> List[Path]:
     """覆盖圆方案落盘：JSON（含校验与对照）+ CSV（圆心坐标）。"""

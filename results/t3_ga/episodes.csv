@@ -1,2 +1,0 @@
-episode,seed,n_sources,cleared,clear_ratio,virtual_time_s,avg_time_s,n_measure,n_clear,ga_runs,localize_rms_deg,n_located,localize_err_mean_m,localize_err_max_m
-1,0,,10,,3209.99813,320.999813,153,11,31,0.05847217492187984,0,,

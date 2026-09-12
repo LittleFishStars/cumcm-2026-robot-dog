@@ -30,7 +30,7 @@ __all__ = ["setup_mpl_env", "font_context", "save_png", "slug", "hint_plot_once"
 TRAJ_FONTS = ("Noto Sans CJK SC", "Noto Sans CJK JP", "WenQuanYi Zen Hei",
               "Microsoft YaHei", "SimHei", "DejaVu Sans")
 
-# 统一配色：两族策略（t3 / t3ga）与论文出图共用，避免同一含义在不同图里颜色不一致
+# 统一配色：各题策略与论文出图共用，避免同一含义在不同图里颜色不一致
 C_PATH = "#2f6fb5"          # 行驶路径 / 主色
 C_DIR = "#1f4e79"           # 有示向度的测量点
 C_NOSIG = "#9aa3ad"         # 无信号的测量点

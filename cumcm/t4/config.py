@@ -122,7 +122,7 @@ EXCL_QUAD = 16                  # 圆盘约束的近似精度：正 4×EXCL_QUAD
 SEED = 2026
 PROBLEM_NO = 4                  # 本方案对应题目问题四（演练场据此生成定向+全向混合场景）
 
-RESULTS_DIR = "results/t4"      # 结果目录（与 t3/t3_ga 分开）
+RESULTS_DIR = "results/t4"      # 结果目录（与 results/t3 分开）
 PLAN_JSON = "t4_sweep_plan.json"        # 扫描方案（含听到率统计）
 PLAN_CSV = "t4_sweep_points.csv"        # 扫描测量位置坐标
 SURVEY_JSON = "t4_survey.json"          # 逐局扫描统计

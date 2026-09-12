@@ -70,15 +70,12 @@ SURVEY_ROUTE_M = 6167.3234       # 从原点出发走完 7 点的最短开放路
 
 SEED = 2026
 
-RESULTS_DIR = "results/t3"       # 问题三确定性方案的结果目录（与 GA 版分开放，见 TRAJ_DIR 说明）
+RESULTS_DIR = "results/t3"       # 问题三确定性方案的结果目录
 PLAN_JSON = "t3_cover_plan.json"        # 覆盖圆求解结果
 PLAN_CSV = "t3_cover_circles.csv"       # 覆盖圆圆心坐标
 SURVEY_JSON = "t3_survey.json"          # 逐局巡视扫描统计
 OBS_CSV = "t3_observations.csv"         # 逐条示向度观测
 # 逐局轨迹图与轨迹表所在子目录（相对 --save-dir）。
-# 两套方案的结果树彻底分开：本程序写 results/t3/，GA 版写 results/t3_ga/，各自下面都有
-# trajectory/。早期两者共用 results/trajectory/ 且轨迹同名（epNN_seedMM），实测一次性
-# 覆盖掉对方 10 个已提交文件；现在靠目录隔离，不会再撞。
 TRAJ_DIR = "trajectory"
 TRAJ_DPI = 160.0                        # 轨迹图位图分辨率
 

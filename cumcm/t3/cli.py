@@ -32,7 +32,6 @@ def _api_log(args: argparse.Namespace, echo: bool):
     """接口日志上下文（把 CLI 参数拆成公共层 api_log 所需的参数）。
 
     路径优先取 --api-log；未指定时用 <save-dir>/api_calls.jsonl；显式传空串则关闭日志。
-    与 GA 方案（cumcm.t3ga.cli）同一套机制，便于两份结果用同样的方式审计。
     """
     return _api_log_raw(args.save_dir, args.api_log, echo)
 
@@ -263,8 +262,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--survey-only", action="store_true",
                    help="只做阶段一（巡视扫描 + 覆盖核对），不做定位与清除")
     p.add_argument("--traj-dir", default=TRAJ_DIR,
-                   help=f"轨迹图输出子目录（相对 --save-dir；缺省 {TRAJ_DIR}，"
-                        f"与 T3_ga.py 的 trajectory/ 分开以免互相覆盖）")
+                   help=f"轨迹图输出子目录（相对 --save-dir；缺省 {TRAJ_DIR}）")
     p.add_argument("--no-rotate", action="store_true",
                    help="不做起始扫描后的布局旋转（保持设计基准朝向，用于对照实验）")
     p.add_argument("--no-plot", action="store_true",
@@ -276,8 +274,8 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: Optional[Sequence[str]] = None) -> int:
     """按模式分派：`--practice` → 本地演练；`--plan-only` → 只求覆盖圆；其余 → 官方模拟器。
 
-    即 `python T3.py` 不带任何参数时**直接连官方模拟器**（缺省 http://127.0.0.1:2026）跑完一局，
-    与 GA 方案 T3_ga.py 的手感一致。三种模式共用同一次覆盖圆求解与同一份策略代码，差别只在
+    即 `python T3.py` 不带任何参数时**直接连官方模拟器**（缺省 http://127.0.0.1:2026）跑完一局。
+    三种模式共用同一次覆盖圆求解与同一份策略代码，差别只在
     "场景从哪来"与"结果写哪去"。
     """
     relax_console_encoding()

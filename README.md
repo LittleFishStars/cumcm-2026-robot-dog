@@ -6,7 +6,7 @@
 ## 目录结构
 
 ```
-T1.py / T3.py / T3_ga.py / T3_validate.py / T3_figures.py / T4.py / T4_figures.py
+T1.py / T3.py / T4.py / T4_figures.py
                                                                   顶层薄入口（只调用 cumcm.*，用法不变）
 sim_api.py                                                  模拟器接口的兼容垫片
 cumcm/
@@ -15,16 +15,12 @@ cumcm/
   t1/        问题一：交会定位区域 TriangulationRegion
   t3/        问题三主线（确定性策略）：config / covering / regions / probing / strategy /
              report / plotting / cli
-  t3ga/      问题三 GA 对照方案：config / localize / routing_ga / ga_ops / covering /
-             strategy / plotting / training / cli
   t4/        问题四（定向 + 全向混合，确定性策略）：config / sweep（7 基点 + 3 内点 + 12 外圈点扫描）/ regions /
              probing / strategy / report / plotting / cli
-  analysis/  验证与出图：validate（六组独立验证）、figures / figures_t4（论文图表）
+  analysis/  验证与出图：figures_t4（论文图表，问题四）
 jammers-py/  本地演练场（复刻模拟器；data/behavior-logs/ 会随每次演练累积日志，可随时清空）
 results/     运行产物，按各题分成独立子树（**不按运行模式分家**：一个目录 = 最新一次运行）：
   t3/        确定性方案（T3.py）：覆盖圆方案、巡视汇总、逐条观测、接口日志、总轨迹图、逐步扫描图
-  t3_ga/     GA 对照方案（T3_ga.py）：GA 训练记录、逐局统计、接口日志、验证结果、
-             轨迹与扫描图，以及 holdout/（独立 seed 泛化批）
   t4/        问题四方案（T4.py）：扫描方案（复用 7 覆盖基点 + 3 内点 + 12 外圈点、含听到率统计）、
              逐局统计、观测明细、接口日志、轨迹图与逐步扫描图
 figures/     论文用图表 PDF 与背后的数据 CSV
@@ -44,13 +40,10 @@ uv sync                              # 或 pip install -e .
 .venv/bin/python T3.py               # 官方模式：连 http://127.0.0.1:2026 跑完一局
 .venv/bin/python T3.py --plan-only   # 只求覆盖圆方案（不连任何模拟器）
 .venv/bin/python T3.py --practice 3  # 本地演练 3 局（结果落 results/t3/）
-.venv/bin/python T3_ga.py --practice 3        # 结果落 results/t3_ga/
-.venv/bin/python T3_validate.py      # 六组独立验证（默认审计 results/t3_ga/ + 其 holdout/）
-.venv/bin/python T3_figures.py       # 生成论文图表（默认读 results/t3_ga/）
 .venv/bin/python -m cumcm.t3.covering   # 覆盖圆方案自检（旋转不破坏保证 / 密集扇区选向 / 最少圆数）
 ```
 
-`T3.py` 与 `T3_ga.py` 的命令行一致（都不加参数即连官方模拟器），三种模式共用同一次覆盖圆求解
+`T3.py` 不加参数即连官方模拟器，三种模式共用同一次覆盖圆求解
 与同一份策略代码，差别只在"场景从哪来"：官方模式与演练**写同一目录**（`results/t3/`）
 且**拿不到真值**（逐次请求/响应落盘到 `api_calls.jsonl`，这是唯一的证据链）；`--practice` 用
 jammers-py 自动拉起、**自带真值**可核对覆盖保证，写 `results/t3/`。
@@ -70,8 +63,8 @@ jammers-py 自动拉起、**自带真值**可核对覆盖保证，写 `results/t
 
 逐步扫描图（`scan/`）是对总轨迹图的补充：整局上百次测向挤在一张 3600 m 见方的图上很难看清，
 而策略的信息全部来自一步步扫描。每张扫描图标出本步的测向点与结果、示向度射线、到本步为止的
-行驶路径、当时的可能源区域、以及累计清除数。两族方案（T3 / T3_ga）都出这两种图，画法共用
-`cumcm/common/scanfigure.py`。所有图在 `/exit` 之后生成，不占用现实时间预算（`--no-plot` 关闭）。
+行驶路径、当时的可能源区域、以及累计清除数。所有图由 `cumcm/common/scanfigure.py` 绘制。
+所有图在 `/exit` 之后生成，不占用现实时间预算（`--no-plot` 关闭）。
 
 **为什么是 7 个覆盖圆**（而不是更少）：半径 1000 m 的圆盘覆盖半径 1800 m 的圆域，属于经典的
 *disk covering problem*。k 个等半径圆盘覆盖一个圆所需的最小半径比 ρ_k 已有证明：ρ_5 = 0.6093829
@@ -91,6 +84,6 @@ d = d_min = 1122.9558 m 时也是 6737.73 m。但**六边形并不是最优的**
 同 seed 配对实测（各 10 局、均 131/131 全清）：虚拟时间 4008 → **3796 s**（省 212.1 s，5.3%，
 t = 3.97），里程 16419 → **15038 m**（省 1381 m，8.4%，t = 5.90）。
 
-分层规则见 `cumcm/__init__.py`：依赖只能向下（common ← t1/t3/t3ga ← analysis），
+分层规则见 `cumcm/__init__.py`：依赖只能向下（common ← t1/t3/t4 ← analysis），
 严禁下层反向导入上层；t4 与 t3 是并列叶子，t4 复用 t3 时只 import 其纯函数模块
 `t3.probing`（补测选点与 t3 完全同源，直接复用、不复制）。

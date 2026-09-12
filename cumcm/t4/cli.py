@@ -32,7 +32,7 @@ from cumcm.t4.sweep import SweepPlan, build_sweep_plan, print_sweep_report, veri
 
 
 def _api_log(args: argparse.Namespace, echo: bool):
-    """接口日志上下文（与 t3/t3ga 同一套机制，便于用同样方式审计）。"""
+    """接口日志上下文（便于用同一方式审计）。"""
     return _api_log_raw(args.save_dir, args.api_log, echo)
 
 

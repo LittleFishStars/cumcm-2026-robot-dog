@@ -1,8 +1,7 @@
 # 官方评测平台操作手册（问题三）
 
-> 适用：2026 CUMCM B 题问题三，程序 `T3.py`（确定性主线）或 `T3_ga.py`（GA 对照）。
-> **两者命令行完全一致、都不加参数即连官方模拟器**，本手册的命令可原样互换。
-> 本手册只讲**在官方测试平台上怎么跑**；算法与本地演练见 `reports/RESULTS_REPORT.md`。
+> 适用：2026 CUMCM B 题问题三，程序 `T3.py`（确定性主线）。
+> 本手册只讲**在官方测试平台上怎么跑**；算法与本地演练见 `README.md`。
 
 ## 0. 一句话说明
 
@@ -12,26 +11,15 @@
 ```
 Windows 机器
 ├── 官方模拟器（jammers-simulator-full.exe）  监听 http://127.0.0.1:2026
-└── Python + T3.py（或 T3_ga.py）             连 127.0.0.1:2026，跑完一局
+└── Python + T3.py                            连 127.0.0.1:2026，跑完一局
 ```
 
-两套方案的开法一样，**不带任何参数**就跑官方模式：
-
-| 程序 | 说明 | 官方模式结果目录 |
-| --- | --- | --- |
-| `T3.py` | 确定性主线方案（**建议正式测试用它**） | `results/t3/` |
-| `T3_ga.py` | GA 对照方案 | `results/t3_ga/` |
+`T3.py` **不带任何参数**就跑官方模式，结果写 `results/t3/`。
 
 > **结果目录不按模式分家**：官方模式与本地演练写同一个目录，一个结果目录 = 最新一次运行。
 > 跑完官方测试后，该目录里的演练批产物（多局统计、真值相关字段）会被这次单局结果覆盖。
->
-> 因此有一个固定次序：**先跑演练批 → 再跑验证/出图**。官方产物没有真值（接口不返回），
-> 靠它无法出论文图 —— `T3_figures.py` 会直接提示，`T3_validate.py` 则把需要真值的几项
-> 标为"跳过"（而不是判失败）。演练批逐字节可复现，重跑一次即可：
-> `.venv/bin/python T3_ga.py --practice 20 --seed 0`（注意它会反过来覆盖官方留档）。
->
-> 想知道某个目录是哪一次运行留下的，看 `ga_training.json` 的 `meta.mode`
-> （或 `t3_survey.json` 的 `meta.mode`）：`practice` / `official`。
+> 想知道某个目录是哪一次运行留下的，看 `t3_survey.json` 的 `meta.mode`：
+> `practice` / `official`。
 
 ## 1. 一次性准备（约 5 分钟）
 
@@ -58,13 +46,12 @@ pip install numpy matplotlib
 代码按包组织，需要**整个 `cumcm/` 目录 + 顶层入口**，放进同一个目录（例如 `D:\cumcm\`）：
 
 ```
-T3.py         入口（确定性主线，建议正式测试用）
-T3_ga.py      入口（GA 对照方案）
-cumcm\        求解实现（common / t1 / t3 / t3ga / analysis 五个子包）
+T3.py         入口（确定性主线，正式测试用）
+cumcm\        求解实现（common / t1 / t3 / t4 / analysis 五个子包）
 ```
 
-`cumcm\` 少一层都不行：`T3.py` 只调用 `cumcm.t3.cli`、`T3_ga.py` 只调用
-`cumcm.t3ga.cli`，`sim_api.py` 只是 `cumcm.common.sim_client` 的兼容垫片。
+`cumcm\` 少一层都不行：`T3.py` 只调用 `cumcm.t3.cli`，
+`sim_api.py` 只是 `cumcm.common.sim_client` 的兼容垫片。
 **不要**只拷 `sim_api.py` 和某个入口文件 —— 那样会报
 `ModuleNotFoundError: No module named 'cumcm'`。
 
@@ -106,7 +93,7 @@ python build/submit.pyz --help          # 自检
 ③ 选「问题3演练测试」→ 点开始 → 二次确认
 ④ 5 秒倒计时（此期间接口未开放，先别运行程序）
 ⑤ 界面提示接口已就绪
-⑥ 运行：python T3.py        （等价于 --base-url http://127.0.0.1:2026；T3_ga.py 同样用法）
+⑥ 运行：python T3.py        （等价于 --base-url http://127.0.0.1:2026）
 ⑦ 约 3 秒后程序自行结束；界面「指令与反馈」区可见完整请求/反馈
 ⑧ 记下界面显示的清除结果，与本程序输出的「清除 N 个」核对
 ```
@@ -132,32 +119,27 @@ python -X utf8 T3.py --plan-only
 | --- | --- | --- |
 | `--base-url` | `http://127.0.0.1:2026` | 模拟器接口地址，改过端口才需要 |
 | `--robot-id` | `202614023005` | 参赛队号，已内置，不用传 |
-| `--save-dir` | `results/t3_ga/` | 结果输出目录（不按演练/官方分家） |
+| `--save-dir` | `results/t3/` | 结果输出目录（不按演练/官方分家） |
 | `--quiet` | 关 | 只打印汇总，不打印过程明细 |
 | `--no-plot` | 关 | 关闭每局结束后的轨迹图 |
 
 ### 2.3 预期输出
 
 （下例是**实测样例**：用与官方同源的复刻模拟器走同一套官方模式代码路径跑出来的，连同
-`results/t3/`、`results/t3_ga/` 的顶层内容一起留档，便于对照。）
+`results/t3/` 的顶层内容一起留档，便于对照。）
 
 ```
 ==========================================================================
-2026 CUMCM B 题 · 问题三：遗传算法自动定位与清除
+2026 CUMCM B 题 · 问题三：机器狗搜索与清除干扰源（确定性策略）
 ==========================================================================
 连接模拟器 http://127.0.0.1:2026（robot_id=202614023005）
 完成：清除 16 个，巡视 7 个圆心，里程 15489 m，虚拟时间 3864 s，测向 113 次（补测 2 次），听到 16 个频道（40 条示向度）
 结果已保存：results/t3/t3_cover_plan.json，results/t3/t3_cover_circles.csv，results/t3/t3_survey.json，results/t3/t3_observations.csv
 总轨迹图：results/t3/trajectory/ep01.png，results/t3/trajectory/ep01.csv
 接口调用日志：共 138 次（/clear 11、/enter 1、/exit 1、/measure 125）→ results/t3/api_calls.jsonl
-定位 GA：14 次训练（每代 80 个体），提前收敛 2/14 次（判据 适应度<1e-04），否则跑满 150 代...
-路线 GA：覆盖路点巡回（8 点）8145 m → 8117 m，改进 0.3%
-训练结果已保存：results/t3_ga/ga_training.json，results/t3_ga/ga_convergence.csv，results/t3_ga/episodes.csv
-接口调用日志：共 166 次（/clear 11、/enter 1、/exit 1、/measure 153）→ results/t3_ga/api_calls.jsonl
 ```
 
-上面是 **T3.py（确定性主线）** 的实测样例（与 `results/t3/` 一起留档，便于对照；
-`T3_ga.py` 的输出格式不同，样例见 `results/t3_ga/`）。
+上面是 **T3.py（确定性主线）** 的实测样例（与 `results/t3/` 一起留档，便于对照）。
 
 **核对要点**：本程序报的「清除 N 个」应与模拟器界面显示的清除结果一致；
 `/enter`、`/exit` 各恰好 1 次；`/measure` 次数 = 测向次数。
@@ -199,8 +181,7 @@ python -X utf8 T3.py --plan-only
 python -X utf8 T3.py --base-url http://127.0.0.1:2026 --save-dir results\formal
 ```
 
-（官方模式与演练写**同一目录**，所以 `T3.py` 与 `T3_ga.py` 不加 `--save-dir` 都写 `results/t3/`、
-`results/t3_ga/`。）
+（官方模式与演练写**同一目录**，所以 `T3.py` 不加 `--save-dir` 写 `results/t3/`。）
 
 3. 正式测试结束后，**导出模拟器生成的加密行为日志**（界面 4.6 节路径），
    连同本程序的 `results\formal\api_calls.jsonl` 一起作为支撑材料。
@@ -244,7 +225,7 @@ Linux 上的 `jammers-py` 是用于算法验证的复刻模拟器，**不能替�
 
 ## 6. 产出文件
 
-跑完一局后 `results/t3_ga/` 下会有：
+跑完一局后 `results/t3/` 下会有：
 
 | 文件 | 内容 | 用途 |
 | --- | --- | --- |
@@ -252,8 +233,6 @@ Linux 上的 `jammers-py` 是用于算法验证的复刻模拟器，**不能替�
 | `trajectory/ep01.png` | 本局机器狗轨迹图 | 结果直观展示、论文插图 |
 | `trajectory/ep01.csv` | 同名轨迹表（`step,x,y,kind`） | 与接口日志逐点对账 |
 | `episodes.csv` | 本局战绩（清除数、虚拟时间、测向次数） | 论文与汇总表 |
-| `ga_training.json` | GA 训练记录与最终解 | 论文「GA 训练过程」 |
-| `ga_convergence.csv` | 逐代收敛曲线 | 论文收敛曲线图 |
 
 官方模式下**拿不到干扰源真值**，因此定位误差等需要真值的指标留空——这是正常的，
-成绩以模拟器判定为准。带真值的统计请用本地演练（`--practice N`，见 `RESULTS_REPORT.md`）。
+成绩以模拟器判定为准。带真值的统计请用本地演练（`--practice N`，见 `README.md`）。

@@ -1,7 +1,7 @@
 """结果落盘的小工具：CSV 写出、JSON 写出、目录准备。
 
 原先各脚本里散落着 `json.dumps(..., ensure_ascii=False, indent=2)` 与
-`csv.writer(...)` 的手写循环（T3.py、T3_ga.py、T3_figures.py 各一份），这里统一：
+`csv.writer(...)` 的手写循环，这里统一：
 **中文一律不转义**（`ensure_ascii=False`），便于直接阅读结果文件。
 """
 

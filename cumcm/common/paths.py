@@ -5,7 +5,7 @@
 
 * `PACKAGE_ROOT` / `PROJECT_ROOT` —— 由本文件位置反推，与调用方在哪个子模块无关；
 * 数据与结果的相对路径则一律以**当前工作目录**为基准（沿用拆分前的行为，
-  例如 `--save-dir results/t3_ga` 始终相对 CWD）。
+  例如 `--save-dir results/t3` 始终相对 CWD）。
 """
 
 from __future__ import annotations

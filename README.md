@@ -6,25 +6,24 @@
 ## 目录结构
 
 ```
-T1.py / T2.py / T3.py / T4.py
-                                                             顶层薄入口（只调用 cumcm.*，用法不变）
-cumcm/
-  common/    跨题通用：geometry 几何、routing 路线算子、sim_client 接口、practice_arena 演练场、
-             plotting 绘图、scanfigure/trajfigure 逐局出图、records 落盘、paths 路径、console 控制台
-  t1/        问题一：交会定位区域 TriangulationRegion
-  t2/        问题二：第二个检测点的选择与候选区域（config / region 几何底座 / score 最坏情况
-             最小化 / report / plotting 适合度图 / cli）
-  t3/        问题三主线（确定性策略）：config / covering / regions / probing / strategy /
-             report / plotting / cli
-  t4/        问题四（定向 + 全向混合，确定性策略）：config / sweep（7 覆盖基点 + 12 外圈点 =
-             20 个测量位置，含听到率统计）/ regions / probing / strategy / nn_layout* 布局搜索 /
-             report / plotting / cli
-  analysis/  静态检查：undefined_names（漏定义/缺失参数扫描）
+common/    跨题通用：geometry 几何、routing 路线算子、sim_client 接口、practice_arena 演练场、
+           plotting 绘图、scanfigure/trajfigure 逐局出图、records 落盘、paths 路径、console 控制台
+t1/        问题一：交会定位区域 TriangulationRegion
+t2/        问题二：第二个检测点的选择与候选区域（config / region 几何底座 / score 最坏情况
+           最小化 / report / plotting 适合度图 / cli）
+t3/        问题三主线（确定性策略）：config / covering / regions / probing / strategy /
+           report / plotting / cli
+t4/        问题四（定向 + 全向混合，确定性策略）：config / sweep（7 覆盖基点 + 12 外圈点 =
+           20 个测量位置，含听到率统计）/ regions / probing / strategy / nn_layout* 布局搜索 /
+           report / plotting / cli
+analysis/  静态检查：undefined_names（漏定义/缺失参数扫描）
+（六个包都直接放在仓库根，不再套一层包名；每个题目包都带 `__main__.py`，所以
+`python -m t3 --practice 3` 就是原来的 `python T3.py --practice 3`，根目录里不再有薄入口脚本。）
 jammers-py/  本地演练场（复刻模拟器；data/behavior-logs/ 会随每次演练累积日志，可随时清空）
 results/     运行产物，按各题分成独立子树（**不按运行模式分家**：一个目录 = 最新一次运行）：
-  t2/        问题二方案（T2.py）：适合度图 PNG/PDF、全域逐格适合度表 CSV、结论与校验 JSON
-  t3/        确定性方案（T3.py）：覆盖圆方案、巡视汇总、逐条观测、接口日志、总轨迹图、逐步扫描图
-  t4/        问题四方案（T4.py）：扫描方案（7 覆盖基点 + 12 外圈点、含听到率统计）、
+  t2/        问题二方案（python -m t2）：适合度图 PNG/PDF、全域逐格适合度表 CSV、结论与校验 JSON
+  t3/        确定性方案（python -m t3）：覆盖圆方案、巡视汇总、逐条观测、接口日志、总轨迹图、逐步扫描图
+  t4/        问题四方案（python -m t4）：扫描方案（7 覆盖基点 + 12 外圈点、含听到率统计）、
              逐局统计、观测明细、接口日志、轨迹图与逐步扫描图
 reports/     方案说明与结果报告
 References/  参考文献（PDF）
@@ -34,7 +33,7 @@ Problem/     赛题材料（已在 .gitignore 中，不入库）
 > `results/` 是**求解产物**：删掉后重跑命令即可原样重建（同 seed 逐字节一致，唯一例外是
 > `api_calls.jsonl` 里带现实时间戳）。
 > `jammers-py/` 与 `References/` 不是代码依赖，只在本地演练/撰写论文时需要。
-> 论文用图随论文存放：`paper/t2/figures/`（`T2.py` 直接写出）与 `paper/t4/figures/`
+> 论文用图随论文存放：`paper/t2/figures/`（`python -m t2` 直接写出）与 `paper/t4/figures/`
 > （由 `paper/t4/make_figures.py` 读当前 `results/t4/` 生成，图里数字不写死；早期的
 > `figures/` 目录与 `figures_t4*.py` 生成脚本已按用户要求删除）。
 
@@ -42,26 +41,26 @@ Problem/     赛题材料（已在 .gitignore 中，不入库）
 
 ```bash
 uv sync                              # 或 pip install -e .
-.venv/bin/python T1.py               # 问题一示例
-.venv/bin/python T3.py               # 官方模式：连 http://127.0.0.1:2026 跑完一局
-.venv/bin/python T3.py --plan-only   # 只求覆盖圆方案（不连任何模拟器，本机约 0.6 s）
-.venv/bin/python T3.py --practice 3  # 本地演练 3 局（结果落 results/t3/）
-.venv/bin/python T4.py --plan-only   # 只求扫描方案 + 听到率统计（不连模拟器，本机约 1.7 s）
-.venv/bin/python T4.py --practice 3  # 问题四本地演练 3 局（结果落 results/t4/）
-.venv/bin/python -m cumcm.t3.covering   # 覆盖圆方案自检（旋转不破坏保证 / 密集扇区选向 / 最少圆数）
-.venv/bin/python -m cumcm.t4.sweep      # 扫描方案自检（批量判据 vs 单例参考 + 听到率统计）
-.venv/bin/python -m cumcm.analysis.undefined_names   # 静态检查：漏定义 / 缺失参数（扫全仓 .py）
+.venv/bin/python -m t1               # 问题一示例
+.venv/bin/python -m t3               # 官方模式：连 http://127.0.0.1:2026 跑完一局
+.venv/bin/python -m t3 --plan-only   # 只求覆盖圆方案（不连任何模拟器，本机约 0.6 s）
+.venv/bin/python -m t3 --practice 3  # 本地演练 3 局（结果落 results/t3/）
+.venv/bin/python -m t4 --plan-only   # 只求扫描方案 + 听到率统计（不连模拟器，本机约 1.7 s）
+.venv/bin/python -m t4 --practice 3  # 问题四本地演练 3 局（结果落 results/t4/）
+.venv/bin/python -m t3.covering   # 覆盖圆方案自检（旋转不破坏保证 / 密集扇区选向 / 最少圆数）
+.venv/bin/python -m t4.sweep      # 扫描方案自检（批量判据 vs 单例参考 + 听到率统计）
+.venv/bin/python -m analysis.undefined_names   # 静态检查：漏定义 / 缺失参数（扫全仓 .py）
 ```
 
 多局演练时用 `--no-reuse --robot-port 2111 --console-port 8091` 一类参数占用专用端口，避免接管
 正在运行的 `jammers-py`；不同的 A/B 组合必须给各自的 `--save-dir`（一个目录 = 最新一次运行）。
 
-`T3.py` 不加参数即连官方模拟器，三种模式共用同一次覆盖圆求解
+`python -m t3` 不加参数即连官方模拟器，三种模式共用同一次覆盖圆求解
 与同一份策略代码，差别只在"场景从哪来"：官方模式与演练**写同一目录**（`results/t3/`）
 且**拿不到真值**（逐次请求/响应落盘到 `api_calls.jsonl`，这是唯一的证据链）；`--practice` 用
 jammers-py 自动拉起、**自带真值**可核对覆盖保证，写 `results/t3/`。
 
-`T3.py` 的 `--no-rotate` 可关掉"起始扫描后把覆盖圆布局转到源最密集方向"这一步，用于对照实验；
+`python -m t3` 的 `--no-rotate` 可关掉"起始扫描后把覆盖圆布局转到源最密集方向"这一步，用于对照实验；
 `--hex-layout` 可退回经典的正六边形布局，用于对照"布局优化到底值多少"（实测配对省 5.3%）。
 
 **图与日志只保留最新一局**：每局开头清空重写图形目录与过程日志，于是
@@ -76,7 +75,7 @@ jammers-py 自动拉起、**自带真值**可核对覆盖保证，写 `results/t
 
 逐步扫描图（`scan/`）是对总轨迹图的补充：整局上百次测向挤在一张 3600 m 见方的图上很难看清，
 而策略的信息全部来自一步步扫描。每张扫描图标出本步的测向点与结果、示向度射线、到本步为止的
-行驶路径、当时的可能源区域、以及累计清除数。所有图由 `cumcm/common/scanfigure.py` 绘制。
+行驶路径、当时的可能源区域、以及累计清除数。所有图由 `common/scanfigure.py` 绘制。
 所有图在 `/exit` 之后生成，不占用现实时间预算（`--no-plot` 关闭）。
 
 **为什么是 7 个覆盖圆**（而不是更少）：半径 1000 m 的圆盘覆盖半径 1800 m 的圆域，属于经典的
@@ -103,7 +102,7 @@ d = d_min = 1122.9558 m 时也是 6737.73 m（`--hex-layout` 保留作对照）�
 同 seed 配对实测（各 10 局、均 131/131 全清）：虚拟时间 4008 → **3796 s**（省 212.1 s，5.3%，
 t = 3.97），里程 16419 → **15038 m**（省 1381 m，8.4%，t = 5.90）。
 
-## 问题二：第二个检测点怎么选（`T2.py`，不连模拟器，本机约 15 s）
+## 问题二：第二个检测点怎么选（`python -m t2`，不连模拟器，本机约 15 s）
 
 只有一次测向（S₁、θ₁，误差 ±1°）时，源的可能位置是一个以 S₁ 为顶点、长 1500 m、张角 2° 的
 窄楔形（下界 5 m 来自附录 2(9)"近距测不到示向度"，上界 1500 m 来自接收半径上限）。第二点要
@@ -114,12 +113,12 @@ t = 3.97），里程 16419 → **15038 m**（省 1381 m，8.4%，t = 5.90）。
     J(S₂) = max_{G ∈ C, |δ₂| ≤ 1°} 直径( 楔形(S₁,θ₁) ∩ 楔形(S₂,θ₂+δ₂) ∩ 圆域 )
 
 ```bash
-.venv/bin/python T2.py                 # 结论 + 适合度图；产物在 results/t2/
-.venv/bin/python T2.py --eta 0.05      # 候选区域收紧到 J ≤ 1.05 J*
-.venv/bin/python T2.py --site 200 -300 --bearing 45   # 换个第一检测点与示向度
-.venv/bin/python T2.py --no-plot       # 只要数值与 CSV/JSON
-.venv/bin/python -m cumcm.t2.region    # 几何自检：解析构造 vs shapely 精确值（偏差 ~1e-15）
-.venv/bin/python -m cumcm.t2.theory    # 文献判据自检：CRLB/GDOP 闭式 vs 精确最坏界
+.venv/bin/python -m t2                 # 结论 + 适合度图；产物在 results/t2/
+.venv/bin/python -m t2 --eta 0.05      # 候选区域收紧到 J ≤ 1.05 J*
+.venv/bin/python -m t2 --site 200 -300 --bearing 45   # 换个第一检测点与示向度
+.venv/bin/python -m t2 --no-plot       # 只要数值与 CSV/JSON
+.venv/bin/python -m t2.region    # 几何自检：解析构造 vs shapely 精确值（偏差 ~1e-15）
+.venv/bin/python -m t2.theory    # 文献判据自检：CRLB/GDOP 闭式 vs 精确最坏界
 ```
 
 结论（S₁ = 原点、θ₁ = 0°）：最优点 **S₂\* = (801, 605) m**，即距 S₁ **1004 m**、偏示向度
@@ -129,7 +128,7 @@ t = 3.97），里程 16419 → **15038 m**（省 1381 m，8.4%，t = 5.90）。
 **尽量拉长基线（到 1000 m 上限）并把第二点偏到示向度侧面约 37°** —— 两个约束（基线 ≤ 1005 m、
 到最远源 ≤ 1000 m）同时顶到边界，把最坏交会角锁在约 41°。
 
-最优点由"5 m 细网格文献 GDOP 快筛 → 精确复核 → 2 m 细化"给出（`cumcm/t2/theory.py` 的
+最优点由"5 m 细网格文献 GDOP 快筛 → 精确复核 → 2 m 细化"给出（`t2/theory.py` 的
 文献判据层），与"25 m 粗搜 + 局部细化"的结果相差 8.5 m、最坏直径好 0.063 m，两条路线互相印证。
 文献判据（两站测向的 CRLB 误差椭圆/GDOP/几何稀释式）在本模型最优点上比精确最坏半径**低约三成**
 （GDOP 47.0 m vs 精确 67.0 m），但秩相关高达 **0.998** —— 故只用于解释趋势与快速预筛，
@@ -143,19 +142,19 @@ t = 3.97），里程 16419 → **15038 m**（省 1381 m，8.4%，t = 5.90）。
 全部结论与自检数字在 `results/t2/t2_second_site.json`。模型、算法、校验、文献依据与灵敏度的
 完整说明见 `reports/问题二第二检测点候选区域.md`。
 
-分层规则见 `cumcm/__init__.py`：依赖只能向下（common ← t1/t2/t3/t4 ← analysis），
+分层规则见 `__init__.py`：依赖只能向下（common ← t1/t2/t3/t4 ← analysis），
 严禁下层反向导入上层；t2/t3/t4 是并列叶子，t2 复用 t1 的定位区域口径（同一套楔形交，
 t2 只是把它向量化到成千上万个候选点），t4 复用 t3 时只 import 其纯函数模块 `t3.probing`。
 
-## 问题四：定向源 + 全向源混合（`T4.py`）
+## 问题四：定向源 + 全向源混合（`python -m t4`）
 
 扫描阶段用 20 个测量位置（原点 + 问题三的 7 个覆盖基点 + 12 个均匀方位外圈点 r = 1850 m），
 扫完即对每个源取"最近一次测向"三角定位；定向源按 180° 光束建模，半圆盘命中率经 422 万算例
 统计校验（贴边对抗 0 漏、蒙特卡洛漏 320/400 万，**非严格保证**），方案与统计数字见
-`reports/RESULTS_REPORT_T4.md`，模块文档见 `cumcm/t4/sweep.py`。
+`reports/RESULTS_REPORT_T4.md`，模块文档见 `t4/sweep.py`。
 
 ```bash
-.venv/bin/python T4.py --plan-only     # 只求扫描方案（约 1.7 s）
-.venv/bin/python T4.py --practice 20 --seed 0 --no-reuse --robot-port 2112 --console-port 8092
+.venv/bin/python -m t4 --plan-only     # 只求扫描方案（约 1.7 s）
+.venv/bin/python -m t4 --practice 20 --seed 0 --no-reuse --robot-port 2112 --console-port 8092
 .venv/bin/python paper/t4/make_figures.py                              # 重画 paper/t4 的 8 张论文图
 ```

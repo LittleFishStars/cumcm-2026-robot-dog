@@ -27,13 +27,14 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
 
+from cumcm.common.geometry import ang_diff, bearing
 from cumcm.common.geometry import clamp_to_region as _clamp_to_region
 from cumcm.common.geometry import dist
 from cumcm.common.routing import dist_matrix, exact_open_order
 from cumcm.common.sim_client import RecordedSim
 from cumcm.t4.config import (BEARING_ERROR_DEG, CHANNELS, CLEAR_RADIUS, CLIP_ERR,
-                             CLIP_SIDES, HOMING_CAP, HOMING_MAX, HOMING_STEP,
-                             K_CLEAR_MAX, K_COVER_SAMPLES, K_COVER_STEP_MIN, NEAR_RADIUS,
+                             CLIP_SIDES, HOMING_CAP, HOMING_MAX, HOMING_STEP, INLINE_EXCLUDE_R_M,
+                             INLINE_SECTOR_DEG, K_CLEAR_MAX, K_COVER_SAMPLES, K_COVER_STEP_MIN, NEAR_RADIUS,
                              OBS_CAP, RECEIVE_MAX, REFINE_MAX, REGION_MARGIN, REGION_RADIUS, SAFETY_MARGIN,
                              SIDE_SCAN_DIAM, SWEEP_OPP_RADIUS, TOL, TRY_CLEAR_RADIUS)
 from cumcm.t4.probing import hypothesis_points, probe_candidates
@@ -48,7 +49,8 @@ class RobotDog:
 
     阶段一（扫描）：在出发点做全频道扫描（原点测量位置），随后按扫描方案依次走到其余
     测量点；每点对"未听到过的频道"测向（近距就地清除），保证任何源都被听到 ≥ 1 次；
-    顺路对估计附近的频道补测第二/第三视角。
+    顺路对估计附近的频道补测第二/第三视角；每段站间移动时按问题三机制做**途中顺路清除**
+    （_inline_clear：方位扇区内的未清频道估计点顺路试清），扫描结束已清掉约 60% 的源。
 
     阶段二（定位与清除）：对扫描结束时已听到的每个频道，四级清除；**每次清除动作后
     顺路补测**所有"直径比较大（> 200 m）且观测未满"的未清频道（多视角缩小定位区域，
@@ -63,12 +65,16 @@ class RobotDog:
                  episode: int = 0, clear: bool = True,
                  k_clear_max: int = K_CLEAR_MAX,
                  sweep_opp_radius: float = SWEEP_OPP_RADIUS,
+                 inline_sector_deg: float = INLINE_SECTOR_DEG,
+                 inline_exclude_r: float = INLINE_EXCLUDE_R_M,
                  api_log=None) -> None:
         self.sim = sim if api_log is None else RecordedSim(sim, api_log, episode)
         self.verbose = verbose
         self.clear_enabled = bool(clear)
         self.k_clear_max = int(k_clear_max)
         self.sweep_opp_radius = float(sweep_opp_radius)   # 顺路补测半径 / m
+        self.inline_sector_deg = float(inline_sector_deg) # 顺路清除扇形（起点段）半张角 / 度
+        self.inline_exclude_r = float(inline_exclude_r)   # 顺路清除排除的距圆心半径 / m
         self._logfile = open(logfile, "w", encoding="utf-8") if logfile else None
         self.obs: Dict[int, List[Obs]] = defaultdict(list)
         self.meas: Dict[int, List[Meas]] = defaultdict(list)
@@ -82,6 +88,8 @@ class RobotDog:
         self.n_measure = 0
         self.n_clear = 0
         self.n_side_scan = 0        # 清除动作时对"直径大频道"的顺路补测次数
+        self.n_inline = 0            # 途中顺路清除命中的次数（沿用问题三机制）
+        self.n_inline_fail = 0       # 途中顺路清除未命中的次数
         self.n_side_cand = 0        # 顺路补测候选数（直径大且未满且够近）
         self.n_side_skip_far = 0    # 因距估计点 >1500m 必然无信号而跳过的候选
         self.episode = episode
@@ -293,6 +301,9 @@ class RobotDog:
                      f" 次（示向度 {counts['direction']}，无信号 {counts['no_signal']}"
                      f"{skip_note}），"
                      f"累计听到 {heard} 个频道")
+            if k + 1 < len(plan.route) and self.clear_enabled:
+                nxt = plan.route[k + 1]
+                self._inline_clear(at, (float(pts[nxt][0]), float(pts[nxt][1])))
 
     # ---- 阶段 2a：诊断 ----
     def diagnose(self) -> Dict[str, int]:
@@ -448,6 +459,134 @@ class RobotDog:
                 self.log(f"    [顺路补测] 频道{c}：源就在 5 m 内，就地清除成功")
                 self.tracks.setdefault(c, {})["method"] = "near@side"
             # no_signal 对定向源不构成硬约束（可能背光），无新增区域信息，正常跳过
+
+    # ---- 途中顺路清除（沿用问题三 _inline_clear 的机制，见 cumcm.t3.strategy）----
+    @staticmethod
+    def _at_origin(p: Sequence[float]) -> bool:
+        """是否（近似）位于区域圆心（原点）—— 起点 (0,0) 特判用。"""
+        return math.hypot(p[0], p[1]) <= 1.0
+
+    @staticmethod
+    def _polar_deg(p: Sequence[float]) -> float:
+        """点 p 相对区域圆心（原点）的方位角 / 度，[0, 360)。起点 (0,0) 的方位未定义。"""
+        return math.degrees(math.atan2(p[1], p[0])) % 360.0
+
+    def _in_azimuth_arc(self, at: Sequence[float], next_wp: Sequence[float],
+                        est: Sequence[float]) -> Optional[Tuple[float, float, float]]:
+        """估计点 est 是否落在「本站→圆心」与「下一站→圆心」两条连线之间的扇区内。
+
+        以区域圆心（原点）为参照的极角扇区，**半径以两站为限**：
+          · 方位：est 与圆心的连线方向 th_est 位于 th_at 与 th_next 夹出的**较短弧**上，
+            即 ang_diff(th_est, th_at) + ang_diff(th_est, th_next) == ang_diff(th_at, th_next)
+            （三角不等式取等；ang_diff ∈ [0,180]，较短弧是唯一候选）；
+          · 半径：r_est ≤ max(r_at, r_next)，扇区自然止于两站所在的半径。
+        反侧点（th_est 与 th_at 差 180°）由三角不等式排除；必须用角度而不用 sin（|sin 180°|=0
+        会把反侧点误判成同向）。返回 (短弧进度 0~1, 距圆心半径, 与 th_at 的角度差)。
+        """
+        r_at = math.hypot(at[0], at[1])
+        r_next = math.hypot(next_wp[0], next_wp[1])
+        r_est = math.hypot(est[0], est[1])
+        if r_est > max(r_at, r_next) + 1e-6:
+            return None
+        th_at = self._polar_deg(at)
+        th_next = self._polar_deg(next_wp)
+        th_est = self._polar_deg(est)
+        d = ang_diff(th_at, th_next)
+        a1 = ang_diff(th_est, th_at)
+        if d <= 1e-9:                            # 两端点同方位：退化为单方向
+            if a1 > 1e-9:
+                return None
+            return (0.0, r_est, 0.0)
+        if a1 + ang_diff(th_est, th_next) > d + 1e-9:
+            return None
+        return (a1 / d, r_est, a1)
+
+    def _in_sector(self, at: Sequence[float], next_wp: Sequence[float],
+                   est: Sequence[float]) -> Optional[Tuple[float, float, float]]:
+        """起点段的兜底判据：从原点出发去下一站，以"朝向下一站"方向为中心展开的本地扇形。
+
+        仅当本站是起点（_at_origin）时使用："起点与圆心的连线"是零向量、无方位，极角扇区
+        无从谈起；退化为"朝向第一站 ± INLINE_SECTOR_DEG"的本地扇形，把两站之间的近点顺路清掉。
+        返回 (沿线距离, 横向偏离, 角度偏差)。
+        """
+        L = dist(at, next_wp)
+        if L <= 1e-9:
+            return None
+        d = dist(at, est)
+        if d > L + 1e-6:
+            return None
+        alpha = 0.0 if d <= 1e-9 else ang_diff(bearing(at, est), bearing(at, next_wp))
+        if alpha > self.inline_sector_deg:
+            return None
+        t = d * math.cos(math.radians(alpha))
+        h = d * math.sin(math.radians(alpha))
+        return (t, h, alpha)
+
+    def _inline_excluded(self, est: Sequence[float]) -> bool:
+        """估计点是否因"距区域圆心（原点）太近"（< INLINE_EXCLUDE_R_M）被排除在顺路清除外。"""
+        return math.hypot(est[0], est[1]) < self.inline_exclude_r
+
+    def _inline_clear(self, at: Sequence[float], next_wp: Sequence[float]) -> int:
+        """途中顺路清除：把「本站→圆心」与「下一站→圆心」夹出的方位扇区内的未清频道，在
+        从 at 走向 next_wp 的途中走到其估计点试清（起点段退化为本地扇形；排除距原点过近的点）。
+
+        成本：清点要走到估计点再回来——但这些源收尾阶段反正要清，顺路清掉省的是"从别处专程跑
+        一趟"的里程；清点固定 5 s（命中）/ 3 s（未命中），命中后该频道后续测量点都不再测向。
+        沿用问题三的做法：**不设"估计可信度"门槛**——扇区内都试，未命中只花 3 s。
+        """
+        if not self.clear_enabled:
+            return 0
+        arc = not self._at_origin(at)          # 站点间 → 极角扇区；起点 → 本地扇形兜底
+        picked: List[Tuple[float, int, Tuple[float, float], float, float, float, str]] = []
+        for ch in sorted(self.obs):
+            if ch in self.cleared:
+                continue
+            mec = self.region(ch).enclosing_circle
+            if mec is None:
+                continue
+            est = (float(mec[0]), float(mec[1]))
+            got = (self._in_azimuth_arc(at, next_wp, est) if arc
+                   else self._in_sector(at, next_wp, est))
+            if got is None:
+                continue
+            if self._inline_excluded(est):
+                continue                        # 距区域圆心太近：按作用范围限制排除
+            picked.append((got[0], ch, est, got[1], got[2], float(mec[2]),
+                           "arc" if arc else "sector"))
+        if not picked:
+            return 0
+        picked.sort(key=lambda p: (p[0], p[1]))  # 沿扇区方位（或沿线）由近到远依次清
+        if arc:
+            th_a = self._polar_deg(at)
+            th_b = self._polar_deg(next_wp)
+            self.log(f"    [顺路清除] 本站 ({at[0]:.0f}, {at[1]:.0f}) → 下一站"
+                     f" ({next_wp[0]:.0f}, {next_wp[1]:.0f})：方位扇区 {th_a:.0f}° ~ {th_b:.0f}°"
+                     f" 内有 {len(picked)} 个估计点")
+        else:
+            self.log(f"    [顺路清除] 起点→第一站 ({next_wp[0]:.0f}, {next_wp[1]:.0f})："
+                     f"朝向第一站 {self.inline_sector_deg:.1f}° 扇形内（半径"
+                     f" {dist(at, next_wp):.0f} m）有 {len(picked)} 个估计点")
+        n = 0
+        for key, ch, est, a, b, r_mec, mode in picked:
+            if self._out_of_time():
+                break
+            self.stage = "survey-clear"
+            where = (f"方位距「本站→圆心」{b:.1f}°、距圆心 {a:.0f} m、"
+                     f"估计覆盖圆半径 {r_mec:.0f} m") if mode == "arc" else (
+                         f"沿线 {key:.0f} m、横向偏离 {a:.0f} m、方向偏差 {b:.2f}°、"
+                         f"估计覆盖圆半径 {r_mec:.0f} m")
+            if self.clear(est[0], est[1], ch):
+                self.tracks.setdefault(ch, {}).update({"method": "inline",
+                                                       "clear_point": [est[0], est[1]]})
+                self.n_inline += 1
+                self.log(f"    [顺路清除] 频道{ch} @ ({est[0]:.1f}, {est[1]:.1f}) 命中（{where}）")
+            else:
+                self.n_inline_fail += 1
+                self.log(f"    [顺路清除] 频道{ch} @ ({est[0]:.1f}, {est[1]:.1f}) 未命中"
+                         f"（{where}，留到阶段二处理）")
+        if n:
+            self.log(f"    本段顺路清除 {n} 个，累计已清 {len(self.cleared)} 个")
+        return n
 
     def _try_clear(self, channel: int, tag: str) -> Optional[str]:
         mec = self.region(channel).enclosing_circle
@@ -633,8 +772,11 @@ class RobotDog:
             "n_side_scan": self.n_side_scan,
             "n_side_cand": self.n_side_cand,
             "n_side_skip_far": self.n_side_skip_far,
+            "n_inline": self.n_inline,
+            "n_inline_fail": self.n_inline_fail,
             "methods": {m: sum(1 for r in self.tracks.values() if r.get("method") == m)
                         for m in ("try", "try-refined", "multi", "near", "homing",
-                                  "survey-near", "near@center", "near@probe", "failed")},
+                                  "survey-near", "near@center", "near@probe",
+                                  "near@side", "inline", "failed")},
             "tracks": self.tracks,
         }

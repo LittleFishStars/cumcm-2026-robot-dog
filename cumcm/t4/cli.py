@@ -44,7 +44,7 @@ def _episode_printer(clear: bool):
         print(f"本局：扫描 {stats['travel_m']:.0f} m + 收尾，虚拟时间 {stats['virtual_time_s']:.0f} s，"
               f"测向 {stats['n_measure']} 次；扫描结束听到 {stats['channels_heard']}/{n_sources} "
               f"个源（全部在扫描第 {worst} 步内听到，共 {stats['n_bearings']} 条示向度，"
-              f"顺路补测 {stats['n_side_scan']} 次）")
+              f"顺路补测 {stats['n_side_scan']} 次，途中顺路清除命中 {stats['n_inline']} 个）")
         if clear:
             print(f"  清除：{stats['cleared']}/{n_sources}（平均 {stats['avg_time_s']:.1f} s/个），"
                   f"定位误差均值 {check['localize_err_mean_m']} m / 最大 "
@@ -113,7 +113,8 @@ def run_practice(args: argparse.Namespace, plan: SweepPlan, verify: dict, save_d
               f"平均里程 {np.mean([r['travel_m'] for r in rows]):.0f} m，"
               f"平均测向 {np.mean([r['n_measure'] for r in rows]):.0f} 次"
               f"（文献补测 {np.mean([r['n_probe'] for r in rows]):.0f} 次、顺路补测 "
-              f"{np.mean([r['n_side_scan'] for r in rows]):.0f} 次、"
+              f"{np.mean([r['n_side_scan'] for r in rows]):.0f} 次、途中顺路清除命中 "
+              f"{np.mean([r['n_inline'] for r in rows]):.1f} 个、"
               f"判定必无信号跳过 {np.mean([r['n_skip_measure'] for r in rows]):.0f} 次）")
         print(f"  定位误差：均值 "
               f"{np.mean([r['localize_err_mean_m'] for r in rows if r['localize_err_mean_m']]):.2f}"

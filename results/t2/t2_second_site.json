@@ -1,0 +1,139 @@
+{
+  "problem": "CUMCM 2026 B 问题二：第二检测点的选择",
+  "first_site_m": [
+    0.0,
+    0.0
+  ],
+  "first_bearing_deg": 0.0,
+  "second_site_best_m": [
+    806.0,
+    598.0
+  ],
+  "second_site_best_polar": {
+    "r_m": 1003.6134714121766,
+    "phi_from_bearing_deg": 36.57303097851934
+  },
+  "worst_diameter_best_m": 134.14637174802905,
+  "single_measurement_diameter_m": 1800.0,
+  "improvement_factor": 13.418178788920144,
+  "candidate_region": {
+    "criterion": "J <= (1+eta)*J*, eta = 0.1",
+    "level_m": 147.56100892283197,
+    "r_range_m": [
+      947.6142612643409,
+      1004.4915681128315
+    ],
+    "lobes": [
+      {
+        "phi_from_bearing_deg": [
+          25.0,
+          40.0
+        ],
+        "r_m": [
+          947.6142612643409,
+          1004.4915681128315
+        ],
+        "area_km2": 0.010387104160813473
+      },
+      {
+        "phi_from_bearing_deg": [
+          -40.0,
+          -25.0
+        ],
+        "r_m": [
+          947.6142612643409,
+          1004.4915681128315
+        ],
+        "area_km2": 0.010387104160813471
+      }
+    ],
+    "total_area_km2": 0.020774208321626946
+  },
+  "feasible_lens": {
+    "area_km2": 0.44653263932424464,
+    "bounds_m": [
+      [
+        500.1330323566314,
+        -650.956019084485
+      ],
+      [
+        1004.9981675557748,
+        650.956019084485
+      ]
+    ]
+  },
+  "source_uncertainty": {
+    "d_range_m": [
+      5.0,
+      1500.0
+    ],
+    "half_width_deg": 1.0,
+    "n_samples": 279,
+    "corners_m": [
+      [
+        4.999238475781956,
+        -0.08726203218641757
+      ],
+      [
+        4.999238475781956,
+        0.08726203218641757
+      ],
+      [
+        1499.771542734587,
+        -26.178609655925268
+      ],
+      [
+        1499.771542734587,
+        26.178609655925268
+      ]
+    ]
+  },
+  "worst_case": {
+    "diameter": 134.14637174802905,
+    "source": [
+      1499.771542734587,
+      26.178609655925268
+    ],
+    "delta2_deg": 1.0,
+    "theta2_deg": 321.50392099229947,
+    "bearing_nominal_deg": 320.50392099229947,
+    "d_m": 1500.0000000000002,
+    "delta1_deg": 1.0,
+    "r2_m": 899.0543120208921,
+    "gamma_deg": 40.49607900770055,
+    "analytic_m": 121.50128906399745
+  },
+  "checks": {
+    "scenario_exact_m": 134.14637174802886,
+    "scenario_analytic_m": 134.14637174802905,
+    "scenario_rel_dev": 1.4830961390929416e-15,
+    "scenario_clipped": false,
+    "scenario_n_vertices": 4,
+    "discretisation_dense_m": 134.14637174802905,
+    "discretisation_rel_dev": 0.0,
+    "band_radial_gaps": 0,
+    "band_level_m": 147.56100892283197,
+    "feasible_inside_region": true,
+    "best_hears_worst_source_m": 999.6552370530225,
+    "n_source_samples": 279,
+    "d_lo": 5.0,
+    "d_hi": 1500.0,
+    "eta": 0.1,
+    "analytic_vs_shapely": {
+      "n": 400,
+      "n_used": 213,
+      "n_clipped": 179,
+      "n_degenerate": 8,
+      "impl_max_abs_rel_dev": 1.210898654429008e-14,
+      "formula_max_abs_rel_dev": 0.2593046370967506,
+      "formula_median_rel_dev": 0.0007771456061184863,
+      "formula_p90_rel_dev": 0.0029933879628910097,
+      "formula_frac_below_1pct": 0.9833333333333333,
+      "formula_n": 120,
+      "gamma_ok_deg": [
+        30.0,
+        120.0
+      ]
+    }
+  }
+}

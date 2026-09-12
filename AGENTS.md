@@ -1,6 +1,7 @@
 # AGENTS.md
 
-2026 CUMCM B 题：机器狗搜索与清除干扰源（CUMCM 数学建模求解代码）。
+2026 CUMCM Problem B: a robot dog searching for and clearing jammers (the solve code for CUMCM
+mathematical-modelling problems 1-4).
 
 ## Repo layout
 
@@ -94,61 +95,76 @@
   `t2_second_site.json`).
 - Design rationale lives in the module docstrings; `README.md` only covers environment and usage.
 
-## 代码风格（沿用作者在 `~/Projects` 下个人项目的约定）
+## Code style (follows the author's conventions in `~/Projects`)
 
-本仓库所有 Python 代码统一按下面这套约定书写。它不是外部规范，而是作者自己在
-`~/Projects/python/MBridge`、`~/Projects/python/GNNU_API`、`~/Projects/python/CPUISEditor`
-等项目里一贯的写法，新代码与改动都照此办理。
+Every Python file in this repo follows the conventions below. They are not an external standard but
+the author's own habit across `~/Projects/python/MBridge`, `~/Projects/python/GNNU_API` and
+`~/Projects/python/CPUISEditor`; new code and edits follow them too.
 
-- **docstring**：模块、类、函数、方法都有中文 docstring。一句话摘要写成一行、**结尾不加句号**
-  （如 `"""构建命令行解析器"""`）；需要说明参数/返回值时接 Google 风格段：
+- **Docstrings**: every module, class, function and method has one, and in real code it is written in
+  **Chinese** — that is a project convention, not an accident of this file. The one-line summary is a
+  single line **with no trailing period** (e.g. `"""构建命令行解析器"""`); when parameters or return
+  values need explaining, continue with Google-style sections:
 
   ```python
-  """登陆验证
+  """One-line Chinese summary, no trailing period
 
   Args:
-      student_id: 学号
-      password: 统一验证平台密码
+      student_id: student id
+      password: password for the unified verification platform
 
   Returns:
-      tuple[bool, Any]: 是否成功与结果数据
+      tuple[bool, Any]: whether it succeeded, plus the resulting data
   """
   ```
 
-  段内 4 空格缩进，写作 `名字: 说明`、`类型: 说明`。现有模块 docstring 里的数学推导、约束条件与
-  踩过的坑属于**内容**，不要为了"简洁"压缩掉。
-- **类型注解**：函数/方法一律标注参数与返回值，`__init__` 标 `-> None`，内部 `_helper` 同样标注。
-  **只用内建泛型与 `|`**：`list[float]`、`tuple[float, float]`、`dict[str, Any]`、`float | None`，
-  不写 `typing.List/Dict/Tuple/Optional/Union`（`typing` 里只留 `Any`、`Sequence`、`Callable`、
-  `Iterator`、`TextIO`、`NamedTuple` 这类没有内建替身的名字）。numpy 数组用 `np.ndarray`、shapely
-  几何用 `Polygon`/`BaseGeometry`、matplotlib 轴用 `Axes`。跨模块类型只引用本文件已导入的名字，
-  否则用字符串前向引用（`"SimClient"`）——**不要为了写注解新增运行时 import**（分层依赖是硬约定）。
-- **注释**：不明显的语句上方加一行中文注释说明"做什么/为什么"；日志、报错与打印文本一律中文。
-- **导入**：stdlib → 第三方 → 本地包，三组之间空一行；只用绝对导入（`from common.x import y`）。
-- **命名与格式**：模块/函数/变量 snake_case，类 PascalCase，内部符号 `_` 前缀，常量全大写；
-  字符串统一双引号，唯一例外是 `if __name__ == '__main__':` 写成单引号（沿用作者个人项目习惯）；
-  行长 ≤ 110 字符；不留行尾空白、不写制表符。
-- **入口**：可直接运行的模块写 `if __name__ == '__main__':`，命令行解析统一用 `argparse`。
+  The sample above shows the layout only (4-space indent inside a section, written as
+  `name: description` / `type: description`); the real text is Chinese. The maths, constraints and
+  pitfalls already recorded in existing module docstrings are **content** — do not trim them away in
+  the name of brevity.
+- **Type annotations**: annotate parameters and return values on every function and method, including
+  `-> None` on `__init__` and on internal `_helper`s. **Use only builtin generics and `|`**:
+  `list[float]`, `tuple[float, float]`, `dict[str, Any]`, `float | None` — never
+  `typing.List/Dict/Tuple/Optional/Union` (from `typing` keep only names with no builtin replacement,
+  such as `Any`, `Sequence`, `Callable`, `Iterator`, `TextIO`, `NamedTuple`). numpy arrays are typed
+  `np.ndarray`, shapely geometry `Polygon`/`BaseGeometry`, matplotlib axes `Axes`. A cross-module type
+  may reference only names already imported in that file; otherwise use a string forward reference
+  (`"SimClient"`) — **never add a runtime import just to write an annotation** (the layering rule is a
+  hard convention).
+- **Comments**: put a one-line Chinese comment above any non-obvious statement saying what it does or
+  why; logs, errors and printed output are Chinese as well.
+- **Imports**: stdlib → third-party → local packages, one blank line between the groups; absolute
+  imports only (`from common.x import y`).
+- **Naming and formatting**: modules/functions/variables snake_case, classes PascalCase, internal
+  symbols prefixed with `_`, constants UPPER_CASE; double quotes for strings, the single exception
+  being `if __name__ == '__main__':` written with single quotes (the author's habit in personal
+  projects); lines ≤ 110 characters; no trailing whitespace, no tabs.
+- **Entry points**: a directly runnable module uses `if __name__ == '__main__':` and parses its
+  command line with `argparse`.
 
-**风格改动同样受"优化不变量"约束**：纯风格改动（补注解、补 docstring、加注释、折行）后，
-`python -m t2`、`python -m t3 --plan-only`、`python -m t4 --plan-only` 的产物必须与改动前逐字节一致，自检
-（`analysis.undefined_names` 等）必须全过。**类型注解与 docstring 不得改变任何表达式、
-字面量、控制流或输出文本。**
+**Style changes are bound by the same optimization invariant**: after a purely stylistic change (extra
+annotations, docstrings, comments, rewrapped lines) the artifacts of `python -m t2`,
+`python -m t3 --plan-only` and `python -m t4 --plan-only` must stay byte-identical to before, and the
+self-checks (`analysis.undefined_names` and the rest) must all pass. **Annotations and docstrings must
+not change any expression, literal, control flow or output text.**
 
-验证这类改动的做法（本仓库没有测试套件，靠下面三条证据）：
+How to verify this class of change (there is no test suite; the three pieces of evidence are):
 
-1. **全量自检 + 产物零改动**：改动前在工作区内存基线
-   `find results -type f | sort | xargs sha256sum > .results.sha256`，跑完五条自检与
-   `python -m t2`、`python -m t3 --plan-only`、`python -m t4 --plan-only` 后
-   `sha256sum -c .results.sha256` 必须全部 OK，最后删掉这个基线文件。
-   注意两点：`results/` 已不入库，不能再用 `git status` 判断；基线要放工作区内（本机的 `/tmp`
-   在每条命令之间会被清空，写 `/tmp` 会立刻丢），中英文 locale 下 `sha256sum -c` 分别打印
-   `OK` / `成功`，脚本里判断时两者都要认。
-2. **AST 归一化审计**：把 `HEAD` 版与工作区版都解析成 AST，剥离 docstring、函数签名注解、带注解
-   赋值的注解、类型别名与 import 名单后比对 `ast.dump`，必须完全相同（注释本就不进 AST）。这一步能
-   证明"只有注解/docstring/注释/导入写法变了"。为折行而提取局部变量之类的改动会被它标出来，属正常，
-   但必须再用第 3 条单独验证。
-3. **真题 A/B**：出现过语句层改动的文件，用 `--practice N --seed 0`（官方模拟器绝不参与）在
-   两种版本下各跑一次同一 seed，比对 `--save-dir` 里的 `t3_survey.json`、`t3_observations.csv`
-   （T4 同理）与 stdout；产物必须逐字节一致。stdout 里每次调用的墙钟毫秒数本就随机，比对时按
-   `（N ms` 归一化即可。
+1. **Full self-checks + unchanged artifacts**: before touching anything, hash the baseline inside the
+   workspace with `find results -type f | sort | xargs sha256sum > .results.sha256`; after running the
+   five self-checks plus `python -m t2`, `python -m t3 --plan-only` and `python -m t4 --plan-only`,
+   `sha256sum -c .results.sha256` must report every entry OK, then delete the baseline file. Three
+   gotchas: `results/` is no longer tracked, so `git status` can no longer tell you this; keep the
+   baseline inside the workspace (this machine wipes `/tmp` between commands, so a `/tmp` baseline is
+   lost immediately); and `sha256sum -c` prints `OK` or, in a Chinese locale, `成功`, so accept both
+   in scripts.
+2. **AST normalization audit**: parse both the `HEAD` version and the working-tree version into an AST,
+   strip docstrings, signature annotations, annotated-assignment annotations, type aliases and import
+   name lists, then compare `ast.dump` — they must be identical (comments never reach the AST). This
+   proves that only annotations/docstrings/comments/import spelling changed. Rewrapping that hoists a
+   local variable will show up here, which is expected — verify those with step 3 instead.
+3. **Real-harness A/B**: for files with statement-level changes, run `--practice N --seed 0` (never the
+   official simulator) once per version on the same seed, and compare the `t3_survey.json`,
+   `t3_observations.csv` (same for T4) and stdout under `--save-dir`; the artifacts must be
+   byte-identical. The per-call wall-clock milliseconds in stdout are random by nature, so normalize
+   them (e.g. strip `（N ms`) before comparing.

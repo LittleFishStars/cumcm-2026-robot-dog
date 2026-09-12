@@ -8,7 +8,6 @@
 ```
 T1.py / T2.py / T3.py / T4.py
                                                              顶层薄入口（只调用 cumcm.*，用法不变）
-sim_api.py                                                  模拟器接口的兼容垫片
 cumcm/
   common/    跨题通用：geometry 几何、routing 路线算子、sim_client 接口、practice_arena 演练场、
              plotting 绘图、scanfigure/trajfigure 逐局出图、records 落盘、paths 路径、console 控制台
@@ -158,7 +157,5 @@ t2 只是把它向量化到成千上万个候选点），t4 复用 t3 时只 imp
 ```bash
 .venv/bin/python T4.py --plan-only     # 只求扫描方案（约 1.7 s）
 .venv/bin/python T4.py --practice 20 --seed 0 --no-reuse --robot-port 2112 --console-port 8092
-.venv/bin/python drv_speed.py          # 布局调参驱动（GA + 代理模型，可选，需要 torch）
-.venv/bin/python drv_speed.py --layout-file layout.npy --seeds 0 1 2   # 任意布局的演练实测
 .venv/bin/python paper/t4/make_figures.py                              # 重画 paper/t4 的 8 张论文图
 ```

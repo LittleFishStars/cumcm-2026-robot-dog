@@ -10,8 +10,8 @@
     records.py         结果落盘：CSV/JSON 写出与接口调用日志
     paths.py           项目内路径定位（包根 / 仓库根 / 默认演练场目录）
 
-原先这些实现散落在 T1.py / T3.py / sim_api.py 里各有一份（dist、bearing、
-clamp_to_region 等完全重复），抽取后各题共用同一实现。
+原先这些实现散落在各题入口脚本里各有一份（dist、bearing、clamp_to_region 等完全重复），
+抽取后各题共用同一实现。
 """
 
 __all__ = ["geometry", "routing", "sim_client", "practice_arena", "plotting",

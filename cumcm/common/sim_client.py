@@ -19,8 +19,8 @@
 协议要点：HTTP 错误由 urllib 抛 HTTPError，业务拒绝（HTTP 200 但 accepted=false）不抛异常，
 由返回值里的 accepted 判断。网络中断后重试同一动作时，传入原 request_id 复用原请求。
 
-原 sim_api.py 保留为兼容垫片（`sim_api.Simulator` 等名字照旧可用），故 T1/T3 之外的既有脚本
-不必改动。
+原先顶层还有一个 `sim_api.py` 兼容垫片，现已删除；需要这些名字时直接从本模块导入
+（`from cumcm.common.sim_client import Simulator`）。
 """
 
 from __future__ import annotations

@@ -5,7 +5,7 @@
 ## Repo layout
 
 - Git repo root is **this** directory (`cumcm-2026-robot-dog/`). Run all commands from here.
-- Top-level `T1.py` / `T2.py` / `T3.py` / `T4.py` / `sim_api.py` / `drv_speed.py`
+- Top-level `T1.py` / `T2.py` / `T3.py` / `T4.py`
   are thin shims. Real code is in `cumcm/` (`common`, `t1`, `t2`, `t3`, `t4`, `analysis`). Edit the
   package, not the shims; keep the same CLI behavior.
 - Layering is a hard convention: deps only point down `common <- t1/t2/t3/t4 <- analysis`
@@ -44,8 +44,7 @@
 - `uv run python T4.py --plan-only` — solve the 20 measurement positions + hearing-rate statistics
   (~2 s; writes `results/t4/t4_sweep_plan.json` + `t4_sweep_points.csv`).
 - `uv run python T4.py --practice 20 --seed 0 --layout-file <layout.npy> --save-dir <dir>` — benchmark
-  an alternative measurement layout with the same harness (used for the paper's layout verdict table;
-  `drv_speed.py --layout-file` is the lighter-weight variant).
+  an alternative measurement layout with the same harness (used for the paper's layout verdict table).
 - `uv run python -m cumcm.t4.sweep` — problem 4 scan self-check (batched hearing predicate vs the
   single-case reference, then the 4.2 M-case statistics without touching any simulator).
 - `uv run python -m cumcm.analysis.undefined_names` — static scan of every repo `.py` for names read

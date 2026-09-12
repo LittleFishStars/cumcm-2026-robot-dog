@@ -92,7 +92,7 @@
   `python -m t4 --plan-only` outputs stay byte-identical before/after. Deviations that were rejected for
   this reason: replacing `np.hypot` by `sqrt(x²+y²)` in the T2 diameter pair loop (last-bit drift in
   `t2_second_site.json`).
-- Design rationale lives in the module docstrings and `README.md`.
+- Design rationale lives in the module docstrings; `README.md` only covers environment and usage.
 
 ## 代码风格（沿用作者在 `~/Projects` 下个人项目的约定）
 

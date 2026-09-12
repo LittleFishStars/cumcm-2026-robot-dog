@@ -44,7 +44,9 @@ python -m analysis.undefined_names      # 静态检查：漏定义 / 缺失参�
 ```
 
 - **演练模式**（`--practice N`）自动拉起 `resources/jammers-py/` 里的本地复刻模拟器（自带真值，
-  可核对覆盖保证）；该目录不入库，缺了就只能跑上面的离线命令，`--jammers-dir` 可指定别处。
+  可核对覆盖保证）；该目录是独立子仓库（私有远端，克隆后先跑一次
+  `git submodule update --init resources/jammers-py`），缺了就只能跑上面的离线命令，
+  `--jammers-dir` 可指定别处。
   多局并行或不想复用已有实例时加 `--no-reuse --robot-port 2111 --console-port 8091` 一类参数。
 - **官方模式**（`python -m t3` / `python -m t4` 不带参数）连 `http://127.0.0.1:2026`，只有 3 次
   机会，**不要用它试跑**。官方与演练写同一个 `--save-dir`（一个目录 = 最新一次运行），且官方模式
@@ -60,7 +62,7 @@ python -m analysis.undefined_names      # 静态检查：漏定义 / 缺失参�
 common/            跨题通用层：几何、路线算子、模拟器接口、演练场、绘图、落盘、路径、控制台
 t1/ t2/ t3/ t4/    问题一~四
 analysis/          静态检查工具
-resources/         本机材料（不入库）：jammers-py/ 本地演练场、Problem/ 赛题、References/ 文献
+resources/         本机材料（不入库）：Problem/ 赛题、References/ 文献；jammers-py/ 是子仓库
 results/           运行产物（不入库）
 ```
 

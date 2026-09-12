@@ -57,8 +57,10 @@ mathematical-modelling problems 1-4).
 
 - `resources/jammers-py/` is the local replica simulator used by `--practice` (`common/paths.py`
   resolves it via the `JAMMERS_REL_DIR` constant; `--jammers-dir` overrides it).
-- It is **not tracked by git** and may be absent in a fresh clone; if missing, only the offline
-  commands above run. If present, `--practice` and ground-truth checks work.
+- It is a **git submodule** (private remote `LittleFishStars/jammers-py-simulator`): a fresh clone
+  carries only its commit pointer, so run `git submodule update --init resources/jammers-py` once.
+  While it is absent, only the offline commands above run; once present, `--practice` and
+  ground-truth checks work.
 - `uv run python -m simulator --help` or `cd resources/jammers-py; uv run python run.py`.
 
 ## Running against the official simulator

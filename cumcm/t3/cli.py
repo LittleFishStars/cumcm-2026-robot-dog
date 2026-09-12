@@ -20,7 +20,8 @@ from cumcm.common.paths import default_jammers_dir
 from cumcm.common.practice_arena import PracticeArena
 from cumcm.common.sim_client import API_LOG_NAME, BASE_URL, ROBOT_ID, Simulator
 from cumcm.common.sim_client import api_log as _api_log_raw
-from cumcm.t3.config import (BEARING_ERROR_DEG, CHOSEN_RING_RADIUS, CLEAR_RADIUS, COVER_RADIUS, INLINE_SECTOR_DEG, K_CLEAR_MAX, RESULTS_DIR, SEED, TRAJ_DIR)
+from cumcm.t3.config import (BEARING_ERROR_DEG, CHOSEN_RING_RADIUS, CLEAR_RADIUS, COVER_RADIUS,
+                             INLINE_R_MAX, INLINE_R_MIN, K_CLEAR_MAX, RESULTS_DIR, SEED, TRAJ_DIR)
 from cumcm.t3.covering import (CoverSolveResult, optimal_ring_radius, print_cover_report, solve_covering_circles)
 from cumcm.common.scanfigure import STEP_DIR_NAME, reset_dir
 from cumcm.t3.plotting import save_scan_figures, save_trajectory, truth_points
@@ -82,7 +83,6 @@ def run_practice(args: argparse.Namespace, res: CoverSolveResult, save_dir: Path
                                              timeout=args.timeout),
                            verbose=not args.quiet, logfile=args.log, episode=ep + 1,
                            clear=clear, k_clear_max=args.k_clear_max,
-                           inline_sector_deg=args.inline_sector_deg,
                            inline_radius_max=(None if args.inline_radius_max <= 0
                                             else args.inline_radius_max),
                            rotate=not args.no_rotate, api_log=api_log)
@@ -172,7 +172,6 @@ def run_official(args: argparse.Namespace, res: CoverSolveResult, save_dir: Path
     with _api_log(args, not args.quiet) as api_log:
         dog = RobotDog(sim, verbose=not args.quiet, logfile=args.log, episode=1,
                        clear=not args.survey_only, k_clear_max=args.k_clear_max,
-                       inline_sector_deg=args.inline_sector_deg,
                            inline_radius_max=(None if args.inline_radius_max <= 0
                                             else args.inline_radius_max),
                        rotate=not args.no_rotate, api_log=api_log)
@@ -258,12 +257,8 @@ def build_parser() -> argparse.ArgumentParser:
                    help=f"试清未中后最多再补清几个点（用 K 个半径 20 m 的圆覆盖定位区域；"
                         f"缺省 {K_CLEAR_MAX}，只在能盖满区域时才用，盖不满则转入补测）")
     p.add_argument("--inline-radius-max", type=float, default=0.0,
-                   help="顺路清除扇区**固定**半径上界 / m（0=缺省用'两站半径最大者'；"
-                        "本参数为二分搜索最优半径而设，给 >0 则 _in_azimuth_arc 以此为上界）")
-    p.add_argument("--inline-sector-deg", type=float, default=INLINE_SECTOR_DEG,
-                   help=f"巡视途中顺路清除的方位扇区半张角 / 度（缺省 {INLINE_SECTOR_DEG:.0f}；"
-                        f"判据：估计点与圆心的连线方向落在「本站→圆心」与「下一站→圆心」"
-                        f"两条连线之间即清；本参数只用于起点(原点)→第一站的兜底扇形）")
+                   help=f"站点间前向顺路清除的估计点半径**上界** / m（0=缺省 {INLINE_R_MAX:.0f}；"
+                        f"下界固定 {INLINE_R_MIN:.0f}。本参数为二分搜索最优半径而设）")
     p.add_argument("--survey-only", action="store_true",
                    help="只做阶段一（巡视扫描 + 覆盖核对），不做定位与清除")
     p.add_argument("--traj-dir", default=TRAJ_DIR,

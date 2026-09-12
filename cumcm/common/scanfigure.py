@@ -26,7 +26,7 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
 
-from cumcm.common.plotting import (C_COVER, C_DIR, C_FRAME, C_HIT, C_NEAR,
+from cumcm.common.plotting import (C_COVER, C_DIR, C_FRAME, C_HIT, C_MEAS, C_NEAR,
                                    C_NOSIG, C_PATH, C_SRC, C_TRY, font_context, save_png,
                                    setup_mpl_env)
 
@@ -218,9 +218,23 @@ def draw_scan_step(out_path: Path, step: ScanStep, *,
                 handles.append(Line2D([], [], marker="^", ms=6.5, ls="none", mfc="none",
                                       mec=C_TRY, mew=1.3, label=f"清除未中（{bad} 次）"))
 
-        # 本步结束时的估计：按用户要求（2026-09-12）不画"定位估计 1σ 圆 / 中心十字 / 可能源
-        # 区域轮廓"——橙黄圈与示向度射线混在一张图里显得杂乱，区域/估计信息改由轨迹表与
-        # t4_survey 的逐频道档案提供。regions / estimates 数据仍在 ScanStep 里保留。
+        # 本步结束时的估计：按用户要求（2026-09-12）去掉"定位估计 1σ 圆 / 中心十字"（橙黄小圈与
+        # 射线混在一起杂乱），但**保留可能源区域的多边形轮廓**（区域形状信息仍有价值）。
+        if step.regions:
+            widths = []
+            for ch, ring in sorted(step.regions.items()):
+                pts = list(ring)
+                if len(pts) < 3:
+                    continue
+                arr = np.asarray(pts + [pts[0]], dtype=float)
+                ax.plot(arr[:, 0], arr[:, 1], color=C_MEAS, lw=0.8, alpha=0.7, zorder=5.5)
+                # 区域"宽度"取包围盒对角线：用来量化"信息收缩到什么程度"（逐步对比即可看到
+                # 从几百米收到几十米）。用包围盒而非精确直径，是画图取值的廉价近似。
+                widths.append(float(np.hypot(np.max(arr[:, 0]) - np.min(arr[:, 0]),
+                                             np.max(arr[:, 1]) - np.min(arr[:, 1]))))
+            med = float(np.median(widths)) if widths else 0.0
+            handles.append(Line2D([], [], color=C_MEAS, lw=0.8, alpha=0.7,
+                                  label=f"可能源区域（{len(widths)} 个频道，中位宽 {med:.0f} m）"))
 
         # 干扰源真值（仅演练模式有）与清除半径
         if sources:

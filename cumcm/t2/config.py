@@ -57,7 +57,15 @@ BAND_PHI_STEP = 0.5             # 候选区域搜索的方位步长 / 度
 
 # ----------------------------------------------------------------------------
 # 候选区域与出图口径
-ETA = 0.10                      # 候选区域阈值：J ≤ (1+η)·J*（即适合度 F ≥ 1/(1+η) ≈ 0.909）
+ETA = 0.10
+
+# ---- 文献判据层（cumcm/t2/theory.py）----
+CERTIFY_STEP = 5.0        # 全域认证网格步长 / m（GDOP 快筛 + 精确复核）
+CERTIFY_MAX = 30000       # 认证网格点数上限：可行域大时自动放宽步长（缺省步长不受影响）
+CERTIFY_TOP = 48          # 快筛最优先进入精确复核的候选个数
+PROBE_N = 1200            # 判据一致性（秩相关）抽样的可行点数
+EXPECT_STEP = 10.0        # 期望口径（Chen 2009 式）搜索网格步长 / m
+EXPECT_MAX = 12000        # 期望口径搜索的点数上限（同上，自动放宽）                      # 候选区域阈值：J ≤ (1+η)·J*（即适合度 F ≥ 1/(1+η) ≈ 0.909）
 CONTOUR_F = (0.50, 0.75, 0.90)  # 适合度等值线（图上标注对应的 J，单位 m）
 DEFAULT_SITE: Tuple[float, float] = (0.0, 0.0)   # 缺省第一检测点（机器狗起点即原点）
 DEFAULT_BEARING = 0.0           # 缺省示向度 / 度（正东）
@@ -67,6 +75,8 @@ DEFAULT_BEARING = 0.0           # 缺省示向度 / 度（正东）
 RESULTS_DIR = "results/t2"
 MAP_CSV = "t2_suitability.csv"      # 全域适合度表（x, y, 最坏直径, 适合度, 可测性）
 SUMMARY_JSON = "t2_second_site.json"  # 最优区域、可行域、最坏情形与全部校验
+CRITERIA_PNG = "t2_criteria.png"
+CRITERIA_PDF = "t2_criteria.pdf"
 FIGURE_PNG = "t2_suitability.png"   # 论文可用图（位图）
 FIGURE_PDF = "t2_suitability.pdf"   # 同上（矢量，供 LaTeX 直接插图）
 DPI = 160.0

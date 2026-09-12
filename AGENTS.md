@@ -26,9 +26,12 @@
 ## Commands that work offline
 
 - `uv run python T1.py` — problem 1 demo.
-- `uv run python T2.py` — problem 2: best second detection point + suitability figure (offline,
-  ~5 s; writes `results/t2/{t2_suitability.png,pdf,t2_suitability.csv,t2_second_site.json}`).
+- `uv run python T2.py` — problem 2: best second detection point + suitability figure + literature
+  criteria figure (offline, ~15 s; writes `results/t2/{t2_suitability.png,pdf,t2_criteria.png,pdf,
+  t2_suitability.csv,t2_second_site.json}`).
 - `uv run python -m cumcm.t2.region` — problem 2 geometry self-check (analytic quad vs shapely).
+- `uv run python -m cumcm.t2.theory` — problem 2 literature self-check (CRLB/GDOP closed forms vs
+  the exact set-membership worst-case bound; prints per-γ and per-r₂/d deviation buckets).
 - `uv run python T3.py --plan-only` — solve the 7 cover circles; no simulator, no ground truth.
 - `uv run python -m cumcm.t3.covering` — cover-layout self-check (rotation/selection/min-circle).
 
@@ -59,6 +62,8 @@
 
 - There is no test suite, linter config, or CI workflow. Treat `python -m cumcm.t3.covering`,
   `python -m cumcm.t2.region` and byte-identical fixed-seed reruns as the checks. `T2.py` is fully
-  deterministic (no RNG): its four outputs are byte-identical across runs, and every run self-checks
-  the analytic geometry against shapely (max rel. dev ~1e-15) plus a 3x-refined discretization.
+  deterministic (no RNG): its six outputs are byte-identical across runs, and every run self-checks
+  the analytic geometry against shapely (max rel. dev ~1e-15), a 3x-refined discretization,
+  the literature CRLB/GDOP closed forms, and a 5 m global GDOP-prefiltered certification of
+  the optimum.
 - Design rationale lives in the module docstrings and `README.md`.

@@ -47,6 +47,7 @@ from shapely import Polygon
 from cumcm.common.geometry import bearing
 from cumcm.t1 import TriangulationRegion
 from cumcm.t2 import config as cfg
+from cumcm.t2 import theory
 from cumcm.t2.region import (corner_sources, exact_region, feasible_lens, quad_diameters,
                              quad_polygon, verify_analytic, worst_case_scenario,
                              worst_diameters_all, worst_source_distance)
@@ -90,15 +91,31 @@ def delta2_grid(n: int = cfg.DELTA2_SAMPLES,
 
 def worst_case_diameters(site: Sequence[float], sx: np.ndarray, sy: np.ndarray, theta1: float,
                          sources: np.ndarray, deltas2: np.ndarray,
-                         err_deg: float = cfg.BEARING_ERROR_DEG) -> np.ndarray:
-    """J(S2)：对源采样点与第二次测向误差取最坏的定位直径 / m（向量化，逐候选点）。
+                         err_deg: float = cfg.BEARING_ERROR_DEG,
+                         reduce: str = "max") -> np.ndarray:
+    """J(S2)：对源采样点与第二次测向误差取最坏（或期望）的定位直径 / m，向量化、逐候选点。
 
     对每个候选点 S2 与每个源采样点 G，第二次示向度的名义值是 θ₂ = ∠(S2→G)；实际读数再叠加
     误差 δ₂，故把 θ₂ + δ₂ 代进四边形构造取最大。源采样点已含 δ₁ ∈ [−1°, 1°]（源在楔形内的
-    角向不确定性），于是这一层 max 覆盖了"源在楔形内何处 + 第二次测向偏多少"的全部组合。
+    角向不确定性），于是这一层覆盖了"源在楔形内何处 + 第二次测向偏多少"的全部组合。
+
+    `reduce="max"` 是本文的 minimax 口径（保证最坏情况）；`reduce="mean"` 是文献常用的**期望**
+    口径（Chen 等 2009 用期望滤波 RMS 位置误差），两者给出的最优第二检测点可能不同 ——
+    这正是 `theory_analysis` 要量化对照的东西。
     """
     sx = np.asarray(sx, dtype=float).ravel()
     sy = np.asarray(sy, dtype=float).ravel()
+    if reduce == "mean":
+        acc = np.zeros(sx.shape, dtype=float)
+        n = 0
+        for gx, gy in np.asarray(sources, dtype=float):
+            w2 = np.degrees(np.arctan2(gy - sy, gx - sx)) % 360.0
+            for d2 in np.asarray(deltas2, dtype=float):
+                acc += quad_diameters(site, theta1, sx, sy, w2 + d2, err_deg)
+                n += 1
+        return acc / max(n, 1)
+    if reduce != "max":
+        raise ValueError(f"reduce 只能是 'max' 或 'mean'，收到 {reduce!r}")
     best = np.zeros(sx.shape, dtype=float)
     for gx, gy in np.asarray(sources, dtype=float):
         w2 = np.degrees(np.arctan2(gy - sy, gx - sx)) % 360.0
@@ -141,10 +158,162 @@ def coarse_fields(site: Sequence[float], theta1: float, sources: np.ndarray,
     return {"x": xx, "y": yy, "hear": hear, "feasible": feasible, "j": j}
 
 
+# ----------------------------------------------------------------------------
+# ②b 文献判据层：全域快筛、判据对照与全局认证（cumcm/t2/theory.py）
+# ----------------------------------------------------------------------------
+
+def closed_form_table(d: float, r2: float, gamma_deg: float, exact_radius: float,
+                      err_deg: float = cfg.BEARING_ERROR_DEG) -> Dict[str, Any]:
+    """最坏情形几何上"本文闭式 / 文献 GDOP / 文献 CRLB 主半轴 / Foy 稀释式"与精确最坏半径的对照。"""
+    closed = {
+        "minimax_radius_m": theory.minimax_radius(d, r2, gamma_deg, err_deg),
+        "gdop_m": theory.gdop(d, r2, gamma_deg, err_deg),
+        "crlb_major_m": theory.crlb_major(d, r2, gamma_deg, err_deg),
+        "crlb_area_m2": theory.crlb_area(d, r2, gamma_deg, err_deg),
+        "foy_rmec_m": theory.foy_rmec(d, r2, gamma_deg, err_deg),
+    }
+    # 面积（m²）不与半径（m）比相对偏差，只列绝对值
+    dev = {k: (v - exact_radius) / exact_radius for k, v in closed.items()
+           if k != "crlb_area_m2" and math.isfinite(v)}
+    return {"worst_case_geometry": {"d_m": float(d), "r2_m": float(r2),
+                                    "gamma_deg": float(gamma_deg),
+                                    "exact_worst_radius_m": float(exact_radius)},
+            "closed_form_m": closed, "closed_form_rel_dev": dev}
+
+
+def theory_analysis(site: Sequence[float], theta1: float, sources: np.ndarray,
+                    deltas2: np.ndarray, best: Tuple[float, float], j_star: float,
+                    d_lo: float, d_hi: float, eta: float,
+                    err_deg: float = cfg.BEARING_ERROR_DEG,
+                    radius: float = cfg.REGION_RADIUS,
+                    receive_min: float = cfg.RECEIVE_MIN,
+                    step: float = cfg.CERTIFY_STEP, top: int = cfg.CERTIFY_TOP,
+                    probe_n: int = cfg.PROBE_N,
+                    expect_step: float = cfg.EXPECT_STEP,
+                    certify_max: int = cfg.CERTIFY_MAX,
+                    expect_max: int = cfg.EXPECT_MAX) -> Dict[str, Any]:
+    """把文献判据（GDOP/CRLB/几何稀释）接到本文算法上，做三件事。
+
+    1. **全域认证**：在可行域包围盒内按 `step`（缺省 5 m）建细网格，用解析 GDOP 场
+       （`theory.radius_field`，比精确构造快约两个数量级）快筛出最优先的 `top` 个候选，
+       再用精确判据复核 —— 于是"最优点"不再依赖 25 m 粗网格是否恰好框住盆地，
+       而是"细网格全局快筛 + 精确复核"的结果（报告中给出两者的差）。
+    2. **判据对照**：在可行域内等距抽 `probe_n` 个点，比较文献 GDOP 判据与本文精确判据的
+       **秩相关**（文献判据能不能替代精确判据做搜索）；并给出三条文献判据在本文最坏情形上
+       相对精确最坏界的偏差（低估多少）。
+    3. **准则对照**：分别求"文献 GDOP 判据最优"、"期望（平均）直径最优"（Chen 等 2009 的
+       期望 RMS 口径）与本文 minimax 最优三点，并在**同一张表**上用精确最坏直径、期望直径、
+       GDOP 三个指标互评 —— 说明 minimax 与期望准则的取舍，而不是只说一句"我们用最坏情况"。
+    """
+    lens = feasible_lens(site, theta1, d_lo, d_hi, err_deg, receive_min, radius)
+    x0, y0, x1, y1 = lens.bounds
+    # 可行域大（换了第一检测点）时 5 m 网格会涨到几十万点，按点数上限自动放宽步长；
+    # 缺省情形的步长不受影响（17 861 点 < 上限），只在必要时变粗并如实记进结果。
+    step = max(float(step), math.sqrt(max((x1 - x0) * (y1 - y0), 1e-9) / float(certify_max)))
+    expect_step = max(float(expect_step),
+                      math.sqrt(max((x1 - x0) * (y1 - y0), 1e-9) / float(expect_max)))
+    xs = np.arange(x0, x1 + 0.5 * step, step)
+    ys = np.arange(y0, y1 + 0.5 * step, step)
+    xx, yy = np.meshgrid(xs, ys)
+    px, py = xx.ravel(), yy.ravel()
+    in_region = np.hypot(px, py) <= radius + 1e-9
+    feasible = in_region & (worst_source_distance(px, py, sources) <= receive_min)
+    pts = np.column_stack([px[feasible], py[feasible]])
+    gdop_field = theory.radius_field(site, theta1, pts, sources, mode="gdop", err_deg=err_deg)
+
+    # ① 全域认证：GDOP 最小的一批候选 + 当前最优点 → 精确复核
+    order = np.argsort(gdop_field)
+    cand = np.vstack([pts[order[:int(top)]], np.asarray([best], dtype=float)])
+    j_cand = worst_case_diameters(site, cand[:, 0], cand[:, 1], theta1, sources, deltas2, err_deg)
+    k = int(np.argmin(j_cand))
+    # 快筛出来的点在 5 m 网格上，再按 REFINE_STEP 细化一次，才是可与粗搜解比较的"认证解"
+    cert = refine_best(site, theta1, sources, deltas2, float(cand[k, 0]), float(cand[k, 1]),
+                       half=step, step=cfg.REFINE_STEP, err_deg=err_deg,
+                       receive_min=receive_min)
+
+    # ② 判据对照：秩相关 + 三条文献判据在最坏情形上的偏差
+    sub = pts[:: max(1, pts.shape[0] // int(probe_n))]
+    j_sub = worst_case_diameters(site, sub[:, 0], sub[:, 1], theta1, sources, deltas2, err_deg)
+    g_sub = theory.radius_field(site, theta1, sub, sources, mode="gdop", err_deg=err_deg)
+    rho = theory.spearman(g_sub, j_sub)
+    sc = worst_case_scenario(site, theta1, best, sources, deltas2, err_deg)
+    cf = closed_form_table(float(sc["d_m"]), float(sc["r2_m"]), float(sc["gamma_deg"]),
+                           0.5 * float(sc["diameter"]), err_deg)
+
+    # ③ 准则对照：GDOP 判据最优点、期望口径最优点
+    p_gdop = (float(pts[order[0], 0]), float(pts[order[0], 1]))
+    ex_xs = np.arange(x0, x1 + 0.5 * expect_step, expect_step)
+    ex_ys = np.arange(y0, y1 + 0.5 * expect_step, expect_step)
+    exx, exy = np.meshgrid(ex_xs, ex_ys)
+    epx, epy = exx.ravel(), exy.ravel()
+    efeas = (np.hypot(epx, epy) <= radius + 1e-9) & (
+        worst_source_distance(epx, epy, sources) <= receive_min)
+    epts = np.column_stack([epx[efeas], epy[efeas]])
+    mean_field = worst_case_diameters(site, epts[:, 0], epts[:, 1], theta1, sources, deltas2,
+                                      err_deg, reduce="mean")
+    ke = int(np.argmin(mean_field))
+    p_exp = refine_best(site, theta1, sources, deltas2, float(epts[ke, 0]), float(epts[ke, 1]),
+                        half=expect_step, step=cfg.REFINE_STEP, err_deg=err_deg,
+                        receive_min=receive_min, reduce="mean")
+    return {
+        "certify": {"step_m": float(step), "expect_step_m": float(expect_step),
+                    "n_grid": int(pts.shape[0]), "n_exact": int(cand.shape[0]),
+                    "xy_m": [cert[0], cert[1]], "worst_diam_m": cert[2],
+                    # 解关于 θ1 方向严格镜像对称，故比距离时取"到粗解或其镜像"的较小者
+                    "vs_coarse_m": min(math.hypot(cert[0] - float(best[0]), cert[1] - float(best[1])),
+                                       math.hypot(cert[0] - float(best[0]), cert[1] + float(best[1]))),
+                    "vs_coarse_j_m": cert[2] - float(j_star),
+                    "better_than_coarse_m": float(j_star) - cert[2]},
+        "probe": {"gdop_m": g_sub, "worst_diam_m": j_sub},
+        "criteria": {"n_probe": int(sub.shape[0]), "gdop_vs_exact_spearman": rho, **cf},
+        "points_xy": {"gdop": [p_gdop[0], p_gdop[1]], "expected": [p_exp[0], p_exp[1]]},
+        "citations": theory.CITATIONS,
+    }
+
+
+def criteria_points(site: Sequence[float], theta1: float, sources: np.ndarray,
+                    deltas2: np.ndarray, points_xy: Dict[str, Tuple[float, float]],
+                    j_star: float, mirror: bool = True,
+                    err_deg: float = cfg.BEARING_ERROR_DEG) -> Dict[str, Any]:
+    """三个口径的最优点在同一张表上互评（最坏直径 / 期望直径 / GDOP）。
+
+    `mirror=True` 时把 φ < 0 的点镜像到 +φ（解关于示向度方向严格对称，指标不变）——
+    与主结论的报告方式一致，便于并排比较。`j_star` 是最终认定最优的最坏直径，
+    表里的 `worst_diam_loss_pct` 就是各点相对它的损失。
+    """
+    ang = math.radians(float(theta1))
+    table: Dict[str, Any] = {}
+    for name, (bx, by) in points_xy.items():
+        phi = _rel_angle(bearing(site, (bx, by)), theta1)
+        if mirror and phi < 0.0:
+            bx = float(site[0]) + math.cos(ang) * (float(bx) - float(site[0])) \
+                 + math.sin(ang) * (float(by) - float(site[1]))
+            by = float(site[1]) + math.sin(ang) * (float(bx) - float(site[0])) \
+                 - math.cos(ang) * (float(by) - float(site[1]))
+            phi = _rel_angle(bearing(site, (bx, by)), theta1)
+        px, py = np.asarray([float(bx)]), np.asarray([float(by)])
+        jj = float(worst_case_diameters(site, px, py, theta1, sources, deltas2, err_deg)[0])
+        jm = float(worst_case_diameters(site, px, py, theta1, sources, deltas2, err_deg,
+                                        reduce="mean")[0])
+        gg = float(theory.radius_field(site, theta1, np.column_stack([px, py]), sources,
+                                       mode="gdop", err_deg=err_deg)[0])
+        table[name] = {
+            "xy_m": [float(bx), float(by)],
+            "r_m": math.hypot(float(bx) - float(site[0]), float(by) - float(site[1])),
+            "phi_deg": phi,
+            "worst_diam_m": jj,
+            "worst_diam_loss_pct": 100.0 * (jj - float(j_star)) / float(j_star),
+            "mean_diam_m": jm,
+            "gdop_m": gg,
+        }
+    return table
+
+
 def refine_best(site: Sequence[float], theta1: float, sources: np.ndarray, deltas2: np.ndarray,
                 x0: float, y0: float, half: float = cfg.REFINE_HALF,
                 step: float = cfg.REFINE_STEP, err_deg: float = cfg.BEARING_ERROR_DEG,
-                receive_min: float = cfg.RECEIVE_MIN) -> Tuple[float, float, float]:
+                receive_min: float = cfg.RECEIVE_MIN,
+                reduce: str = "max") -> Tuple[float, float, float]:
     """在粗解附近做局部细化，返回 (x, y, J)。
 
     J 在最优点附近光滑、"太大/近共线"的区域被哨兵值挡住，故 25 m 粗网格必然把最优点圈进
@@ -158,7 +327,8 @@ def refine_best(site: Sequence[float], theta1: float, sources: np.ndarray, delta
     feasible = worst_source_distance(px, py, sources) <= receive_min
     if not feasible.any():                       # 理论上不会发生（x0, y0 本就可行）
         return float(x0), float(y0), float("nan")
-    j = worst_case_diameters(site, px[feasible], py[feasible], theta1, sources, deltas2, err_deg)
+    j = worst_case_diameters(site, px[feasible], py[feasible], theta1, sources, deltas2, err_deg,
+                             reduce=reduce)
     k = int(np.argmin(j))
     return float(px[feasible][k]), float(py[feasible][k]), float(j[k])
 
@@ -350,6 +520,7 @@ class SolveResult:
     fields: Dict[str, np.ndarray]
     scenario: Dict[str, Any]                        # 最优点的最坏情形（论文插图用）
     checks: Dict[str, Any]
+    theory: Dict[str, Any] = field(default_factory=dict)   # 文献判据层（cumcm/t2/theory.py）
 
     @property
     def improvement(self) -> float:
@@ -381,12 +552,33 @@ def solve(site: Sequence[float] = cfg.DEFAULT_SITE, theta1: float = cfg.DEFAULT_
     bx, by, j_star = refine_best(site, theta1, sources, deltas2, x0, y0, err_deg=err_deg,
                                  receive_min=receive_min)
 
-    # ③ 候选区域
+    # ②b 文献判据层：全域认证（5 m 细网格 GDOP 快筛 + 精确复核）、判据一致性与准则对照
+    thy = theory_analysis(site, theta1, sources, deltas2, (bx, by), j_star, d_lo, d_hi, eta,
+                          err_deg=err_deg, radius=radius, receive_min=receive_min)
+    # ③ 两条路线（25 m 粗搜 + 局部细化 / 细网格全域快筛 + 局部细化）取更优者
+    cx, cy, cj = (float(thy["certify"]["xy_m"][0]), float(thy["certify"]["xy_m"][1]),
+                  float(thy["certify"]["worst_diam_m"]))
+    if cj < j_star:
+        bx, by, j_star = cx, cy, cj
+    phi_best = _rel_angle(bearing(site, (bx, by)), theta1)
+    # ④ 解关于过 S1 的示向度方向**严格镜像对称**（源集、δ 网格、圆域都对称），故 φ* < 0 时
+    #    报告 +φ 那一支；镜像后 J 必须逐位一致，不一致就说明哪里不对称，直接报出来。
+    mirror_rel_dev = 0.0
+    if phi_best < 0.0:
+        ang = math.radians(float(theta1))
+        mx = site[0] + math.cos(ang) * (bx - site[0]) + math.sin(ang) * (by - site[1])
+        my = site[1] + math.sin(ang) * (bx - site[0]) - math.cos(ang) * (by - site[1])
+        jm = float(worst_case_diameters(site, np.asarray([mx]), np.asarray([my]), theta1, sources,
+                                        deltas2, err_deg)[0])
+        mirror_rel_dev = abs(jm - j_star) / max(abs(j_star), 1e-9)
+        bx, by = float(mx), float(my)
+
+    # ⑤ 候选区域
     band = candidate_band(site, theta1, sources, deltas2, j_star * (1.0 + eta),
                           r_center=math.hypot(bx - site[0], by - site[1]), d_lo=d_lo, d_hi=d_hi,
                           err_deg=err_deg, receive_min=receive_min, radius=radius)
 
-    # ④ 最优点的最坏情形（含圆域截断判定）与各项校验
+    # ⑥ 最优点的最坏情形（含圆域截断判定）与各项校验
     scenario = worst_case_scenario(site, theta1, (bx, by), sources, deltas2, err_deg)
     exact = exact_region(site, theta1, (bx, by), scenario["theta2_deg"], err_deg, radius)
     dense = float(np.max(worst_diameters_all(
@@ -397,6 +589,15 @@ def solve(site: Sequence[float] = cfg.DEFAULT_SITE, theta1: float = cfg.DEFAULT_
         delta2_grid(cfg.DELTA2_SAMPLES * cfg.DENSE_FACTOR, err_deg), err_deg)))
     lens = feasible_lens(site, theta1, d_lo, d_hi, err_deg, receive_min, radius)
     single = _single_measurement_diameter(site, theta1, err_deg, radius)
+    # ⑦ 闭式对照表与三点互评表都用**最终解**重算（theory_analysis 里那次是认证前的中间值）
+    thy["criteria"].update(closed_form_table(float(scenario["d_m"]), float(scenario["r2_m"]),
+                                             float(scenario["gamma_deg"]),
+                                             0.5 * float(scenario["diameter"]), err_deg))
+    thy["points"] = criteria_points(site, theta1, sources, deltas2,
+                                    {"minimax": (float(bx), float(by)),
+                                     "gdop": tuple(thy["points_xy"]["gdop"]),
+                                     "expected": tuple(thy["points_xy"]["expected"])},
+                                    float(j_star), err_deg=err_deg)
     checks: Dict[str, Any] = {
         "scenario_exact_m": float(exact.diameter),
         "scenario_analytic_m": float(scenario["diameter"]),
@@ -414,10 +615,20 @@ def solve(site: Sequence[float] = cfg.DEFAULT_SITE, theta1: float = cfg.DEFAULT_
                                                                  np.asarray([by]), sources)[0]),
         "n_source_samples": int(sources.shape[0]),
         "d_lo": float(d_lo), "d_hi": float(d_hi), "eta": float(eta),
+        "certify_worst_diam_m": float(thy["certify"]["worst_diam_m"]),
+        "certify_j_rel_dev": abs(float(thy["certify"]["worst_diam_m"]) - float(j_star))
+                             / max(abs(float(j_star)), 1e-9),
+        "certify_vs_coarse_m": float(thy["certify"]["vs_coarse_m"]),
+        "gdop_vs_exact_spearman": float(thy["criteria"]["gdop_vs_exact_spearman"]),
+        "theory_closed_form_rel_dev": thy["criteria"]["closed_form_rel_dev"],
+        "mirror_rel_dev": float(mirror_rel_dev),
     }
     if verify_n > 0:
         checks["analytic_vs_shapely"] = verify_analytic(n=verify_n, err_deg=err_deg, radius=radius)
+        checks["theory_closed_forms"] = theory.verify_theory(max(40, verify_n // 4),
+                                                             err_deg=err_deg, radius=radius)
     return SolveResult(site=(float(site[0]), float(site[1])), theta1=float(theta1),
+                       theory=thy,  # 认证细节在 thy["certify"]；最优点已按上面两条路线择优
                        j_star=float(j_star), best=(bx, by),
                        best_r=math.hypot(bx - site[0], by - site[1]),
                        best_phi=_rel_angle(bearing(site, (bx, by)), theta1),

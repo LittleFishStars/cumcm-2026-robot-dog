@@ -1,4 +1,6 @@
-"""问题二的成果图：第二检测点的适合度图（一张图说清"往哪儿走"）。
+"""问题二的成果图。
+
+* **`draw_suitability`**（主图）：第二检测点的适合度图（一张图说清"往哪儿走"）。
 
 题目要的是"第二个检测点的候选区域"，一张能直接支撑结论的图必须同时回答四个问题：
 ① 第二点必须落在哪（可行域，否则第二次测向可能什么都听不到）；② 落在不同位置的效果差多少
@@ -31,9 +33,11 @@ import numpy as np
 from cumcm.common.plotting import (C_FRAME, C_GRAY, C_MEAS, C_PATH, C_SRC, font_context,
                                    no_plot_hint, save_png, setup_mpl_env)
 from cumcm.t2 import config as cfg
+from cumcm.t2 import theory
+from cumcm.t2.region import quad_diameters
 from cumcm.t2.score import SolveResult, scenario_quad, suitability
 
-__all__ = ["draw_suitability", "zoom_window"]
+__all__ = ["draw_suitability", "draw_criteria", "zoom_window"]
 
 # 图上专用配色：适合度用"深色 = 好"的冷暖渐变，候选弧带用亮橙以区别于红色的最坏情形
 C_MAP = "YlGnBu"
@@ -291,6 +295,131 @@ def draw_suitability(out_path: Path, result: SolveResult, dpi: float = cfg.DPI,
                      f"{result.site[1]:.0f}) m，$\\theta_1$ = {result.theta1:.0f}°；只有一次测向时最坏"
                      f"定位直径 {result.single_m:.0f} m → 补测后 {result.j_star:.0f} m，"
                      f"缩小 {result.improvement:.1f} 倍）", fontsize=10.4, y=0.965)
+        save_png(fig, out_path, dpi=dpi)
+        if pdf_path is not None:
+            pdf_path = Path(pdf_path)
+            pdf_path.parent.mkdir(parents=True, exist_ok=True)
+            fig.savefig(pdf_path, metadata={"Software": None, "CreationDate": _PDF_DATE})
+        plt.close(fig)
+    return out_path
+
+
+def _exact_radius_at(R1: float, R2: float, gamma_deg: float,
+                     err_deg: float = cfg.BEARING_ERROR_DEG) -> float:
+    """构造一个恰好实现 (R1, R2, γ) 的两站构型，并用精确构造给出最坏半径 / m。
+
+    记源 G 在 (R1, 0)、S1 在原点，则 G→S1 方向为 180°；取 G→S2 方向为 180°−γ、长度 R2，
+    于是两站在源处的交会角恰为 γ。再用 `quad_diameters`（±1° 楔形交的精确直径）取一半。
+    """
+    gx, gy = R1, 0.0
+    ang = math.radians(180.0 - gamma_deg)
+    s2x, s2y = gx + R2 * math.cos(ang), gy + R2 * math.sin(ang)
+    theta2 = math.degrees(math.atan2(gy - s2y, gx - s2x)) % 360.0
+    d = float(quad_diameters((0.0, 0.0), 0.0, np.asarray([s2x]), np.asarray([s2y]),
+                             np.asarray([theta2]), err_deg)[0])
+    return 0.5 * d
+
+
+def draw_criteria(out_path: Path, result: SolveResult, dpi: int = cfg.DPI,
+                  pdf_path: Optional[Path] = None) -> Path:
+    """文献判据 vs 本文精确判据的对照图（写论文"为什么这么选点"用）。
+
+    * **(a) 交会角的影响**：固定 R₁ = 1500 m、R₂ = 907 m（本文最坏情形的距离组合），
+      按 γ ∈ [15°, 90°] 逐点用**精确构造**算出最坏半径，与三条文献闭式/本文闭式并排 ——
+      直接显示 Foy 1976 的几何稀释（γ 越小半径越大），以及文献 GDOP 式系统性偏低约三成。
+    * **(b) 判据一致性**：可行域内 1200 余个采样点上，文献 GDOP 判据与本文精确 J 的散点
+      （双对数），给出 Spearman 秩相关 —— 说明它**适合做快筛**（秩几乎一致）但**不能当硬界**
+      （点云整体在对角线下方，即 GDOP 低估最坏直径）。
+    """
+    try:
+        import matplotlib
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+    except ImportError:
+        no_plot_hint()
+        return Path(out_path)
+
+    out_path = Path(out_path)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    th = result.scenario
+    R1, R2 = float(th["d_m"]), float(th["r2_m"])
+    gammas = np.arange(15.0, 90.5, 2.5)
+    exact = np.array([_exact_radius_at(R1, R2, float(g)) for g in gammas])
+    curves = {
+        "精确构造（±1° 楔形交，本文判据）": (exact, "#111111", "-", 1.8, "o", 3.0),
+        "本文集员闭式": (np.array([theory.minimax_radius(R1, R2, float(g)) for g in gammas]),
+                        C_BAND, "--", 1.3, None, 0),
+        "文献 GDOP $\\sigma\\sqrt{R_1^2+R_2^2}/\\sin\\gamma$":
+            (np.array([theory.gdop(R1, R2, float(g)) for g in gammas]), "#1c7ed6", "-.", 1.3, None, 0),
+        "文献 CRLB 主半轴（任叶童 2016 式(2-52)）":
+            (np.array([theory.crlb_major(R1, R2, float(g)) for g in gammas]), "#7048e8", ":", 1.5,
+             None, 0),
+        "文献稀释式 $\\tan\\varepsilon\\sqrt{R_1^2+R_2^2}/\\sin\\gamma$":
+            (np.array([theory.foy_rmec(R1, R2, float(g)) for g in gammas]), "#2b8a3e", (0, (4, 2)),
+             1.3, None, 0),
+    }
+    with font_context(size=8.6):
+        fig = plt.figure(figsize=(12.6, 5.4))
+        gs = fig.add_gridspec(1, 2, width_ratios=[1.0, 1.0], wspace=0.24, left=0.075, right=0.985,
+                              top=0.85, bottom=0.13)
+        ax = fig.add_subplot(gs[0, 0])
+        for label, (y, c, ls, lw, mk, ms) in curves.items():
+            ax.plot(gammas, y, color=c, ls=ls, lw=lw, marker=mk, ms=ms, label=label, alpha=0.95)
+        ax.axvline(float(th["gamma_deg"]), color=C_GRAY, lw=0.9, ls=":")
+        ax.annotate(f"本文最坏情形\n$\\gamma$ = {float(th['gamma_deg']):.1f}°",
+                    xy=(float(th["gamma_deg"]), 0.0), xycoords=("data", "axes fraction"),
+                    xytext=(4, 6), textcoords="offset points", fontsize=7.0, color="#202020")
+        ax.set_yscale("log")
+        ax.set_xlabel("源处交会角 $\\gamma$ / °")
+        ax.set_ylabel("定位区域半径 / m（对数轴）")
+        ax.set_title(f"(a) 交会角的影响（$R_1$ = {R1:.0f} m，$R_2$ = {R2:.0f} m）", fontsize=9.2)
+        ax.grid(alpha=0.20, lw=0.4, which="both")
+        ax.tick_params(labelsize=7.6)
+        ax.legend(fontsize=6.8, loc="upper right", frameon=False)
+
+        probe = result.theory.get("probe", {})
+        ax2 = fig.add_subplot(gs[0, 1])
+        if probe:
+            gx = np.asarray(probe["gdop_m"], dtype=float)
+            jy = np.asarray(probe["worst_diam_m"], dtype=float)
+            ax2.scatter(gx, jy, s=7.0, color="#1c7ed6", alpha=0.45, lw=0.0)
+            lim = [min(gx.min(), jy.min()) * 0.9, max(gx.max(), jy.max()) * 1.1]
+            ax2.plot(lim, lim, color=C_GRAY, lw=0.9, ls="--")
+            ax2.set_xlim(lim)
+            ax2.set_ylim(lim)
+            ax2.set_xscale("log")
+            ax2.set_yscale("log")
+            rho = float(result.theory["criteria"]["gdop_vs_exact_spearman"])
+            ax2.annotate(f"可行域内 {gx.size} 个采样点\nSpearman 秩相关 = {rho:.3f}\n"
+                         f"（秩几乎一致 → 可作快筛；\n点云在对角线下方 → GDOP 偏低，不可当硬界）",
+                         xy=(0.03, 0.97), xycoords="axes fraction", va="top", ha="left",
+                         fontsize=7.2, color="#202020",
+                         bbox=dict(boxstyle="round,pad=0.3", fc="white", ec=C_GRAY, lw=0.5,
+                                   alpha=0.92))
+            # 三个口径的最优点在 (GDOP, J) 平面上几乎重合（相差 < 0.2%），故只画星标 + 一处合注，
+            # 避免三个文字标签叠在一起（数值对照放在右下角的框里）
+            tags = {"minimax": "本文 minimax", "gdop": "文献 GDOP", "expected": "期望口径"}
+            lines = []
+            for name, q in result.theory.get("points", {}).items():
+                ax2.scatter([q["gdop_m"]], [q["worst_diam_m"]], s=34, marker="*",
+                            color=C_BAND if name == "minimax" else "#7048e8", zorder=5)
+                lines.append(f"{tags[name]}：$r$ = {q['r_m']:.0f} m、$\\varphi$ = {q['phi_deg']:+.1f}°、"
+                             f"$J$ = {q['worst_diam_m']:.1f} m")
+            ax2.annotate("三个口径的最优点几乎重合（$J$ 相差 < 0.1%）：\n" + "\n".join(lines),
+                         xy=(0.97, 0.05), xycoords="axes fraction", va="bottom", ha="right",
+                         fontsize=6.8, color="#202020", zorder=6,
+                         bbox=dict(boxstyle="round,pad=0.3", fc="white", ec=C_GRAY, lw=0.5,
+                                   alpha=0.92))
+        else:
+            ax2.annotate("（无判据对照数据：请用 solve() 的返回值出图）", xy=(0.5, 0.5),
+                         xycoords="axes fraction", ha="center", fontsize=8.0)
+        ax2.set_xlabel("文献 GDOP 判据 / m")
+        ax2.set_ylabel("本文精确最坏定位直径 $J$ / m")
+        ax2.set_title("(b) 两个判据在可行域内的关系", fontsize=9.2)
+        ax2.grid(alpha=0.20, lw=0.4, which="both")
+        ax2.tick_params(labelsize=7.6)
+
+        fig.suptitle("问题二：文献判据（GDOP / CRLB / 几何稀释）与本文精确判据的对照", fontsize=10.4)
         save_png(fig, out_path, dpi=dpi)
         if pdf_path is not None:
             pdf_path = Path(pdf_path)

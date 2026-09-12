@@ -78,10 +78,18 @@ def save_summary_json(save_dir: Path, result: SolveResult,
                                "n_samples": result.checks["n_source_samples"],
                                "corners_m": result.corners.tolist()},
         "worst_case": scenario,
+        "literature_criteria": _theory_json(result),
         "checks": result.checks,
     }
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     return path
+
+
+def _theory_json(result: SolveResult) -> Dict[str, Any]:
+    """文献判据层的可序列化子集（探针数组只用于出图，不进 JSON）。"""
+    thy = dict(result.theory)
+    thy.pop("probe", None)
+    return thy
 
 
 def print_report(result: SolveResult, figure: Optional[Path] = None,
@@ -113,6 +121,33 @@ def print_report(result: SolveResult, figure: Optional[Path] = None,
               f"[{lobe['phi_lo']:+.1f}°, {lobe['phi_hi']:+.1f}°]，面积 "
               f"{lobe['area_m2'] / 1e6:.3f} km²")
     print("-" * 74)
+    thy = result.theory
+    if thy:
+        ce = thy["certify"]
+        cr = thy["criteria"]
+        print("文献判据（GDOP / CRLB / 几何稀释）与全局认证：")
+        print(f"  全域认证：可行域包围盒 {ce['step_m']:.0f} m 细网格 {ce['n_grid']} 点 → "
+              f"GDOP 快筛取 {ce['n_exact']} 个候选精确复核 → 细化后 J = {ce['worst_diam_m']:.4f} m")
+        print(f"    与 25 m 粗搜+细化解的距离 {ce['vs_coarse_m']:.1f} m、"
+              f"最坏直径差 {ce['vs_coarse_j_m']:+.2e} m（未漏掉更好的盆地）")
+        print(f"  判据一致性：可行域内 {cr['n_probe']} 个采样点上，文献 GDOP 与本文精确直径的 "
+              f"Spearman 秩相关 = {cr['gdop_vs_exact_spearman']:.3f}")
+        wc = cr["worst_case_geometry"]
+        print(f"  最坏情形（d = {wc['d_m']:.0f} m、r2 = {wc['r2_m']:.0f} m、γ = "
+              f"{wc['gamma_deg']:.1f}°）的半径：精确构造 {wc['exact_worst_radius_m']:.2f} m；"
+              f"本文闭式 {cr['closed_form_m']['minimax_radius_m']:.2f} m"
+              f"（{cr['closed_form_rel_dev']['minimax_radius_m']*100:+.1f}%）、"
+              f"GDOP {cr['closed_form_m']['gdop_m']:.2f} m"
+              f"（{cr['closed_form_rel_dev']['gdop_m']*100:+.1f}%）—— 文献式偏低，故只作快筛")
+        print("  准则对照（同一张表三个口径互评）：")
+        for name, tag in (("minimax", "本文 minimax"), ("gdop", "文献 GDOP  "),
+                          ("expected", "期望口径  ")):
+            q = thy["points"][name]
+            print(f"    {tag} ({q['xy_m'][0]:6.0f}, {q['xy_m'][1]:5.0f}) r = {q['r_m']:.0f} m、"
+                  f"φ = {q['phi_deg']:+.1f}°：最坏直径 {q['worst_diam_m']:.2f} m"
+                  f"（比最优差 {q['worst_diam_loss_pct']:+.2f}%）、期望直径 {q['mean_diam_m']:.2f} m、"
+                  f"GDOP {q['gdop_m']:.1f} m")
+    print("-" * 74)
     ok = lambda b: "✓" if b else "⚠ 需检查"          # noqa: E731（局部小工具，语义清楚）
     print("校验：")
     print(f"  {ok(c['scenario_rel_dev'] < 1e-9)} 最坏情形：解析构造 {c['scenario_analytic_m']:.4f} m"
@@ -123,6 +158,8 @@ def print_report(result: SolveResult, figure: Optional[Path] = None,
           f"（相对偏差 {c['discretisation_rel_dev']:.1e}）")
     print(f"  {ok(c['band_radial_gaps'] == 0)} 候选弧带：每个方位角上径向区间连续"
           f"（断口 {c['band_radial_gaps']} 处）")
+    print(f"  {ok(c['certify_j_rel_dev'] < 1e-9)} 全局认证（细网格快筛+精确复核）"
+          f"J = {c['certify_worst_diam_m']:.4f} m，与粗搜细化解相对偏差 {c['certify_j_rel_dev']:.1e}")
     if "analytic_vs_shapely" in c:
         v = c["analytic_vs_shapely"]
         print(f"  {ok(v['impl_max_abs_rel_dev'] < 1e-9)} 四边形构造 vs shapely："
@@ -130,6 +167,13 @@ def print_report(result: SolveResult, figure: Optional[Path] = None,
               f"（另有圆域截断 {v['n_clipped']} 例、近共线 {v['n_degenerate']} 例按规则跳过）")
         print(f"  {ok(v['formula_frac_below_1pct'] > 0.95)} 一阶公式（论文引用）：中位偏差 "
               f"{v['formula_median_rel_dev']:.3%}，<1% 占 {v['formula_frac_below_1pct']:.0%}")
+    if "theory_closed_forms" in c:
+        tv = c["theory_closed_forms"]
+        print(f"  {ok(tv['closed_vs_eigen_max_rel_dev'] < 1e-9)} 文献闭式 vs 数值特征值："
+              f"最大相对偏差 {tv['closed_vs_eigen_max_rel_dev']:.1e}（{tv['n_used']} 个有效样本）")
+        print(f"  {ok(tv['minimax_closed_median_rel_dev'] < 0.01)} 本文闭式 vs 精确最坏半径："
+              f"中位 {tv['minimax_closed_median_rel_dev']:.2%}；文献 GDOP 类判据中位偏差 "
+              f"{tv['gdop_vs_exact_median_rel_dev']:+.1%}（低估，故不作保险判据）")
     for p in list(files) + ([figure] if figure else []):
         print(f"  → {p}")
 

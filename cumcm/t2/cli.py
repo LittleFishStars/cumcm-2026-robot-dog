@@ -60,17 +60,20 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
     figure: Optional[Path] = None
     if not args.no_plot:
-        from cumcm.t2.plotting import draw_suitability
+        from cumcm.t2.plotting import draw_criteria, draw_suitability
 
         pdf_path = args.save_dir / cfg.FIGURE_PDF
         figure = draw_suitability(args.save_dir / cfg.FIGURE_PNG, result, pdf_path=pdf_path)
+        draw_criteria(args.save_dir / cfg.CRITERIA_PNG, result,
+                      pdf_path=args.save_dir / cfg.CRITERIA_PDF)
     if args.quiet:
         print(result.summary())
         print(f"结果：{files['json']}" + (f"；图：{figure}" if figure else ""))
     else:
         shown = [files[k] for k in ("csv", "json") if k in files]
         if figure is not None:
-            shown += [figure, args.save_dir / cfg.FIGURE_PDF]
+            shown += [figure, args.save_dir / cfg.FIGURE_PDF,
+                      args.save_dir / cfg.CRITERIA_PNG, args.save_dir / cfg.CRITERIA_PDF]
         print_report(result, figure=figure, files=shown)
     return 0
 

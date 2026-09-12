@@ -18,7 +18,9 @@
   which carries wall-clock timestamps. Expect a dirty tree after a run; the committed artifacts are
   the **latest** run, so refresh them deliberately rather than mixing runs.
 - The old `figures/` directory and the `figures_t4*.py` / `T4_figures.py` generators were deleted at
-  the user's request; paper figures now come from `paper/*/` (TikZ/LaTeX) and `paper/t2/figures/`.
+  the user's request; paper figures now live with their paper: `paper/t2/figures/` (written by `T2.py`)
+  and `paper/t4/figures/` (written by `paper/t4/make_figures.py`, which reads `results/t4/` and never
+  hard-codes a number). Regenerate after a rerun with `.venv/bin/python paper/t4/make_figures.py`.
 
 ## Setup / environment
 
@@ -41,6 +43,9 @@
 - `uv run python -m cumcm.t3.covering` — cover-layout self-check (rotation/selection/min-circle).
 - `uv run python T4.py --plan-only` — solve the 20 measurement positions + hearing-rate statistics
   (~2 s; writes `results/t4/t4_sweep_plan.json` + `t4_sweep_points.csv`).
+- `uv run python T4.py --practice 20 --seed 0 --layout-file <layout.npy> --save-dir <dir>` — benchmark
+  an alternative measurement layout with the same harness (used for the paper's layout verdict table;
+  `drv_speed.py --layout-file` is the lighter-weight variant).
 - `uv run python -m cumcm.t4.sweep` — problem 4 scan self-check (batched hearing predicate vs the
   single-case reference, then the 4.2 M-case statistics without touching any simulator).
 - `uv run python -m cumcm.analysis.undefined_names` — static scan of every repo `.py` for names read

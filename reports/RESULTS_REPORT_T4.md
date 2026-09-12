@@ -242,7 +242,7 @@ seed16=12/12(5580s)   seed17=14/14(6209s)   seed18=11/11(7133s)   seed19=15/15(6
 
 结论：扫描 17.0 km（检测必须）与 no_signal 试探（检测保证，每位置必测未听频道）合计约占总
 时间的 90%，本质不可压缩；其余顺路/收尾机动已在上表逐项优化至实测极值。**6 445 s ≈ 时间下界
-的实现值**（20 点定案；同轮 23 点版 6 930 s，多 3 个内部补点的测向代价）。顺带修复一个健壮性 bug：
+的实现值**（20 点定案；新参数下同口径对拍 23 点版 6 688 s，多 3 个内部补点的测向代价）。顺带修复一个健壮性 bug：
 `_nearest_order` 对空输入（某局扫描即全清、收尾无剩余）会崩溃，现已空输入直接返回。
 
 **时间成本的说明。** 问题四虚拟总耗时（≈ 107 min）高于问题三（≈ 60 min）：17.0 km 的扫描行驶是
@@ -260,10 +260,18 @@ seed16=12/12(5580s)   seed17=14/14(6209s)   seed18=11/11(7133s)   seed19=15/15(6
 | `results/t4/trajectory/ep<局数>_seed<seed>.png` + `.csv` | 每局总轨迹图与同名轨迹表（只保留最新一局） |
 | `results/t4/scan/ep<局数>_seed<seed>_sKK_<步骤名>.png` | 每步扫描结果图（最新一局，20 张：起点全频道扫描 + 19 个测量位置） |
 
-论文图不在本仓库生成：`paper/t4/` 用 TikZ/LaTeX 直接绘制（扫描布局、迎光/背光示意、时间构成
-等），数据取自 `results/t4/*.json|csv`。早期的 `figures/` 目录与 `T4_figures.py`
-（`cumcm/analysis/figures_t4.py`）已按用户要求删除；`paper/t4/` 里若仍引用
-`../figures/fig_t4_*.pdf`，那些 PDF 需重新绘制（见 `reports/VERIFY_REPORT.md` 的说明）。
+论文图由 `paper/t4/make_figures.py` 生成到 `paper/t4/figures/`（8 张：扫描布局、迎光/背光示意、
+逐局清除数、首次听到步骤、定位误差、时间构成、NN 布局对照、NN 耗时对照）。脚本只读当前产物
+（`results/t4/t4_survey.json`、`t4_sweep_plan.json`、`.nn_*` 与 `.nn_arm_speed.json`）并在
+`build_sweep_plan()` 上取定案布局，**图里的数字不写死**，重跑后重新执行即可自动同步：
+
+```bash
+.venv/bin/python paper/t4/make_figures.py
+```
+
+布局对照（人工 20 / 人工 23 / NN 12 外圈 / NN 11 外圈 / NN 自由）的统一口径实测汇总在
+`results/t4/.nn_arm_speed.json`，点集见其 `note`；重跑方式：
+`T4.py --practice 20 --seed 0 --layout-file <布局.npy> --save-dir <临时目录>`。
 
 ## 7. 复现
 

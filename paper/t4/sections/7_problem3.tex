@@ -17,10 +17,10 @@
     \textbf{指标} & \textbf{数值} & \textbf{备注} \\
     \midrule
     清除比例 & $\mathbf{256/256 = 100\%}$ & 20/20 局全部清完，0 失败 \\
-    平均虚拟总耗时 & $6850$ s & $\approx 114$ min，逐局 $5615$--$8270$ s \\
-    平均里程 & $26\,242$ m & 其中检测扫描 $17\,019$ m \\
-    平均测向 & $251$ 次/局 & 顺路清除尝试 $11.5$ 个（命中 $7.8$ + 未中 $3.6$） \\
-    定位误差 & 均值 $7.27$ m & 最差单源 $19.80$ m，全部 $\le 20$ m \\
+    平均虚拟总耗时 & $6445$ s & $\approx 107$ min，逐局 $5580$--$7861$ s \\
+    平均里程 & $24\,392$ m & 其中检测扫描 $16\,996$ m \\
+    平均测向 & $247$ 次/局 & 顺路清除尝试 $8.6$ 个（命中 $7.1$ + 未中 $1.5$） \\
+    定位误差 & 均值 $7.66$ m & 最差单源 $19.67$ m，全部 $\le 20$ m \\
     首次听到步骤 & $\le 19$ & 共 20 个测量位置，最晚第 19 步 \\
     \bottomrule
   \end{tabular}
@@ -28,33 +28,33 @@
 
 \begin{figure}[H]
   \centering
-  \includegraphics[width=0.78\textwidth]{../figures/fig_t4_episode_clear.pdf}
+  \includegraphics[width=0.78\textwidth]{figures/fig_t4_episode_clear.pdf}
   \caption{20 局清除数（$256/256$）与各局虚拟时间。}
   \label{fig:clear}
 \end{figure}
 
 \begin{figure}[H]
   \centering
-  \includegraphics[width=0.78\textwidth]{../figures/fig_t4_first_heard.pdf}
+  \includegraphics[width=0.78\textwidth]{figures/fig_t4_first_heard.pdf}
   \caption{听到率实证：全部 $256$ 个源在扫描第 $\le 19$ 步内首次听到。}
   \label{fig:firstheard}
 \end{figure}
 
 \begin{figure}[H]
   \centering
-  \includegraphics[width=0.78\textwidth]{../figures/fig_t4_localization_error.pdf}
-  \caption{清除点定位误差：均值 $7.27$ m，全部落在 $20$ m 清除半径内。}
+  \includegraphics[width=0.78\textwidth]{figures/fig_t4_localization_error.pdf}
+  \caption{清除点定位误差：局均 $7.66$ m，全部落在 $20$ m 清除半径内。}
   \label{fig:locerr}
 \end{figure}
 
 逐局明细（seed : 清除数/源数（虚拟秒））：
 
 \begin{quote}\small
-\texttt{seed0=16/16(7281s)  seed1=11/11(7277s)  seed2=16/16(8129s)  seed3=11/11(6510s)}\\
-\texttt{seed4=11/11(5615s)  seed5=14/14(6305s)  seed6=16/16(8270s)  seed7=12/12(6718s)}\\
-\texttt{seed8=11/11(6734s)  seed9=13/13(7409s)  seed10=14/14(5750s) seed11=13/13(6742s)}\\
-\texttt{seed12=13/13(7288s) seed13=12/12(7002s) seed14=10/10(6626s) seed15=11/11(5982s)}\\
-\texttt{seed16=12/12(5664s) seed17=14/14(7086s) seed18=11/11(7533s) seed19=15/15(7070s)}
+\texttt{seed0=16/16(6238s)  seed1=11/11(6544s)  seed2=16/16(6585s)  seed3=11/11(6246s)\\
+seed4=11/11(5648s)  seed5=14/14(6064s)  seed6=16/16(7166s)  seed7=12/12(7080s)\\
+seed8=11/11(6217s)  seed9=13/13(7861s)  seed10=14/14(5966s)  seed11=13/13(6212s)\\
+seed12=13/13(6582s)  seed13=12/12(6486s)  seed14=10/10(6191s)  seed15=11/11(6027s)\\
+seed16=12/12(5580s)  seed17=14/14(6209s)  seed18=11/11(7133s)  seed19=15/15(6859s)}
 \end{quote}
 
 \subsection{"方向不对"的实证}
@@ -64,7 +64,7 @@ seed 0 频道 6：该源在第 $0$--$19$ 个测量位置的多次测量中全部
 随后一次清除成功。若没有 12 个外圈测量点，这个源会被当成"不存在"而漏掉——这正是问题四
 检测布局的意义。
 
-\subsection{时间构成与 6850 s 下界}
+\subsection{时间构成与 6445 s 下界}
 
 虚拟时间构成（图~\ref{fig:cost}）：移动 $\sim 78\%$（其中检测扫描 $17.0$ km 为检测必须、
 约 $54\%$）、测向 $\sim 17\%$（大半是"每个测量位置测未听频道"的必需试探）、清除
@@ -72,13 +72,13 @@ $\sim 5\%$。前两项合计约 $90\%$ 本质不可压缩。
 
 \begin{figure}[H]
   \centering
-  \includegraphics[width=0.78\textwidth]{../figures/fig_t4_cost.pdf}
+  \includegraphics[width=0.78\textwidth]{figures/fig_t4_cost.pdf}
   \caption{时间构成：17.0 km 检测扫描行驶为固定搜索成本。}
   \label{fig:cost}
 \end{figure}
 
 在此约束下逐个尝试可调旋钮（2--20 局同 seed 对拍，表~\ref{tab:knobs}），收敛到
-$6850$ s 的实测时间下界。
+$6445$ s 的实测时间下界。
 
 \begin{table}[H]
   \centering
@@ -98,9 +98,9 @@ $6850$ s 的实测时间下界。
   \end{tabular}
 \end{table}
 
-\textbf{结论：$6850$ s $\approx$ 时间下界的实现值}（20 点定案；曾定案的 23 点版 $6930$ s，
+\textbf{结论：$6445$ s $\approx$ 时间下界的实现值}（20 点定案；曾定案的 23 点版 $6688$ s，
 多 3 个内部补点的测向代价。题目时限约束的是现实时钟——测试窗口 25 min / 程序 20 min——
-与虚拟 100 h 上限；模拟器即时演算，114 min 虚拟时间在现实秒级内跑完，不构成超时）。
+与虚拟 100 h 上限；模拟器即时演算，107 min 虚拟时间在现实秒级内跑完，不构成超时）。
 
 \subsection{神经网络独立交叉验证}
 
@@ -110,7 +110,7 @@ $6850$ s 的实测时间下界。
 
 \begin{figure}[H]
   \centering
-  \includegraphics[width=0.95\textwidth]{../figures/fig_t4_nn_layout_compare.png}
+  \includegraphics[width=0.95\textwidth]{figures/fig_t4_nn_layout_compare.png}
   \caption{神经网络搜索布局 vs 人工定案布局对比（左侧人工 20 点；右侧神经网络自由搜索
   布局——外圈点不均匀、路线更长）。}
   \label{fig:nn_compare}
@@ -118,8 +118,8 @@ $6850$ s 的实测时间下界。
 
 \begin{figure}[H]
   \centering
-  \includegraphics[width=0.95\textwidth]{../figures/fig_t4_nn_speed_compare.png}
-  \caption{各布局 20 局实测平均虚拟时间：人工 20 点版 $6850$ s 为最小，神经网络全部尝试
+  \includegraphics[width=0.95\textwidth]{figures/fig_t4_nn_speed_compare.png}
+  \caption{各布局 20 局实测平均虚拟时间：人工 20 点版 $6445$ s 为最小，神经网络全部尝试
   （自由、12 外圈、11 外圈）均更慢。}
   \label{fig:nn_speed}
 \end{figure}
@@ -132,16 +132,16 @@ $6850$ s 的实测时间下界。
     \toprule
     \textbf{布局} & \textbf{位置数} & \textbf{听率} & \textbf{20 局平均虚拟时间} \\
     \midrule
-    人工 23 点（历史候选）          & 23 & $99.9974\%$ & $6930$ s \\
-    \textbf{人工 20 点版（定案）}   & 20 & $99.9884\%$ & $\mathbf{6850}$ s \\
-    神经网络 12 外圈（非均匀摆位）  & 20 & $99.93\%$   & $7318$ s \\
-    神经网络 11 外圈（非均匀摆位）  & 19 & $99.81\%$   & $7079$ s \\
-    神经网络自由 20 位置            & 20 & $99.86\%$   & $\approx 7.7$--$8.2$ ks（2 局初判） \\
+    人工 23 点（历史候选）          & 23 & $99.9974\%$ & $6688$ s \\
+    \textbf{人工 20 点（定案）}     & 20 & $99.9891\%$ & $\mathbf{6445}$ s（$256/256$）\\
+    神经网络 12 外圈（非均匀摆位）  & 20 & $99.9218\%$ & $6947$ s（$256/256$）\\
+    神经网络 11 外圈（非均匀摆位）  & 19 & $99.7778\%$ & $6724$ s（$\mathbf{255/256}$，漏 1 源）\\
+    神经网络自由 23 位置            & 23 & $99.9419\%$ & $7697$ s（2 局：6960 / 8433 s）\\
     \bottomrule
   \end{tabular}
 \end{table}
 
-\textbf{结论}：神经网络独立搜索证伪了"存在更短耗时布局"的假设——听率是隐性时间成本（听率
-每低一个数量级，漏源成为特定区域系统性覆盖缺失，收尾专程移动暴涨；NN 布局实测总里程
-$28$--$32$ km vs 人工 $26.6$ km），且均匀对称外圈已是顺路清除路径的实战极值。这使
-$6850$ s 的下界可信，也最终确立了第~\ref{sec:detect} 节的 20 点定案布局。
+\textbf{结论}：神经网络独立搜索证伪了"存在更短耗时布局"的假设——听率是隐性时间成本：听率从
+$99.9891\%$ 降到 $99.7778\%$（11 外圈）时，20 局演练里\textbf{真的有 1 个源始终没被听到、$255/256$
+漏清}；NN 布局实测总里程 $25.4$--$29.6$ km 也高于人工的 $24.4$ km。可见均匀对称外圈已是顺路清除
+路径的实战极值。这使 $6445$ s 的下界可信，也最终确立了第~\ref{sec:detect} 节的 20 点定案布局。

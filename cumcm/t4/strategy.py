@@ -34,8 +34,8 @@ from cumcm.common.sim_client import RecordedSim
 from cumcm.t4.config import (BEARING_ERROR_DEG, CHANNELS, CLEAR_RADIUS, CLIP_ERR,
                              CLIP_SIDES, HOMING_CAP, HOMING_MAX, HOMING_STEP,
                              K_CLEAR_MAX, K_COVER_SAMPLES, K_COVER_STEP_MIN, NEAR_RADIUS,
-                             OBS_CAP, RECEIVE_MAX, REFINE_MAX, REGION_MARGIN, REGION_RADIUS,
-                             SAFETY_MARGIN, SWEEP_OPP_RADIUS, TOL, TRY_CLEAR_RADIUS)
+                             OBS_CAP, RECEIVE_MAX, REFINE_MAX, REGION_MARGIN, REGION_RADIUS, SAFETY_MARGIN,
+                             SIDE_SCAN_DIAM, SWEEP_OPP_RADIUS, TOL, TRY_CLEAR_RADIUS)
 from cumcm.t4.probing import hypothesis_points, probe_candidates
 from cumcm.t4.regions import DirProbRegion, Meas, Obs
 from cumcm.t4.sweep import SweepPlan
@@ -50,7 +50,9 @@ class RobotDog:
     测量点；每点对"未听到过的频道"测向（近距就地清除），保证任何源都被听到 ≥ 1 次；
     顺路对估计附近的频道补测第二/第三视角。
 
-    阶段二（定位与清除）：对扫描结束时已听到的每个频道，四级清除：
+    阶段二（定位与清除）：对扫描结束时已听到的每个频道，四级清除；**每次清除动作后
+    顺路补测**所有"直径比较大（> 200 m）且观测未满"的未清频道（多视角缩小定位区域，
+    见 _side_scan）：
       1. 就近试清（走到定位区域最小覆盖圆圆心直接 /clear 一次，未命中就地复测）；
       2. 多清几次（K 个半径 20 m 的圆盖满区域外，依次补清）；
       3. 按文献准则补测缩小区域后再清（含单射线局面）；
@@ -79,6 +81,9 @@ class RobotDog:
         self.vt = 0.0
         self.n_measure = 0
         self.n_clear = 0
+        self.n_side_scan = 0        # 清除动作时对"直径大频道"的顺路补测次数
+        self.n_side_cand = 0        # 顺路补测候选数（直径大且未满且够近）
+        self.n_side_skip_far = 0    # 因距估计点 >1500m 必然无信号而跳过的候选
         self.episode = episode
         self.deadline = float("inf")
         self.travel_m = 0.0
@@ -410,12 +415,49 @@ class RobotDog:
             p = np.array(nxt, dtype=float)
         return False
 
+    def _side_scan(self, exclude: int) -> None:
+        """清除动作时顺路补测：对所有"直径比较大"（定位区域未收敛）的未清频道测一次。
+
+        定向源只能迎光侧测向，多视角交会定位更宝贵；在每次计划性清除尝试前，把当前
+        仍"不确定"（最小覆盖圆直径 > SIDE_SCAN_DIAM）且示向度条数未满（< OBS_CAP）的
+        频道各补测一条，用当前这个路过的位置换一个新视角，缩小它们的可能区域，让
+        后续清除更省（减少文献补测 / 兜底逼近）。
+        """
+        if self._out_of_time():
+            return
+        for c in sorted(self.obs):
+            if c == exclude or c in self.cleared:
+                continue
+            if len(self.obs[c]) >= OBS_CAP:
+                continue
+            if self.diameter(c) <= SIDE_SCAN_DIAM:
+                continue
+            if self._provable_no_signal(c, self.pos):
+                self.n_side_skip_far += 1
+                continue
+            self.n_side_cand += 1
+            self.stage = "clear"
+            d0 = self.diameter(c)
+            r = self.measure(self.pos[0], self.pos[1], c)
+            res = r.get("measure_result", "no_signal")
+            self.n_side_scan += 1
+            if res == "direction":
+                self.log(f"    [顺路补测] 频道{c} @ ({self.pos[0]:.1f}, {self.pos[1]:.1f})："
+                         f"直径 {d0:.0f} → {self.diameter(c):.0f} m，新视角 +1")
+            elif res == "near" and self.clear(self.pos[0], self.pos[1], c):
+                self.log(f"    [顺路补测] 频道{c}：源就在 5 m 内，就地清除成功")
+                self.tracks.setdefault(c, {})["method"] = "near@side"
+            # no_signal 对定向源不构成硬约束（可能背光），无新增区域信息，正常跳过
+
     def _try_clear(self, channel: int, tag: str) -> Optional[str]:
         mec = self.region(channel).enclosing_circle
         if mec is None:
             return None
         cx, cy, r = mec
-        if self.clear(cx, cy, channel):
+        hit = self.clear(cx, cy, channel)   # 到达清除点并尝试清除（成败都会更新 self.pos）
+        # 每次清除动作后在清除点顺路补测"直径比较大"的其它频道（多视角缩小其定位区域）
+        self._side_scan(channel)
+        if hit:
             self.tracks.setdefault(channel, {})["clear_radius_m"] = round(r, 3)
             self.log(f"    [清除] 频道{channel} @ ({cx:.1f}, {cy:.1f}) 命中，"
                      f"最小覆盖圆半径 {r:.2f} m")
@@ -588,6 +630,9 @@ class RobotDog:
             "first_heard": dict(self.first_heard),
             "n_refined": sum(1 for r in self.tracks.values() if r.get("n_probe")),
             "n_probe": sum(int(r.get("n_probe", 0)) for r in self.tracks.values()),
+            "n_side_scan": self.n_side_scan,
+            "n_side_cand": self.n_side_cand,
+            "n_side_skip_far": self.n_side_skip_far,
             "methods": {m: sum(1 for r in self.tracks.values() if r.get("method") == m)
                         for m in ("try", "try-refined", "multi", "near", "homing",
                                   "survey-near", "near@center", "near@probe", "failed")},

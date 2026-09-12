@@ -334,7 +334,12 @@ class RobotDog:
         return np.asarray(pts, dtype=float)
 
     def _nearest_order(self, channels: Sequence[int]) -> List[int]:
-        """精确最短开放路径定序（Held-Karp；见 cumcm.t3.strategy 同名列注释）。"""
+        """精确最短开放路径定序（Held-Karp；见 cumcm.t3.strategy 同名列注释）。
+
+        空输入直接返回空（r0 顺路清除后可能出现"扫描即全清、收尾无剩余"的局）。
+        """
+        if not channels:
+            return []
         pts = self._clear_points(channels)
         idx = exact_open_order(len(channels), dist_matrix(pts, self.pos))
         return [channels[int(i)] for i in idx]

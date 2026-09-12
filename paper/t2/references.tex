@@ -1,0 +1,27 @@
+% 参考文献。注意：main.tex 中 \referencescn 已通过 thebibliography 自动生成
+% “参考文献”一级标题（不带编号），并已 \addcontentsline 进入目录，
+% 所以本文件**不要再写一级标题**，否则会出现两个“参考文献”标题。
+
+\begin{thebibliography}{99}
+\bibitem{cumcm2026b} 全国大学生数学建模竞赛组委会. 2026 年高教社杯全国大学生数学建模竞赛 B 题：
+                    机器狗搜索与清除干扰源[Z]. 2026.
+\bibitem{foy1976} W. H. Foy. Position-Location Solutions by Taylor-Series Estimation[J].
+                  IEEE Transactions on Aerospace and Electronic Systems, 1976, AES-12(2): 187--194.
+                  （几何稀释：两条示向度夹角过小时定位误差沿角平分线方向被放大，且在该夹角
+                  区间内增设测线亦不能改善）
+\bibitem{chan1994} Y. T. Chan, K. C. Ho. A Simple and Efficient Estimator for Hyperbolic
+                   Location[J]. IEEE Transactions on Signal Processing, 1994, 42(8): 1905--1915.
+                   （几何精度因子较差时，最小二乘类定位估计显著退化，可用于说明必须避开退化构型）
+\bibitem{ren2016} 任叶童. 基于到达角信息的无源定位算法研究[D]. 天津: 天津大学电子信息工程学院,
+                  2016. （第 2.4 节：双站测向定位误差概率椭圆的半轴与面积公式，即本文
+                  式~\eqref{eq:crlb} 的 $1\sigma$ 形式）
+\bibitem{chen2009} X. Chen, Z. Xu, L. Rui. An Optimization Algorithm of Multi-Observer
+                   Trajectories for Cooperative Bearings-Only Target Localization[C].
+                   Proceedings of ICICS 2009. IEEE, 2009.
+                   （观测点优化中"靠近目标"与"改善方位分布"的权衡关系，以及以期望位置误差
+                   为指标的口径）
+\bibitem{proj} 本题求解代码与全部数值复现：\texttt{cumcm/t2/} 为问题二的模型、算法、文献判据层
+              与制图实现（顶层入口 \texttt{T2.py}）；结论与自校验数值见
+              \texttt{results/t2/t2\_second\_site.json}，逐格适合度见
+              \texttt{results/t2/t2\_suitability.csv}. 2026.
+\end{thebibliography}

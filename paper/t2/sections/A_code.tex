@@ -1,0 +1,68 @@
+\vspace{1.1em}
+
+核心代码见 \texttt{cumcm/t2/}~\cite{proj}（模型、算法、文献判据层与制图），以下列出最关键的三个部分：
+楔形交定位区域的直径、最坏情况代价函数、以及文献闭式判据。
+
+\begin{lstlisting}[language=Python]
+# cumcm/t2/region.py —— 定位四边形（两条 ±1° 边界射线之交）的直径，向量化
+def quad_diameters(site, theta1, sx, sy, theta2, err_deg=BEARING_ERROR_DEG,
+                   sentinel=DIAM_SENTINEL):
+    """区域是凸的，故直径 = 候选顶点两两距离的最大值；近共线时返回哨兵值。"""
+    P, keep = _candidate_points(site, theta1, sx, sy, theta2, err_deg)
+    best = np.zeros(np.shape(sx), dtype=float)
+    for i in range(P.shape[0]):
+        for j in range(i + 1, P.shape[0]):
+            d = np.hypot(P[i][..., 0] - P[j][..., 0], P[i][..., 1] - P[j][..., 1])
+            best = np.maximum(best, np.where(keep[i] & keep[j], d, 0.0))
+    return np.where(np.isnan(best), sentinel, best)
+
+def analytic_diameter(d, r2, gamma_deg, err_deg=BEARING_ERROR_DEG):
+    """一阶解析式:(2*eps/sin(gamma))*sqrt(d^2 + r2^2 + 2*d*r2*|cos(gamma)|)，仅用于解释趋势。"""
+    g = math.radians(gamma_deg)
+    return (2.0 * math.radians(err_deg) / math.sin(g)) * math.sqrt(
+        d * d + r2 * r2 + 2.0 * d * r2 * abs(math.cos(g)))
+\end{lstlisting}
+
+\begin{lstlisting}[language=Python]
+# cumcm/t2/score.py —— 最坏定位直径 J(S2)：源采样 × 第二次测向误差的两层 max
+def worst_case_diameters(site, sx, sy, theta1, sources, deltas2,
+                         err_deg=cfg.BEARING_ERROR_DEG, reduce="max"):
+    """reduce='max' 为本文 minimax 口径；'mean' 为文献常用的期望口径（用于对照）。"""
+    sx, sy = np.asarray(sx, float).ravel(), np.asarray(sy, float).ravel()
+    best = np.zeros(sx.shape, dtype=float)
+    for gx, gy in np.asarray(sources, dtype=float):            # 源在楔形内何处
+        w2 = np.degrees(np.arctan2(gy - sy, gx - sx)) % 360.0  # 第二次测向的名义方向
+        for d2 in np.asarray(deltas2, dtype=float):            # 第二次测向误差
+            best = np.maximum(best, quad_diameters(site, theta1, sx, sy, w2 + d2, err_deg))
+    return best
+\end{lstlisting}
+
+\begin{lstlisting}[language=Python]
+# cumcm/t2/theory.py —— 文献闭式判据（与数值特征分解对账，最大相对偏差 1.4e-12）
+def gdop(d, r2, gamma_deg, err_deg=cfg.BEARING_ERROR_DEG):
+    """GDOP = sigma*sqrt(R1^2+R2^2)/sin(gamma)（由 tr H、det H 直接得到）。"""
+    return math.radians(err_deg) * math.sqrt(d * d + r2 * r2) / math.sin(math.radians(gamma_deg))
+
+def crlb_major(d, r2, gamma_deg, err_deg=cfg.BEARING_ERROR_DEG):
+    """CRLB 误差椭圆主半轴:sqrt(2)*sigma*R1*R2 / sqrt(R1^2+R2^2-sqrt((R1^2+R2^2)^2-4*R1^2*R2^2*sin(gamma)^2))。"""
+    g, s = math.radians(gamma_deg), math.radians(err_deg)
+    a = d * d + r2 * r2
+    delta = math.sqrt(max(a * a - 4.0 * d * d * r2 * r2 * math.sin(g) ** 2, 0.0))
+    return math.sqrt(2.0) * s * d * r2 / math.sqrt(a - delta)
+
+def minimax_radius(d, r2, gamma_deg, err_deg=cfg.BEARING_ERROR_DEG):
+    """本文集员闭式的半径 = 一阶解析直径的一半。"""
+    return 0.5 * analytic_diameter(d, r2, gamma_deg, err_deg)
+\end{lstlisting}
+
+完整可复现命令（结果为确定性输出，两次运行逐字节一致；论文图由程序输出后复制到
+\texttt{paper/t2/figures/}）：
+
+\begin{verbatim}
+.venv/bin/python T2.py                 # 求解 + 两张成果图（约 15 s）
+.venv/bin/python T2.py --eta 0.05      # 候选区域收紧到 1.05 J*
+.venv/bin/python T2.py --no-plot       # 只出数值与 CSV/JSON
+.venv/bin/python T2.py --site 200 -300 --bearing 45   # 换检测点
+.venv/bin/python -m cumcm.t2.region    # 几何自检（解析 vs 精确）
+.venv/bin/python -m cumcm.t2.theory    # 文献判据自检
+\end{verbatim}

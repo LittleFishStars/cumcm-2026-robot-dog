@@ -1,9 +1,9 @@
 """单步扫描结果图：把"某一步扫描"看到的信息单独画成一张图。
 
 **为什么要逐步骤出图**：一整局的轨迹图信息密度太高 —— 上百次测向、几十次清除尝试全部挤在
-一张 3600 m 见方的圆域里，看不清"某一步到底听到了什么、哪些频道还是空白、当前估计收缩到
-什么程度"。而策略的全部信息都来自这一步步扫描，所以每步单独出图既能讲清"信息是怎么积累
-起来的"，也便于逐站复核（图上每个点都能与过程日志、api_calls.jsonl 对上）。
+一张 3600 m 见方的圆域里，看不清"某一步到底听到了什么、哪些频道还是空白"。而策略的全部
+信息都来自这一步步扫描，所以每步单独出图既能讲清"信息是怎么积累起来的"，也便于逐站复核
+（图上每个点都能与过程日志、api_calls.jsonl 对上）。
 
 **一步扫描是什么**：机器狗停在某个位置，把"尚未采够示向度且未清除"的频道按频道号升序测
 一遍。T3 的一步 = 起点全频道扫描 + 每个巡视站各一次。
@@ -26,7 +26,7 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
 
-from cumcm.common.plotting import (C_COVER, C_DIR, C_FRAME, C_HIT, C_MEAS, C_NEAR,
+from cumcm.common.plotting import (C_COVER, C_DIR, C_FRAME, C_HIT, C_NEAR,
                                    C_NOSIG, C_PATH, C_SRC, C_TRY, font_context, save_png,
                                    setup_mpl_env)
 
@@ -218,30 +218,9 @@ def draw_scan_step(out_path: Path, step: ScanStep, *,
                 handles.append(Line2D([], [], marker="^", ms=6.5, ls="none", mfc="none",
                                       mec=C_TRY, mew=1.3, label=f"清除未中（{bad} 次）"))
 
-        # 本步结束时的估计：定位估计的 1σ 圆
-        if step.estimates:
-            for ch, (ex, ey, sigma) in sorted(step.estimates.items()):
-                ax.plot(ex + sigma * cos_th, ey + sigma * sin_th, color=C_MEAS, lw=0.8,
-                        alpha=0.8, zorder=6.5)
-                ax.plot([ex], [ey], marker="+", ms=7, mew=1.4, ls="none", color=C_MEAS,
-                        zorder=6.6)
-            handles.append(Line2D([], [], color=C_MEAS, lw=0.8,
-                                  label=f"定位估计 1σ（{len(step.estimates)} 个频道）"))
-        if step.regions:
-            widths = []
-            for ch, ring in sorted(step.regions.items()):
-                pts = list(ring)
-                if len(pts) < 3:
-                    continue
-                arr = np.asarray(pts + [pts[0]], dtype=float)
-                ax.plot(arr[:, 0], arr[:, 1], color=C_MEAS, lw=0.8, alpha=0.7, zorder=5.5)
-                # 区域"宽度"取包围盒对角线：用来量化"信息收缩到什么程度"（逐步对比即可看到
-                # 从几百米收到几十米）。用包围盒而非精确直径，是画图取值的廉价近似。
-                widths.append(float(np.hypot(np.max(arr[:, 0]) - np.min(arr[:, 0]),
-                                             np.max(arr[:, 1]) - np.min(arr[:, 1]))))
-            med = float(np.median(widths)) if widths else 0.0
-            handles.append(Line2D([], [], color=C_MEAS, lw=0.8, alpha=0.7,
-                                  label=f"可能源区域（{len(widths)} 个频道，中位宽 {med:.0f} m）"))
+        # 本步结束时的估计：按用户要求（2026-09-12）不画"定位估计 1σ 圆 / 中心十字 / 可能源
+        # 区域轮廓"——橙黄圈与示向度射线混在一张图里显得杂乱，区域/估计信息改由轨迹表与
+        # t4_survey 的逐频道档案提供。regions / estimates 数据仍在 ScanStep 里保留。
 
         # 干扰源真值（仅演练模式有）与清除半径
         if sources:

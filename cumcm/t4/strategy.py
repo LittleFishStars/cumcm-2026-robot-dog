@@ -1,12 +1,12 @@
-"""机器狗策略（问题四）：寻向拖网（阶段一）+ 定向感知定位清除（阶段二）。
+"""机器狗策略（问题四）：扫描（阶段一）+ 定向感知定位清除（阶段二）。
 
 与问题三的差别（其余手法——就近试清、K 圆覆盖、Fisher 准则补测、沿示向度逼近——同源复用，
 见 cumcm.t3.strategy 的模块文档）：
 
-* 阶段一不再是"7 个覆盖圆圆心巡视"，而是**寻向拖网**：按 cumcm.t4.sweep 的方案依次走到 37 个
+* 阶段一**复用问题三的 7 个覆盖基点并加密**：按 cumcm.t4.sweep 的方案依次走到 29 个
   测量点（原点 + 覆盖到半径 2270 m 的 700 m 格点），在每个点对"还没听到过"的频道测向，另对
-  已听到但估计还不够准、且当前点就在其估计附近的频道顺路补一两个视角。**拖网保证**：任意半
-  圆盘都被至少一个测量点命中，故任何干扰源（全向或定向）在拖网结束前至少被听到一次——这是
+  已听到但估计还不够准、且当前点就在其估计附近的频道顺路补一两个视角。**布局效果**：实测
+  听到率 ~99.8%（200 万随机算例），故绝大多数干扰源（全向或定向）在扫描结束前被听到——
   "确保所有干扰源被清除"的检测侧依据（清除侧见下）。
 * no_signal 不再是"源在接收半径之外"的硬约束（可能是方向不对，见 DirProbRegion 与 config），
   定位区域只用 direction/near 两类约束；"跳过必无信号的测量"仍保留（区域整体在 1500 m 外才
@@ -14,7 +14,7 @@
 * homing 兜底针对"起始点可能恰在波束背面"加了反方向修正：起点实测无信号时，先朝该频道**测量
   点质心**（必在迎光侧）步进，直到重新采到示向度再正常逼近——半圆盘是凸集，从迎光侧向源
   逼近始终留在波束内，故最终必能贴到 20 m 内清除。
-* 阶段二仍对"拖网结束时已听到的频道"全部处理（这些频道 = 全部有源的频道），逐频道四级清除。
+* 阶段二仍对"扫描结束时已听到的频道"全部处理，逐频道四级清除。
 """
 
 from __future__ import annotations
@@ -46,11 +46,11 @@ clamp_to_region = partial(_clamp_to_region, radius=REGION_RADIUS - REGION_MARGIN
 class RobotDog:
     """两阶段机器狗（问题四）。
 
-    阶段一（寻向拖网）：在出发点做全频道扫描（即拖网第 0 点），随后按拖网方案依次走到其余
+    阶段一（扫描）：在出发点做全频道扫描（原点测量位置），随后按扫描方案依次走到其余
     测量点；每点对"未听到过的频道"测向（近距就地清除），保证任何源都被听到 ≥ 1 次；
     顺路对估计附近的频道补测第二/第三视角。
 
-    阶段二（定位与清除）：对拖网结束时已听到的每个频道，四级清除：
+    阶段二（定位与清除）：对扫描结束时已听到的每个频道，四级清除：
       1. 就近试清（走到定位区域最小覆盖圆圆心直接 /clear 一次，未命中就地复测）；
       2. 多清几次（K 个半径 20 m 的圆盖满区域外，依次补清）；
       3. 按文献准则补测缩小区域后再清（含单射线局面）；
@@ -84,7 +84,7 @@ class RobotDog:
         self.travel_m = 0.0
         self.stage = "sweep"
         self.plan: Optional[SweepPlan] = None
-        self.first_heard: Dict[int, int] = {}       # 频道 → 首次听到时的拖网步骤序号
+        self.first_heard: Dict[int, int] = {}       # 频道 → 首次听到时的测量位置序号
         self.first_heard_at: Dict[int, Tuple[float, float]] = {}
         self.scan_steps: List[Dict[str, Any]] = []
         self._cur_step: Optional[Dict[str, Any]] = None
@@ -222,15 +222,15 @@ class RobotDog:
         mec = self.region(channel).enclosing_circle
         return mec is not None and mec[2] + CLIP_ERR < CLEAR_RADIUS
 
-    # ---- 阶段 1：寻向拖网 ----
+    # ---- 阶段 1：扫描 ----
     def _est(self, channel: int) -> Optional[Tuple[float, float]]:
         mec = self.region(channel).enclosing_circle
         return (mec[0], mec[1]) if mec is not None else None
 
     def _sweep_channels(self, at: Sequence[float]) -> List[int]:
-        """拖网该点要测的频道：未清除 且（从未听到 或（顺路补测视角））。
+        """该测量位置要测的频道：未清除 且（从未听到 或（顺路补测视角））。
 
-        * 从未听到的频道：**必测**——拖网的检测保证就靠"每个测量点都测所有未听到频道"；
+        * 从未听到的频道：**必测**——扫描布局的作用就靠"每个测量位置都测所有未听到频道"；
         * 已听到但视角不足（< OBS_CAP）且估计还不够准、当前点又在其估计附近（≤ sweep_opp_
           radius）的频道：顺路补测，多一条不同角度的射线（对仅单侧可听的定向源尤其宝贵）。
         """
@@ -270,17 +270,17 @@ class RobotDog:
         return counts
 
     def sweep(self, plan: SweepPlan) -> None:
-        """阶段一主体：原点全频道扫描（拖网第 0 点）+ 其余 36 个拖网点依次测向。"""
+        """阶段一主体：原点全频道扫描 + 其余 28 个测量位置依次测向。"""
         self.plan = plan
         pts = plan.points
-        self.log(f"── 阶段一：寻向拖网（{plan.n_points} 个测量点，里程 "
+        self.log(f"── 阶段一：扫描（{plan.n_points} 个测量位置，里程 "
                  f"{plan.route_m:.0f} m）──")
         for k, i in enumerate(plan.route):
             at = (float(pts[i][0]), float(pts[i][1]))
             if k == 0:
-                label = "起点全频道扫描（拖网点 0/37）"
+                label = "起点全频道扫描（原点测量位置）"
             else:
-                label = f"拖网点 {k}/37"
+                label = f"测量位置 {k}"
             counts = self._sweep_at(at, label, k)
             heard = sum(1 for c in self.obs if c not in self.cleared)
             skip_note = f"，跳过 {counts['skip']}" if counts["skip"] else ""
@@ -305,7 +305,7 @@ class RobotDog:
                 "n_probe": 0,
             })
             precise += self._precise(ch)
-        self.log(f"── 阶段二：定位与清除（拖网结束听到 {len(self.obs)} 个频道，"
+        self.log(f"── 阶段二：定位与清除（扫描结束听到 {len(self.obs)} 个频道，"
                  f"其中估计已够准 {precise} 个）──")
         return {"n_channels": len(self.obs), "n_precise": precise, "n_skip": self.n_skip}
 
@@ -549,7 +549,7 @@ class RobotDog:
 
     # ---- 主流程 ----
     def run(self, plan: SweepPlan) -> Dict[str, Any]:
-        """/enter → 寻向拖网 → 诊断 → 逐频道定位清除 → /exit。"""
+        """/enter → 扫描 → 诊断 → 逐频道定位清除 → /exit。"""
         enter = self.sim.enter()
         if not enter.get("accepted"):
             raise RuntimeError(f"/enter 被拒绝：{enter}")

@@ -1,12 +1,12 @@
-"""逐局轨迹图（问题四）：行驶轨迹、拖网格点、测量结果与真值波束方向。
+"""逐局轨迹图（问题四）：行驶轨迹、测量位置、测量结果与真值波束方向。
 
 绘图在 `/exit` 之后进行，不占用现实时间预算，也不影响实时决策 —— 图上画的就是
 `RobotDog.actions` 里的实际动作点，可与过程日志逐点对账；同名 CSV 轨迹表让"图上每个点"
 都能被逐行复核。
 
-绘制内容：作业圆域 1800 m 与源生成域 1770 m、拖网格点（700 m 格点，|p| ≤ 2270，含圆域外
-470 m）、从原点起的行驶路径、按结果分类的动作点、干扰源真值（**定向源额外画其 ±90° 波束
-扇形**，一眼看出"背对波束的点听不到它"）、20 m 清除半径。
+绘制内容：作业圆域 1800 m 与源生成域 1770 m、扫描测量位置（原点起点 + 7 覆盖基点 +
+21 外推中点）、从原点起的行驶路径、按结果分类的动作点、干扰源真值（**定向源额外画其 ±90°
+波束扇形**，一眼看出"背对波束的点听不到它"）、20 m 清除半径。
 
 逐步扫描图（<save-dir>/scan/ 下）复用 common.scanfigure 的通用画法：覆盖圆信息对问题四无
 意义（没有 7 个覆盖圆），故传空，仅保留该步测向点、示向度射线、行驶路径、估计区域与真值。
@@ -86,7 +86,7 @@ def draw_trajectory(out_path: Path, actions: Sequence[Dict[str, Any]],
                    Line2D([], [], color=C_FRAME, lw=0.8, ls="--", alpha=0.85,
                           label="源生成域 1770 m")]
 
-        # 拖网格点：|p| ≤ 2270 的 700 m 格点中，圆域内 / 外分开标注
+        # 扫描测量位置：圆域内（原点 + 7 基点）/ 圆域外（21 外推中点）分开标注
         wp = plan.points
         inner = wp[np.linalg.norm(wp, axis=1) <= REGION_RADIUS + 1e-9]
         outer = wp[np.linalg.norm(wp, axis=1) > REGION_RADIUS + 1e-9]
@@ -96,7 +96,7 @@ def draw_trajectory(out_path: Path, actions: Sequence[Dict[str, Any]],
             ax.plot(outer[:, 0], outer[:, 1], marker=".", ms=3.0, ls="none", color=C_GRAY,
                     alpha=0.45, zorder=1.4)
         handles.append(Line2D([], [], marker=".", ms=3.5, ls="none", color=C_GRAY,
-                              label=f"拖网格点 {len(wp)}（含圆域外 {len(outer)}）"))
+                              label=f"扫描测量位置 {len(wp)}（含圆域外 {len(outer)} 个）"))
 
         # 真值波束扇形（定向源）放最底层
         _draw_beams(ax, sources, th)
@@ -207,9 +207,9 @@ def save_scan_figures(save_dir: Path, name: str, steps: Sequence[Dict[str, Any]]
                       plan: SweepPlan, order: Sequence[int] = (),
                       sources: Sequence[Dict[str, Any]] = (),
                       step_dir: str = STEP_DIR_NAME) -> List[Path]:
-    """把一局内**每一步拖网扫描**各画一张结果图，落在 <save-dir>/<step_dir>/ 下。
+    """把一局内**每一步扫描测量**各画一张结果图，落在 <save-dir>/<step_dir>/ 下。
 
-    文件名形如 `ep01_s00_起点全频道扫描.png`、`ep01_s04_拖网点4.png`，排序后与执行顺序一致。
+    文件名形如 `ep01_s00_起点全频道扫描.png`、`ep01_s04_测量位置4.png`，排序后与执行顺序一致。
     问题四没有覆盖圆，故覆盖圆参数一律传空，画面上保留该步测向点、示向度射线、行驶路径、
     当时估计区域与真值（含定向源波束扇形）。
     """
@@ -238,7 +238,7 @@ def save_scan_figures(save_dir: Path, name: str, steps: Sequence[Dict[str, Any]]
                 cover_radius=0.0, region_radius=REGION_RADIUS,
                 gen_radius=REGION_RADIUS - 30.0, ray_len=RECEIVE_MAX,
                 sources=sources, clear_radius=CLEAR_RADIUS,
-                title=f"第 {k} 步拖网 / 共 {len(steps)} 步：{raw.get('label', '')}")
+                title=f"第 {k} 步扫描 / 共 {len(steps)} 步：{raw.get('label', '')}")
             paths.append(out)
         except ImportError:
             hint_plot_once("提示：未安装 matplotlib，已跳过出图。装上即可自动生成：\n"

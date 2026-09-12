@@ -28,7 +28,7 @@ from cumcm.t4.plotting import save_scan_figures, save_trajectory, truth_points
 from cumcm.t4.report import (episode_row, observation_rows, save_plan, save_survey,
                              truth_check)
 from cumcm.t4.strategy import RobotDog
-from cumcm.t4.sweep import SweepPlan, build_sweep_plan, print_sweep_report, verify_detection_guarantee
+from cumcm.t4.sweep import SweepPlan, build_sweep_plan, print_sweep_report, verify_hearing_stats
 
 
 def _api_log(args: argparse.Namespace, echo: bool):
@@ -41,14 +41,14 @@ def _episode_printer(clear: bool):
     def show(stats: dict, check: dict, n_sources: Optional[int]) -> None:
         fh = [v for v in stats["first_heard"].values()]
         worst = max(fh) if fh else 0
-        print(f"本局：拖网 {stats['travel_m']:.0f} m + 收尾，虚拟时间 {stats['virtual_time_s']:.0f} s，"
-              f"测向 {stats['n_measure']} 次；拖网结束听到 {stats['channels_heard']}/{n_sources} "
+        print(f"本局：扫描 {stats['travel_m']:.0f} m + 收尾，虚拟时间 {stats['virtual_time_s']:.0f} s，"
+              f"测向 {stats['n_measure']} 次；扫描结束听到 {stats['channels_heard']}/{n_sources} "
               f"个源（全部在拖网第 {worst} 步内听到，共 {stats['n_bearings']} 条示向度）")
         if clear:
             print(f"  清除：{stats['cleared']}/{n_sources}（平均 {stats['avg_time_s']:.1f} s/个），"
                   f"定位误差均值 {check['localize_err_mean_m']} m / 最大 "
                   f"{check['localize_err_max_m']} m；方法分布 {stats['methods']}")
-        print(f"  拖网命中核对：{check['n_heard']}/{check['n_sources']} 个源被听到"
+        print(f"  命中核对：{check['n_heard']}/{check['n_sources']} 个源被听到"
               f"（{check['all_heard']}），定位误差在清除半径内 "
               f"{check['n_within_clear_radius']} 个")
     return show
@@ -117,13 +117,13 @@ def run_practice(args: argparse.Namespace, plan: SweepPlan, verify: dict, save_d
               f"{np.mean([r['localize_err_mean_m'] for r in rows if r['localize_err_mean_m']]):.2f}"
               f" m，最差单源 "
               f"{max([r['localize_err_max_m'] for r in rows if r['localize_err_max_m']] or [0]):.2f}"
-              f" m；拖网最晚首次听到发生在第 "
+              f" m；最晚首次听到发生在第 "
               f"{max([r['worst_first_heard_step'] for r in rows if r['worst_first_heard_step'] is not None] or [0])}"
-              f" 步（共 {plan.n_points} 步）")
+              f" 步（共 {plan.n_points} 个测量位置）")
         print("逐局：" + "  ".join(f"seed{r['seed']}={r['cleared']}/{r['n_sources']}"
                                   f"({r['virtual_time_s']:.0f}s)" for r in rows))
     else:
-        print(f"汇总（{len(rows)} 局，仅拖网）：平均里程 {np.mean([r['travel_m'] for r in rows]):.0f} m，"
+        print(f"汇总（{len(rows)} 局，仅扫描）：平均里程 {np.mean([r['travel_m'] for r in rows]):.0f} m，"
               f"平均虚拟时间 {np.mean([r['virtual_time_s'] for r in rows]):.0f} s，"
               f"平均测向 {np.mean([r['n_measure'] for r in rows]):.0f} 次，"
               f"共听到 {sum(r['heard'] for r in rows)}/{sum(r['n_sources'] for r in rows)} 个源")
@@ -145,7 +145,7 @@ def run_practice(args: argparse.Namespace, plan: SweepPlan, verify: dict, save_d
 def run_official(args: argparse.Namespace, plan: SweepPlan, verify: dict, save_dir: Path) -> int:
     """官方评测接口模式：连 127.0.0.1 上已开放接口的模拟器，跑完整一局。
 
-    拿不到真值，故真值相关字段留空；拖网保证（131 万算例 0 失败）与演练里验证过的行为在
+    拿不到真值，故真值相关字段留空；扫描布局（实测听到率 ~99.8%）与演练里验证过的行为在
     正式模式同样成立。接口调用全程落盘 api_calls.jsonl —— 官方模式唯一证据链。
     """
     sim = Simulator(robot_id=args.robot_id, base_url=args.base_url, timeout=args.timeout)
@@ -157,7 +157,7 @@ def run_official(args: argparse.Namespace, plan: SweepPlan, verify: dict, save_d
         stats = dog.run(plan)
         print(f"完成：清除 {stats['cleared']} 个，里程 {stats['travel_m']:.0f} m，"
               f"虚拟时间 {stats['virtual_time_s']:.0f} s，测向 {stats['n_measure']} 次"
-              f"（补测 {stats['n_probe']} 次），拖网结束听到 {stats['channels_heard']} 个频道"
+              f"（补测 {stats['n_probe']} 次），扫描结束听到 {stats['channels_heard']} 个频道"
               f"（{stats['n_bearings']} 条示向度）")
         row = episode_row(1, None, None, dog, stats,
                           truth_check(None, plan, dog.obs, dog.cleared, dog.tracks,
@@ -190,14 +190,14 @@ def run_official(args: argparse.Namespace, plan: SweepPlan, verify: dict, save_d
 
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
-        description="2026 CUMCM B 题问题四：定向 + 全向混合干扰源的搜索与清除（寻向拖网 + 定位清除）")
+        description="2026 CUMCM B 题问题四：定向 + 全向混合干扰源的搜索与清除（扫描 + 定位清除）")
     p.add_argument("--practice", type=int, nargs="?", const=1, default=0,
                    help="本地演练局数：自动拉起 jammers-py 跑 N 局（缺省 1 局）")
     p.add_argument("--base-url", default=BASE_URL,
                    help=f"官方模拟器地址（缺省 {BASE_URL}）；不带任何参数即连它跑完一局。"
-                        f"只想看拖网方案、不连模拟器时用 --plan-only")
+                        f"只想看扫描方案、不连模拟器时用 --plan-only")
     p.add_argument("--plan-only", action="store_true",
-                   help="只求解并保存寻向拖网方案（含半圆盘命中校验），不连模拟器")
+                   help="只求解并保存扫描方案（含听到率统计），不连模拟器")
     p.add_argument("--api-log", default=None,
                    help=f"接口调用日志路径（缺省 <save-dir>/{API_LOG_NAME}；传空串关闭）")
     p.add_argument("--robot-id", default=ROBOT_ID, help="参赛队号（须与模拟器一致）")
@@ -218,7 +218,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--k-clear-max", type=int, default=K_CLEAR_MAX,
                    help=f"试清未中后最多再补清几个点（缺省 {K_CLEAR_MAX}）")
     p.add_argument("--survey-only", action="store_true",
-                   help="只做阶段一（寻向拖网），不做定位与清除")
+                   help="只做阶段一（扫描），不做定位与清除")
     p.add_argument("--traj-dir", default=TRAJ_DIR,
                    help=f"轨迹图输出子目录（相对 --save-dir；缺省 {TRAJ_DIR}）")
     p.add_argument("--no-plot", action="store_true",
@@ -228,7 +228,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
-    """按模式分派：`--practice` → 本地演练；`--plan-only` → 只求拖网方案；其余 → 官方。"""
+    """按模式分派：`--practice` → 本地演练；`--plan-only` → 只求扫描方案；其余 → 官方。"""
     relax_console_encoding()
     args = build_parser().parse_args(argv)
     official = not args.practice and not args.plan_only
@@ -240,17 +240,17 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     print("2026 CUMCM B 题 · 问题四：机器狗搜索与清除干扰源（定向 + 全向混合，确定性策略）")
     print("=" * 78)
 
-    # 第一步：求寻向拖网方案并做半圆盘命中校验（只需一次；随后所有局共用这份点集）
+    # 第一步：求扫描方案并做听到率统计（只需一次；随后所有局共用这份点集）
     plan = build_sweep_plan()
-    verify = verify_detection_guarantee(plan.points)
+    verify = verify_hearing_stats(plan.points)
     if not args.quiet:
         print_sweep_report(plan, verify)
     if not plan.verification:
-        plan = SweepPlan(spacing=plan.spacing, lattice_radius=plan.lattice_radius,
+        plan = SweepPlan(extend_k=plan.extend_k, extend_clamp=plan.extend_clamp,
                          points=plan.points, route=plan.route, route_m=plan.route_m,
                          verification=verify)
     paths = save_plan(plan, save_dir, verify)
-    print("拖网方案已保存：" + "，".join(str(p) for p in paths))
+    print("扫描方案已保存：" + "，".join(str(p) for p in paths))
 
     try:
         if args.practice:

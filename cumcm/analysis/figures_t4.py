@@ -1,13 +1,14 @@
-"""问题四论文图表：读 results/t4/（拖网方案 + 逐局统计）生成 figures/ 下的 PDF。
+"""问题四论文图表：读 results/t4/（扫描方案 + 逐局统计）生成 figures/ 下的 PDF。
 
 与 cumcm.analysis.figures（问题三）同风格：全部图在跑完演练后单独生成（不占现实时间预算），
 数据取自结果目录里的 json/csv，出图确定性（无时间戳元数据）。
 
 本模块覆盖问题四特有的几个论点：
-* 拖网布局与"内切圆定理"：37 个测量点（700 m 格点，取到半径 2270 m）如何保证命中任意半圆盘；
-* 检测保证的实证：20 局里每个源首次被听到发生在拖网的第几步（全部 ≤ 37 步）；
+* 扫描布局与"7 覆盖基点 + 21 外推中点"：如何从问题三的 7 点出发、用中点外推补上定向源的
+  边缘迎光区（实测听到率 ~99.8%，非严格保证）——这是"尽量复用问题三布局"的体现；
+* 听到率实证：20 局里每个源首次被听到发生在扫描的第几步；
 * 方向性：定向源与被漏测的"背光"情形（波束扇形示意图）；
-* 清除结果：逐局清除数/虚拟时间、定位误差分布、时间构成（拖网 vs 收尾）。
+* 清除结果：逐局清除数/虚拟时间、定位误差分布、时间构成（扫描 vs 收尾）。
 
 用法：
 
@@ -24,8 +25,8 @@ from typing import Any, Dict, List, Optional, Sequence
 
 import numpy as np
 
-from cumcm.t4.config import (CLEAR_RADIUS, DIR_BEAM_HALF_DEG, RECEIVE_MAX, REGION_RADIUS,
-                             SWEEP_SPACING, GRID_LATTICE_RAD)
+from cumcm.t4.config import (CLEAR_RADIUS, DIR_BEAM_HALF_DEG, EXTEND_CLAMP, EXTEND_K,
+                             RECEIVE_MAX, REGION_RADIUS)
 from cumcm.t4.sweep import build_sweep_plan
 
 MARKER = {"metadata": {"Software": "cumcm-t4"}}
@@ -40,7 +41,7 @@ def _setup() -> None:
 
 
 def _save(fig, path: Path) -> None:
-    fig.savefig(path, bbox_inches="tight", metadata=MARKER)
+    fig.savefig(path, bbox_inches="tight")
     import matplotlib.pyplot as plt
     plt.close(fig)
 
@@ -50,16 +51,18 @@ def load_json(path: Path) -> Any:
 
 
 # ---------------------------------------------------------------------------
-# 图 1：拖网布局 + 内切圆定理示意（不依赖运行数据，只依赖方案本身）
+# 图 1：扫描布局（原点 + 7 覆盖基点 + 21 外推中点）与半圆盘示意
 # ---------------------------------------------------------------------------
 def fig_sweep_lattice(fig_dir: Path) -> None:
-    """画 37 个拖网格点、作业圆域与一个"半圆盘 ⊇ 内切圆 ∋ 格点"的示意。"""
+    """画扫描布局、作业圆域与一个"半圆盘 ⊇ 内切圆 ∋ 命中测量点"的示意。"""
     _setup()
     import matplotlib.pyplot as plt
-    from matplotlib.patches import Arc, Circle, Polygon
+    from matplotlib.patches import Circle, Polygon
 
     plan = build_sweep_plan()
     pts = plan.points
+    base = pts[1:8]                    # 7 覆盖基点（第 0 个是原点）
+    mids = pts[8:]
     with plt.rc_context({"font.family": FONT_CANDIDATES, "axes.unicode_minus": False}):
         fig, ax = plt.subplots(figsize=(8.6, 8.6))
         th = np.linspace(0.0, 2.0 * np.pi, 361)
@@ -67,19 +70,17 @@ def fig_sweep_lattice(fig_dir: Path) -> None:
                 lw=1.5, label="作业圆域 1800 m")
         ax.plot((REGION_RADIUS - 30.0) * np.cos(th), (REGION_RADIUS - 30.0) * np.sin(th),
                 color="#5b6470", lw=0.8, ls="--", alpha=0.8, label="源生成域 1770 m")
-        inner = pts[np.linalg.norm(pts, axis=1) <= REGION_RADIUS + 1e-9]
-        outer = pts[np.linalg.norm(pts, axis=1) > REGION_RADIUS + 1e-9]
-        ax.plot(inner[:, 0], inner[:, 1], ".", ms=7, color="#2f6fb5", zorder=4,
-                label=f"拖网测量点（圆域内 {len(inner)} 个）")
-        ax.plot(outer[:, 0], outer[:, 1], "^", ms=5, color="#6b7280", zorder=4,
-                label=f"圆域外测量点（{len(outer)} 个）")
+        ax.plot(base[:, 0], base[:, 1], "o", ms=7, color="#2f6fb5", zorder=4,
+                label=f"7 覆盖基点（复用问题三巡视站布局）")
+        ax.plot(mids[:, 0], mids[:, 1], "^", ms=6, color="#7b3fa0", zorder=4,
+                label=f"21 外推中点（两两基点中点 ×{EXTEND_K:.1f}，上限 {EXTEND_CLAMP:.0f} m）")
+        ax.plot(0.0, 0.0, "s", ms=7, color="#2e9e5b", zorder=5, label="原点（起点全频道扫描）")
 
-        # 示意：一个定向源 g（贴在边缘、波束朝外）→ 半圆盘 → 内切圆 → 命中格点
+        # 示意：一个定向源 g（贴在边缘、波束朝外）→ 半圆盘 → 内切圆 → 命中测量点
         g = np.array([1770.0 * math.cos(math.radians(62.0)),
                       1770.0 * math.sin(math.radians(62.0))])
         thb = math.radians(62.0)          # 波束方向 ≈ 径向朝外
         R = 1000.0
-        # 半圆盘（前向半平面 ∩ 接收圆）：圆心 g 扫 [θ−90°, θ+90°] 的弧 + 两条半径闭合
         a0 = thb - math.pi / 2
         half = np.linspace(a0, a0 + math.pi, 61)
         arc = np.stack([g[0] + R * np.cos(half), g[1] + R * np.sin(half)], axis=1)
@@ -89,17 +90,16 @@ def fig_sweep_lattice(fig_dir: Path) -> None:
                              zorder=1))
         ax.plot(arc[:, 0], arc[:, 1], color="#c0392b", lw=1.0, alpha=0.6,
                 label="定向源检测区（半径 R 的半圆盘）")
-        # 内切圆：disk(g + (R/2)u, R/2)
         c = g + (R / 2) * np.array([math.cos(thb), math.sin(thb)])
         ax.add_patch(Circle(c, R / 2, fill=False, color="#2e9e5b", lw=1.4, ls="--",
                             label="半圆盘内切圆（半径 R/2 ≥ 500）"))
         d2 = np.linalg.norm(pts - c, axis=1)
         hit = pts[d2 <= d2.min() + 1e-6]
-        if len(hit):
+        if len(hit) and d2.min() <= 750.0:
             p = hit[0]
-            ax.plot([p[0]], [p[1]], "o", ms=8, color="#2e9e5b", zorder=6)
+            ax.plot([p[0]], [p[1]], "o", ms=9, color="#c0392b", zorder=6)
             ax.annotate("命中测量点", (p[0], p[1]), textcoords="offset points",
-                        xytext=(12, 6), fontsize=9, color="#2e9e5b")
+                        xytext=(12, 6), fontsize=9, color="#c0392b")
         ax.plot([g[0]], [g[1]], "X", ms=12, color="#c0392b", zorder=7, label="定向源")
         ax.annotate("波束方向 θ", (g[0], g[1]), textcoords="offset points", xytext=(-4, -18),
                     fontsize=9, color="#c0392b")
@@ -110,10 +110,10 @@ def fig_sweep_lattice(fig_dir: Path) -> None:
         ax.grid(alpha=0.25, lw=0.5)
         ax.set_xlabel("x / m")
         ax.set_ylabel("y / m")
-        ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.08), ncol=2, fontsize=8.5,
+        ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.10), ncol=2, fontsize=8.5,
                   framealpha=0.9)
-        ax.set_title(f"寻向拖网：间距 {SWEEP_SPACING:.0f} m 格点取到半径 {GRID_LATTICE_RAD:.0f} m"
-                     f"（{len(pts)} 个测量点，保证命中任意半圆盘）")
+        ax.set_title(f"扫描布局：原点 + 7 覆盖基点 + 21 外推中点（{len(pts)} 个测量位置，"
+                     f"实测听到率 ~99.8%，非严格保证）")
         _save(fig, fig_dir / "fig_t4_sweep_lattice.pdf")
 
 
@@ -149,7 +149,7 @@ def fig_episode_clear(survey: Dict[str, Any], fig_dir: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
-# 图 3：检测保证实证 —— 每个源首次被听到的拖网步骤分布
+# 图 3：听到率实证 —— 每个源首次被听到的扫描步骤分布
 # ---------------------------------------------------------------------------
 def fig_first_heard(survey: Dict[str, Any], fig_dir: Path) -> None:
     steps: List[int] = []
@@ -158,19 +158,19 @@ def fig_first_heard(survey: Dict[str, Any], fig_dir: Path) -> None:
         steps += [int(v) for v in fh.values()]
     if not steps:
         return
-    n_plan = survey.get("sweep_plan", {}).get("n_points", 37)
+    n_plan = survey.get("sweep_plan", {}).get("n_measure_points", 29)
     _setup()
     import matplotlib.pyplot as plt
     with plt.rc_context({"font.family": FONT_CANDIDATES, "axes.unicode_minus": False}):
         fig, ax = plt.subplots(figsize=(9.2, 4.4))
         bins = np.arange(0, n_plan + 2) - 0.5
         ax.hist(steps, bins=bins, color="#2f6fb5", alpha=0.85,
-                label=f"各源首次被听到的拖网步骤（{len(steps)} 个源）")
+                label=f"各源首次被听到的扫描步骤（{len(steps)} 个源）")
         ax.axvline(n_plan - 1, color="#c0392b", ls="--", lw=1.2,
-                   label=f"拖网结束（第 {n_plan - 1} 步之后不再有未听到源）")
-        ax.set_xlabel("首次听到时的拖网步骤序号")
+                   label=f"扫描结束（第 {n_plan - 1} 个测量位置之后不再有未听到源）")
+        ax.set_xlabel("首次听到时的扫描步骤序号")
         ax.set_ylabel("源数")
-        ax.set_title("检测保证实证：任意源（含定向源）在拖网结束前都被听到 ≥ 1 次")
+        ax.set_title("听到率实证：全部源（含定向源）都在扫描结束前被听到 ≥ 1 次（本批 20 局）")
         ax.legend(fontsize=8.5)
         _save(fig, fig_dir / "fig_t4_first_heard.pdf")
 
@@ -203,7 +203,7 @@ def fig_localization_error(survey: Dict[str, Any], fig_dir: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
-# 图 5：虚拟时间构成（拖网 vs 收尾；由逐局汇总近似）
+# 图 5：虚拟时间构成（扫描 vs 收尾；由逐局汇总近似）
 # ---------------------------------------------------------------------------
 def fig_cost(survey: Dict[str, Any], fig_dir: Path) -> None:
     rows = survey["episodes"]
@@ -220,13 +220,13 @@ def fig_cost(survey: Dict[str, Any], fig_dir: Path) -> None:
         fig, ax = plt.subplots(figsize=(9.0, 4.4))
         xs = np.arange(len(rows))
         ax.bar(xs, sweeptravel / 5.0 / 60.0, width=0.6, color="#2f6fb5",
-               label=f"拖网行驶（{sweeptravel:.0f} m / 5 m/s）")
+               label=f"扫描行驶（{sweeptravel:.0f} m / 5 m/s）")
         ax.bar(xs, np.maximum(travel - sweeptravel, 0.0) / 5.0 / 60.0, bottom=sweeptravel / 5.0 / 60.0,
                width=0.6, color="#7b3fa0", label="收尾定位行驶")
         ax.plot(xs, vt / 60.0, "o-", ms=4, color="#c0392b", label="总虚拟时间")
         ax.set_xlabel("演练局（seed 升序）")
         ax.set_ylabel("时间 / min")
-        ax.set_title(f"问题四时间构成：拖网行驶平均 "
+        ax.set_title(f"问题四时间构成：扫描行驶平均 "
                      f"{np.mean(sweeptravel / 300.0):.1f} min，总虚拟时间平均 {np.mean(vt / 60.0):.1f} min")
         ax.legend(fontsize=8.5)
         _save(fig, fig_dir / "fig_t4_cost.pdf")

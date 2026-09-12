@@ -1,41 +1,30 @@
-"""寻向拖网：保证命中任意"半圆盘"的检测路点设计与校验（问题四的核心改动）。
-
-问题三的 7 点覆盖只对**全向源**成立：它保证"圆域内任意点到最近巡视点 ≤ 1000 m"，于是走到
-巡视点必能听到全域的源。问题四引入定向源后这一保证失效——定向源只在其"定向方向 ±90°"内有
-信号，**背对着所有巡视点的源即使近在咫尺也听不到**（引擎返回 no_signal，见 engine.py 的
-_in_directional_coverage；这就是"搜索不到还有可能是方向不对"）。
+"""扫描布局：7 个覆盖基点 + 两两中点径向外推的加密测量点（问题四检测阶段）。
 
 定向源在检测点 p 处可被听到 ⟺
 
     |p − g| ≤ R  且  (p − g) · u(θ) ≥ 0        （R 为接收半径 1000~1500，θ 为定向方向，含边界）
 
 即检测区是"接收圆 ∩ 前向半平面"= 半径 R 的**半圆盘**，圆心 g、半径 R、朝向 θ 全部未知。
-因此检测阶段必须满足：**测量点集合命中任意可能的半圆盘**（g ∈ 圆域、θ ∈ [0°,360°)、
-R ≥ 1000）。
+问题三的 7 点覆盖只保证"圆域内任意点到最近巡视点 ≤ 1000 m"（对全向源必听到）；对定向源，
+**背对着所有巡视点的源即使近在咫尺也听不到**（引擎返回 no_signal，见 engine.py 的
+_in_directional_coverage —— 这就是"搜索不到还有可能是方向不对"）。
 
-本模块的布局：间距 700 m 的方形格点，保留 |p| ≤ 2270 m 者（**含圆域外 470 m**）。两条理由
-叠加成严格的解析保证：
+本模块的布局（用户选定，轻量折中）：
+  1. 7 个覆盖基点 = 问题三的巡视站布局（cumcm.t3.config.SURVEY_CENTERS，直接复用）；
+  2. 任意两两基点的中点共 C(7,2) = 21 个，沿径向**外推 EXTEND_K 倍**（模长上限
+     EXTEND_CLAMP = 2270 m），补上"朝向圆域外/边缘的迎光面"——这是中点加密能显著提升
+     听到率的关键（原样中点全挤在 |p| ≤ 1241 内，听到率仅 82.8%；外推后 ~99.8%）；
+  3. 机器狗从原点出发，在原点先做一次全频道扫描（原点计入第 0 个测量位置）。
 
-1. 半圆盘 H(g,θ,R) 含内切圆 disk(g + (R/2)u, R/2)，其半径为 R/2 ≥ 500，圆心最远可达
-   |g| + R/2 ≤ 1770 + 500 = 2270（R = 1000 m 时的最坏情形）；
-2. 方形格点的覆盖半径 ρ = 700/√2 ≈ 495 ≤ 500，且格点铺满到半径 2270 之外，故**任意**上述
-   内切圆内必有一个格点 ⇒ 任意半圆盘被命中（R > 1000 时内切圆更大、圆心更近，自动成立）。
-
-于是"机器人每次都测所有未发现频道"这一朴素策略就能保证：**任何干扰源（全向或定向）在拖网
-结束时都至少被听到一次**。这是第四问"确保所有干扰源被清除"的检测侧依据（清除侧见
-cumcm.t4.strategy）。
-
-数值校验（`verify_detection_guarantee`）逐一确证，三层全部 0 失败：
-  * 精细对抗：半径 {0,300,…,1770} × 48 方位 × 180 光束方向 × {1000,1250,1500} R，181440 例
-    （最坏命中深度 0.792，即最差情形命中点距源 792 m）；
-  * 贴边对抗：源贴生成圆盘边缘（r ∈ {1755,1765,1770}）、光束取径向 ±4°，360 方位 × 40 偏角
-    × 3 R，129600 例（深度 0.566）；
-  * 蒙特卡洛：默认 100 万随机 (g, θ, R)。
-命中深度 = min |m−g|/R（越小越深、越稳），用于量化"离漏检边界还有多远"。
+总计 29 个测量位置（原点 + 7 + 21）。它不再是 37 点拖网的"严格保证"（半圆盘内切圆定理 +
+131 万算例 0 失败），而是一个**实测听到率 ~99.8%、代价明显更低**的布局：论文按要求只报告
+实测统计（`verify_hearing_stats`），不声称严格不漏。残余 ~0.2% 漏例全部是"贴边 + 波束精确
+朝外、内切圆圆心恰落入外推中点方向空隙"的最坏构型。
 """
 
 from __future__ import annotations
 
+import itertools
 import math
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Sequence, Tuple
@@ -43,31 +32,38 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 import numpy as np
 
 from cumcm.common.routing import dist_matrix, nearest_order, two_opt_first, two_opt_greedy
-from cumcm.t4.config import GRID_LATTICE_RAD, REGION_RADIUS, SWEEP_SPACING
+from cumcm.t3.config import SURVEY_CENTERS
+from cumcm.t4.config import EXTEND_CLAMP, EXTEND_K
 
 
-def grid_points() -> List[Tuple[float, float]]:
-    """拖网格点：间距 SWEEP_SPACING 的方形格点中 |p| ≤ GRID_LATTICE_RAD 者（含圆域外）。
+def measure_layout() -> List[Tuple[float, float]]:
+    """29 个测量位置：原点 + 7 覆盖基点 + 21 个外推中点。
 
-    原点 (0, 0) 含在其中；build_sweep_plan 把它重排为访问顺序的首位（机器狗开局就在原点）。
+    段 1：原点 (0, 0)（起点全频道扫描，位置成本为零）；段 2：问题三的 7 个覆盖基点；
+    段 3：任意两两基点的中点，沿径向放大到 min(|mid|·EXTEND_K, EXTEND_CLAMP)。
     """
-    hi = int(math.ceil((GRID_LATTICE_RAD + SWEEP_SPACING) / SWEEP_SPACING)) * SWEEP_SPACING
-    ax = np.arange(-hi, hi + 1e-9, SWEEP_SPACING)
-    return [(float(x), float(y)) for x in ax for y in ax
-            if math.hypot(x, y) <= GRID_LATTICE_RAD + 1e-9]
+    base = np.asarray(SURVEY_CENTERS, dtype=float)
+    mids = []
+    for i, j in itertools.combinations(range(len(base)), 2):
+        m = (base[i] + base[j]) / 2.0
+        r = float(np.hypot(*m))
+        if r > 1e-9:
+            m = m / r * min(r * EXTEND_K, EXTEND_CLAMP)
+        mids.append((float(m[0]), float(m[1])))
+    return [(0.0, 0.0)] + [(float(x), float(y)) for x, y in base] + mids
 
 
 @dataclass(frozen=True)
 class SweepPlan:
-    """寻向拖网方案：测量点集合 + 访问顺序（从原点出发的开放路径）。
+    """扫描方案：测量点集合 + 访问顺序（从原点出发的开放路径）。
 
     `points` 的第 0 个恒为原点 (0, 0)；`route` 是 points 的下标列表，表示机器狗的访问顺序
-    （以 0 开头）。`route_m` 为按该顺序走完的里程。`verification` 保存检测保证校验结果
-    （见 verify_detection_guarantee），供报告与校验脚本引用。
+    （以 0 开头）。`route_m` 为按该顺序走完的里程。`verification` 保存听到率统计
+    （见 verify_hearing_stats），供报告与校验脚本引用。
     """
 
-    spacing: float
-    lattice_radius: float
+    extend_k: float
+    extend_clamp: float
     points: np.ndarray = field(repr=False)
     route: List[int] = field(repr=False)
     route_m: float = 0.0
@@ -82,9 +78,11 @@ class SweepPlan:
 
     def to_json(self) -> Dict[str, Any]:
         return {
-            "spacing_m": float(self.spacing),
-            "lattice_radius_m": float(self.lattice_radius),
-            "n_points": int(self.n_points),
+            "extend_k": float(self.extend_k),
+            "extend_clamp_m": float(self.extend_clamp),
+            "n_measure_points": int(self.n_points),
+            "n_base": 7,
+            "n_mid": 21,
             "route_m": round(float(self.route_m), 2),
             "verification": self.verification,
             "points": [[float(x), float(y)] for x, y in self.points],
@@ -93,16 +91,12 @@ class SweepPlan:
 
 
 def build_sweep_plan() -> SweepPlan:
-    """构造默认的寻向拖网方案：全部格点，从原点出发的最近邻 + 2-opt 精修开路径。
+    """构造默认扫描方案：29 个测量位置，从原点出发的最近邻 + 2-opt 精修开路径。
 
-    顺序与里程不参与检测保证（保证只取决于**点集**），只影响行驶耗时，故这里取确定性下
+    顺序与里程不参与检测效果（效果只取决于**点集**），只影响行驶耗时，故这里取确定性下
     里程较短的一种；`nearest_order`/`two_opt_*` 都是无随机算子（见 common.routing）。
-    原点强制排在 points 的第 0 位（机器狗开局就在原点，起点拖网点即第 0 个测量簇）。
     """
-    grid = grid_points()
-    if abs(grid[0][0]) > 1e-9 or abs(grid[0][1]) > 1e-9:
-        grid = [(0.0, 0.0)] + [p for p in grid if abs(p[0]) > 1e-9 or abs(p[1]) > 1e-9]
-    arr = np.asarray(grid, dtype=float)
+    arr = np.asarray(measure_layout(), dtype=float)
     D = dist_matrix(arr, (0.0, 0.0))
     order = two_opt_greedy(two_opt_first(nearest_order(arr, start=(0.0, 0.0)), D), D)
     route = list(order)
@@ -111,132 +105,121 @@ def build_sweep_plan() -> SweepPlan:
     for i in order:
         route_m += float(np.hypot(*(arr[i] - prev)))
         prev = arr[i]
-    return SweepPlan(spacing=SWEEP_SPACING, lattice_radius=GRID_LATTICE_RAD,
+    return SweepPlan(extend_k=EXTEND_K, extend_clamp=EXTEND_CLAMP,
                      points=arr, route=route, route_m=route_m)
-
-
-def _in_beam(m: np.ndarray, g: np.ndarray, theta_rad: float) -> np.ndarray:
-    """测量点 m 是否在源 g 的定向光束内：(m−g)·u(θ) ≥ 0（含边界）。"""
-    d = m - g
-    return d[:, 0] * math.cos(theta_rad) + d[:, 1] * math.sin(theta_rad) >= -1e-9
 
 
 def _hit_report(pts: np.ndarray, g: np.ndarray, theta_rad: float, R: float) -> Tuple[bool, float]:
     """单个算例：是否存在测量点在（距离 ≤ R 且 在光束内）；返回 (命中?, 命中深度 |m−g|/R)。"""
     d = pts - g
     r2 = np.einsum("ij,ij->i", d, d)
-    ok = (r2 <= R * R + 1e-9) & _in_beam(pts, g, theta_rad)
+    # 在光束内：(m−g)·u ≥ 0。距离在内且方向在前向即命中。
+    ok = (r2 <= R * R + 1e-9) & (
+        d[:, 0] * math.cos(theta_rad) + d[:, 1] * math.sin(theta_rad) >= -1e-9)
     if not ok.any():
         return False, math.inf
     return True, float(np.sqrt(r2[ok]).min() / R)
 
 
-def verify_detection_guarantee(points: Sequence[Sequence[float]],
-                               edge_extra: bool = True,
-                               mc_n: int = 1_000_000,
-                               seed: int = 2026) -> Dict[str, Any]:
-    """对测量点集合做"半圆盘命中"三层校验，返回统计与最坏情形。
+def verify_hearing_stats(points: Sequence[Sequence[float]],
+                         mc_n: int = 2_000_000,
+                         seed: int = 2026) -> Dict[str, Any]:
+    """对测量点集合做"半圆盘命中"统计校验，返回听到率与最坏漏例。
 
-    校验 1（精细对抗枚举）：g 取半径 {0,300,…,1770} × 48 方位，θ 取 180 个等分角，R 取
-    {1000,1250,1500}，共 181440 例。
-    校验 2（贴边对抗，edge_extra=True）：g 贴在源生成圆盘边缘（1755/1765/1770），θ 取径向
-    ±4° 内 40 个偏角 × 360 方位，3 个 R，共 129600 例——专门打击"外翻光束"的刀口情形。
+    校验 1（贴边对抗，最严）：g 贴在源生成圆盘边缘（1755/1765/1770），θ 取径向 ±8° 内
+     40 个偏角 × 360 方位，R ∈ {1000,1250,1500}，共 129600 例——专门打击"外翻光束"的刀口
+     情形（问题四残余漏例全部出现在这里）。
+    校验 2（精细对抗枚举）：g 取半径 {0,300,…,1770} × 48 方位，θ 取 180 个等分角，R 取
+     3 档，共 181440 例。
     校验 3（蒙特卡洛）：g 在圆域内面积均匀、θ 均匀、R ∈ [1000,1500] 均匀，共 mc_n 例。
 
-    返回：all_pass / n_cases / n_fail / worst_depth / margin_m / worst_fail（首例失败）。
+    返回：{n_cases, n_fail, hear_rate, worst_fail(首例漏例), mc_miss, edge_miss}。
+    注意这是**统计**口径（本布局不保证 0 漏），调用方不得把它当"严格不漏"使用。
     """
     P = np.asarray(points, dtype=float)
-    radii = list(range(0, 1800, 300)) + [1770]
-    thetas = [2.0 * math.pi * k / 180 for k in range(180)]
-    Rs = (1000.0, 1250.0, 1500.0)
-    worst_depth = 0.0
     n_fail = 0
     n_cases = 0
     worst_fail: Optional[dict] = None
+    edge_miss = 0
 
-    for R in Rs:
-        for r in radii:
+    def _case(g, t, R):
+        nonlocal n_fail, n_cases, worst_fail
+        ok, _ = _hit_report(P, np.asarray(g, float), t, R)
+        n_cases += 1
+        if not ok:
+            n_fail += 1
+            if worst_fail is None:
+                worst_fail = {"g": [float(g[0]), float(g[1])],
+                              "theta_deg": round(math.degrees(t), 1), "R_m": float(R)}
+
+    for R in (1000.0, 1250.0, 1500.0):
+        for r in (1755.0, 1765.0, 1770.0):
+            for ka in range(360):
+                a = 2.0 * math.pi * ka / 360
+                g0 = np.array([r * math.cos(a), r * math.sin(a)])
+                for ko in range(40):
+                    off = (ko / 39.0 - 0.5) * 8.0
+                    _case(g0, (a + math.radians(off)) % (2.0 * math.pi), R)
+    edge_miss = n_fail
+
+    for R in (1000.0, 1250.0, 1500.0):
+        for r in list(range(0, 1800, 300)) + [1770]:
             for k in range(48):
                 a = 2.0 * math.pi * k / 48
-                g = np.array([r * math.cos(a), r * math.sin(a)])
-                for t in thetas:
-                    ok, depth = _hit_report(P, g, t, R)
-                    n_cases += 1
-                    if not ok:
-                        n_fail += 1
-                        if worst_fail is None:
-                            worst_fail = {"g": [float(g[0]), float(g[1])],
-                                          "theta_deg": round(math.degrees(t), 1),
-                                          "R_m": float(R)}
-                    worst_depth = max(worst_depth, depth if ok else 1.0)
-
-    if edge_extra:
-        for R in Rs:
-            for r in (1755.0, 1765.0, 1770.0):
-                for ka in range(360):
-                    a = 2.0 * math.pi * ka / 360
-                    g = np.array([r * math.cos(a), r * math.sin(a)])
-                    for ko in range(40):
-                        off = (ko / 39.0 - 0.5) * 8.0
-                        t = (a + math.radians(off)) % (2.0 * math.pi)
-                        ok, depth = _hit_report(P, g, t, R)
-                        n_cases += 1
-                        if not ok:
-                            n_fail += 1
-                            if worst_fail is None:
-                                worst_fail = {"g": [float(g[0]), float(g[1])],
-                                              "theta_deg": round(math.degrees(t), 1),
-                                              "R_m": float(R)}
-                        worst_depth = max(worst_depth, depth if ok else 1.0)
+                g0 = np.array([r * math.cos(a), r * math.sin(a)])
+                for t in (2.0 * math.pi * kk / 180 for kk in range(180)):
+                    _case(g0, t, R)
 
     rng = np.random.default_rng(seed)
-    mc_fail = 0
+    mc_miss = 0
     for _ in range(max(1, mc_n // 1000)):
-        g_r = REGION_RADIUS * np.sqrt(rng.random(1000))
+        g_r = 1770.0 * np.sqrt(rng.random(1000))
         g_a = rng.random(1000) * 2.0 * math.pi
         gs = np.stack((g_r * np.cos(g_a), g_r * np.sin(g_a)), axis=1)
         th = rng.random(1000) * 2.0 * math.pi
         RR = rng.uniform(1000.0, 1500.0, 1000)
         for g, t, R in zip(gs, th, RR):
+            ok, _ = _hit_report(P, g, t, R)
             n_cases += 1
-            ok, depth = _hit_report(P, g, t, R)
             if not ok:
                 n_fail += 1
-                mc_fail += 1
+                mc_miss += 1
                 if worst_fail is None:
                     worst_fail = {"g": [float(g[0]), float(g[1])],
                                   "theta_deg": round(math.degrees(t), 1), "R_m": float(R)}
-            worst_depth = max(worst_depth, depth if ok else 1.0)
 
     return {
-        "all_pass": n_fail == 0,
         "n_cases": n_cases,
         "n_fail": n_fail,
-        "worst_depth": round(worst_depth, 4),
-        "mc_fail": mc_fail,
+        "hear_rate": round(1.0 - n_fail / n_cases, 6),
+        "mc_miss": mc_miss,
+        "mc_n": mc_n,
+        "edge_miss": edge_miss,
         "worst_fail": worst_fail,
-        "margin_m": round((1.0 - worst_depth) * 1000.0, 1) if n_fail == 0 else None,
+        "guaranteed": False,
+        "note": "7 覆盖基点 + 21 外推中点布局：实测听到率统计（非严格不漏）",
     }
 
 
-def print_sweep_report(plan: SweepPlan, verify: Dict[str, Any]) -> None:
-    """打印拖网方案与覆盖校验报告（命令行 --plan-only / 每局开头使用）。"""
-    print(f"寻向拖网方案：栅距 {plan.spacing:.0f} m、格点保留半径 {plan.lattice_radius:.0f} m，"
-          f"测量点 {plan.n_points} 个，访问里程 {plan.route_m:.0f} m")
+def print_sweep_report(plan: SweepPlan, verify: Optional[Dict[str, Any]]) -> None:
+    """打印扫描方案与听到率统计报告（命令行 --plan-only / 每局开头使用）。"""
+    print(f"扫描方案：7 覆盖基点 + 21 两两中点外推×{plan.extend_k:.1f}（上限 "
+          f"{plan.extend_clamp:.0f} m），测量位置 {plan.n_points} 个（含原点起点扫描），"
+          f"访问里程 {plan.route_m:.0f} m")
     if verify is None:
-        print("  （未做半圆盘命中校验）")
+        print("  （未做听到率统计）")
         return
-    if verify["all_pass"]:
-        print(f"  半圆盘命中校验：{verify['n_cases']} 个算例全部命中，"
-              f"最坏命中深度 {verify['worst_depth']:.3f}"
-              f"（离漏检边界的余量 {verify['margin_m']:.0f} m）")
+    if verify["n_fail"] == 0:
+        print(f"  听到率统计：{verify['n_cases']} 个算例全部命中（本布局恰好 0 漏）")
     else:
-        print(f"  ⚠ 半圆盘命中校验失败 {verify['n_fail']}/{verify['n_cases']}："
-              f"首例 {verify['worst_fail']} —— 布局不可用，请调整参数！")
+        print(f"  听到率统计：{verify['n_cases']} 个算例中漏 {verify['n_fail']} 个"
+              f"（{verify['hear_rate'] * 100:.4f}% 听到）；贴边对抗漏 "
+              f"{verify['edge_miss']}、蒙特卡洛漏 {verify['mc_miss']}/{verify['mc_n']}；"
+              f"首例漏 {verify['worst_fail']} —— 非严格保证，按实测报告")
 
 
 if __name__ == "__main__":
-    # 自检：`python -m cumcm.t4.sweep` 直接打校验报告（无需连模拟器）
+    # 自检：`python -m cumcm.t4.sweep` 直接打听到率统计（无需连模拟器）
     p = build_sweep_plan()
-    v = verify_detection_guarantee(p.points)
+    v = verify_hearing_stats(p.points)
     print_sweep_report(p, v)

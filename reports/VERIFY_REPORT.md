@@ -115,5 +115,58 @@ cd paper/t2 && xelatex -interaction=nonstopmode main.tex   # 跑两遍
 
 1. **论文图与结果图同步**：`paper/t2/figures/*.pdf` 是 `results/t2/*.pdf` 的复制件；重新运行
    `T2.py` 后需重新复制（已在 `main.tex` 与附录 A 注明）。
-2. `paper/t4/` 的图路径 (`../figures/…`) 指向的文件当前不存在，与本论文无关，未在本次范围内改动。
+2. ~~`paper/t4/` 的图路径 (`../figures/…`) 指向的文件当前不存在~~ → 已解决（2026-09-13）：
+   `paper/t4/figures/` 由 `paper/t4/make_figures.py` 生成，`main.tex` 改为 `\graphicspath{{figures/}}`
+   + `figures/fig_t4_*.pdf`，论文已可正常编译（详见文末追加验收）。
 3. 视觉逐页检查未执行（原因见上），已用程序化检查替代；如需最终交付，建议人工抽查一次。
+
+---
+
+# 追加验收：`paper/t3/` 与 `paper/t4/`（2026-09-13 全量重跑后）
+
+## 结论
+
+**PASS**。两篇论文的正文数字与当前求解产物逐项对齐，编译零错误、无缺图/未定义引用，
+两题的自检脚本全部通过，`T3.py/T4.py --plan-only` 产物与提交前逐字节一致。
+
+## 编译
+
+| 论文 | 引擎 | 结果 | 页数 | 警告 |
+| --- | --- | --- | --- | --- |
+| `paper/t3/main.tex` | xelatex ×3 | rc=0 | 9 页 A4 | 仅 hyperref 的 PDF 书签字符串警告（数学符号，历史存在） |
+| `paper/t4/main.tex` | xelatex ×3 | rc=0 | 21 页 A4 | 无（缺图 / 未定义引用 / 找不到文件均为 0） |
+
+图片真实嵌入证据：`paper/t4/main.pdf` 第 15 页含 2 个位图对象（两张 NN 对比 PNG，2307×1204 与
+1659×911），6 张矢量 PDF 图在文本层可检索到图内文字；`pdftotext` 抽查新数字（`6445`、`99.9891`、
+`6206.6`、`256/256`）均已在 PDF 中。
+
+## 数值一致性（论文 ↔ 产物）
+
+| paper/t4 说法 | 产物来源 | 一致 |
+| --- | --- | --- |
+| 20 局平均虚拟 6 445 s（5 580--7 861）、里程 24 392 m、测向 247 次/局、顺路 8.6 个 | `results/t4/t4_survey.json`（20 局同 seed 复算） | ✓ |
+| 检测扫描 16 996 m、20 个测量位置、定案顺序 | `results/t4/t4_sweep_plan.json` | ✓ |
+| 听率 99.9891%（4 224 640 例漏 460：MC 320 / 贴边 0 / 精细 140） | `t4_sweep_plan.json.verification` + `cumcm.t4.sweep` | ✓ |
+| 定位误差 均值 7.66 m / 最差 19.67 m、256/256 全清、首听 ≤19 步 | `t4_survey.json` | ✓ |
+| 布局裁决表 人工 20 点 6 445 / 人工 23 点 6 688 / NN 12 外圈 6 947 / NN 11 外圈 6 724（255/256）/ NN 自由 7 697 s | `results/t4/.nn_arm_speed.json`（`T4.py --practice 20 --layout-file` 同口径实测） | ✓ |
+| 听率 99.9974% / 99.9218% / 99.7778% / 99.9419% | `verify_hearing_stats` 对同一 4 224 640 例口径重算 | ✓ |
+
+| paper/t3 说法 | 产物来源 | 一致 |
+| --- | --- | --- |
+| 7 站均匀正七边形（$r=1000$ m）、最坏最近距离 1000.0 m @ 原点、余量 0 | `results/t3/t3_cover_plan.json` + `cumcm.t3.covering` 自检 | ✓ |
+| 站点坐标表（7 行） | `t3_cover_plan.json.centers` | ✓ |
+| 巡视里程 6 206.6 m、顺序 $2\to1\to0\to6\to5\to4\to3$ | `t3_cover_plan.json.survey_length_m / survey_order`（与 Held--Karp 精确枚举 7! 的最优值一致） | ✓ |
+| 20 局 256/256、3 590 s（2 558--4 312）、13 980 m、121 次/局、定位误差 7.69/19.24 m、顺路 110/25 | `results/t3/t3_survey.json` | ✓ |
+
+## 自检与不变量
+
+- `python -m cumcm.t4.sweep`：批量判据 vs 单例参考逐例一致；4 224 640 例漏 460（99.9891%）、贴边 0 漏 ✓
+- `python -m cumcm.t3.covering`：均匀 7 点布局（正七边形 / 零余量 / 任意旋转不变 / 里程 6 206.6 m）全部通过 ✓
+- `python -m cumcm.analysis.undefined_names`：46 个文件无漏定义/缺失参数 ✓
+- `T3.py --plan-only`、`T4.py --plan-only` 产物 sha256 与改动前一致（本次只加 `plan_from_points` 复用与
+  `--layout-file` 入口，不改默认路径）✓
+
+## 论文图
+
+`paper/t4/figures/` 8 张图全部由 `paper/t4/make_figures.py` 从当前产物生成（图内数字不写死，
+PDF 去时间戳可逐字节复现）；每张图的图例/标题文字均由脚本按产物动态拼装。视觉细节抽查见下节。

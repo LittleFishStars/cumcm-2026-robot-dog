@@ -85,7 +85,8 @@ def run_practice(args: argparse.Namespace, res: CoverSolveResult, save_dir: Path
                            inline_sector_deg=args.inline_sector_deg,
                            inline_radius_max=(None if args.inline_radius_max <= 0
                                             else args.inline_radius_max),
-                           rotate=not args.no_rotate, api_log=api_log)
+                           rotate=not args.no_rotate,
+                           skip_unknown=args.skip_unknown, api_log=api_log)
             stats = dog.run(res.plan, res.survey_order)
             arena.finish_episode()
             # 用 dog.plan / dog.survey_order_used：布局在起始扫描后按源密集方向旋转过，
@@ -175,7 +176,8 @@ def run_official(args: argparse.Namespace, res: CoverSolveResult, save_dir: Path
                        inline_sector_deg=args.inline_sector_deg,
                            inline_radius_max=(None if args.inline_radius_max <= 0
                                             else args.inline_radius_max),
-                       rotate=not args.no_rotate, api_log=api_log)
+                       rotate=not args.no_rotate,
+                       skip_unknown=args.skip_unknown, api_log=api_log)
         stats = dog.run(res.plan, res.survey_order)
         print(f"完成：清除 {stats['cleared']} 个，巡视 {stats['waypoints_visited']} 个圆心，"
               f"里程 {stats['travel_m']:.0f} m，虚拟时间 {stats['virtual_time_s']:.0f} s，"
@@ -261,6 +263,11 @@ def build_parser() -> argparse.ArgumentParser:
                         f"两条连线之间即清；本参数只用于起点(原点)→第一站的兜底扇形）")
     p.add_argument("--survey-only", action="store_true",
                    help="只做阶段一（巡视扫描 + 覆盖核对），不做定位与清除")
+    p.add_argument("--skip-unknown", action="store_true",
+                   help="【实验开关】阶段一巡视站的扫描跳过从未测出 direction 的频道"
+                        "（起点全频道扫描仍测全部）：省无源频道的空测时间，但可能漏掉"
+                        "'源在 1000 m 之外、只在某个巡视站能听到'的真实源 —— 清除率会降，"
+                        "仅用于 A/B 对照，勿用于正式提交方案）")
     p.add_argument("--traj-dir", default=TRAJ_DIR,
                    help=f"轨迹图输出子目录（相对 --save-dir；缺省 {TRAJ_DIR}）")
     p.add_argument("--no-rotate", action="store_true",

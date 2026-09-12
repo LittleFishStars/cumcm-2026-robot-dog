@@ -73,6 +73,7 @@ class RobotDog:
                  inline_exclude_r: float = INLINE_EXCLUDE_R_M,
                  inline_radius_max: Optional[float] = None,  # None=两站半径最大者
                  rotate: bool = True,
+                 skip_unknown: bool = False,
                  api_log=None) -> None:
         # 传入 api_log 时套一层记录代理：4 个接口的每一次调用都会落盘
         # （官方模式下这是唯一的证据链 —— 拿不到真值，但每次请求/响应都有记录）
@@ -85,6 +86,7 @@ class RobotDog:
         self.inline_radius_max = (None if inline_radius_max is None
                                   else float(inline_radius_max))  # 固定半径上界 / m（None=两站半径）
         self.rotate = bool(rotate)                           # 起始扫描后是否旋转覆盖圆布局
+        self.skip_unknown = bool(skip_unknown)               # 实验开关：巡视站扫描跳过从未测出 direction 的频道
         # 过程日志用 "w"：每局开头重写，于是整份日志只描述**最新一局**。
         # 原先用 "a" 追加，跨局、跨运行无限累积，几轮演练后文件里混着几百局的内容难以查阅。
         self._logfile = open(logfile, "w", encoding="utf-8") if logfile else None
@@ -271,23 +273,33 @@ class RobotDog:
         return mec is not None and mec[2] + CLIP_ERR < CLEAR_RADIUS
 
     # ---- 阶段 1：巡视扫描 ----
-    def _active_channels(self) -> List[int]:
+    def _active_channels(self, include_unknown: bool = True) -> List[int]:
         """仍需测向的频道：未清除、示向度条数未达上限、且**定位还不够准**。
 
         第三条是关键：叠加 no_signal 禁区与接收半径环带后，很多频道两条射线就已把可能源集合压到
         覆盖圆半径 < 20 m，此时再测纯属浪费（每站 5 s 测向 + 可能的 1 s 切换）—— 实测前 3 站
         每站都要把 20 个频道全测一遍，而每站只有 4~6 次能测出方向。
+
+        `include_unknown=False`（`--skip-unknown`）时再排除"从未测出 direction"的频道：起点
+        全频道扫描已确认它们在原点收不到，巡视站是否值得再测由调用方决定（实验开关 —— 可能
+        漏掉"源在 1000 m 之外、只在某个巡视站能听到"的频道，见 _sweep 文档）。
         """
-        return [c for c in CHANNELS
-                if c not in self.cleared
-                and len(self.obs.get(c, ())) < OBS_CAP
-                and not self._precise(c)]
+        chans = [c for c in CHANNELS
+                 if c not in self.cleared
+                 and len(self.obs.get(c, ())) < OBS_CAP
+                 and not self._precise(c)]
+        if not include_unknown:
+            chans = [c for c in chans if c in self.obs]
+        return chans
 
     def _sweep(self, channels: Sequence[int], at: Sequence[float],
                label: Optional[str] = None, index: int = 0) -> Dict[str, int]:
         """在 at 处按频道号升序逐频道测向（升序可省频道切换时间）；near 就地清除。
 
         传入 `label` 时把这一步登记进 `scan_steps`（收尾逐步骤出"扫描结果图"）。
+
+        `--skip-unknown` 时巡视站的扫描由调用方传入过滤后的频道列表（见 survey），因此这里
+        只负责"逐频道测"，不改判据；起点全频道扫描始终测全部（那是唯一的发现手段）。
         """
         if label is not None:
             self._begin_scan_step(index, label, at, len(channels))
@@ -362,7 +374,7 @@ class RobotDog:
             self._inline_clear(origin, waypoints[order[0]])
         for step_i, idx in enumerate(order, 1):
             wp = waypoints[idx]
-            active = self._active_channels()
+            active = self._active_channels(include_unknown=not self.skip_unknown)
             if not active:
                 self.log(f"  第 {step_i} 站：圆心 {idx} @ ({wp[0]:.1f}, {wp[1]:.1f})，"
                          f"所有频道已采够或已清除，巡视提前结束")

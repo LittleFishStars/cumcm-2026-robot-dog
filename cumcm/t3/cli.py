@@ -234,6 +234,11 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--hex-layout", action="store_true",
                    help="改用经典「1 中心 + 6 正六边形环心」布局（缺省是一般 7 点布局，"
                         "里程 ~6167 m 对六边形族最优的 6737.7 m）")
+    p.add_argument("--layout", choices=("uniform", "optimized"), default="uniform",
+                   help="一般 7 点布局的两个变体（缺省 uniform，用户 2026-09-12 指定）："
+                        "uniform = 7 个圆心均匀分布在半径 1000 m 的圆上（正七边形，零余量，"
+                        "里程 ~6207 m）；optimized = 数值优化的最短路径布局（余量 ~5 m，"
+                        "里程 ~6167 m）。仅当未用六边形族时生效")
     p.add_argument("--jammers-dir", default=None,
                    help="jammers-py 目录（缺省为本仓库根目录下的 jammers-py/）")
     p.add_argument("--console-port", type=int, default=8090,
@@ -292,7 +297,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     print("2026 CUMCM B 题 · 问题三：机器狗搜索与清除干扰源（确定性策略）")
     print("=" * 78)
 
-    res = solve_covering_circles(args.ring_radius, use_hex=args.hex_layout)   # 第一步：求 1000 m 覆盖圆的位置
+    res = solve_covering_circles(args.ring_radius, use_hex=args.hex_layout,
+                                 use_uniform=not args.hex_layout
+                                 and args.ring_radius is None
+                                 and args.layout == "uniform")
     if not args.quiet:
         print_cover_report(res)
     paths = save_plan(res, save_dir)

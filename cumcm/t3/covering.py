@@ -5,15 +5,19 @@
 
 最少个数由 disk covering problem 的已证明最优值确定为 7（见 min_circle_count）。圆心的**摆放**
 则是：让 7 个点在保证"圆域内任一点到最近圆心 ≤ 1000 m"的前提下，使从原点出发走遍它们的开放
-路径最短。经典的正六边形族（1 个中心圆 + 6 个环圆）里程恒为 6d、最好 6737.73 m；但把 7 个点
-全部推到距原点约 1000 m 处（原点自己就落在它们的覆盖内，无需专门的中心点）可压到 ~6167 m，
-故默认采用后者（config.SURVEY_CENTERS），六边形族保留作对照。
+路径尽量短，同时给各方位源良好的交会几何。经典的正六边形族（1 个中心圆 + 6 个环圆）里程恒为
+6d、最好 6737.73 m；现有两种一般 7 点布局（CLI `--layout` 切换，**缺省 uniform**）：
+* uniform（SURVEY_CENTERS_UNIFORM）：7 点均匀分布在半径 1000 m 的圆上（正七边形），里程
+  ~6207 m、零余量，但圆周对称 → 定位误差更均衡（实测 −14%）；
+* optimized（SURVEY_CENTERS）：把 7 点推到距原点约 1000 m 处的数值优化布局，里程 ~6167 m、
+  余量 5 m。
 本模块负责：解析地给出最坏最近距离 D(d) = max(d/√3, g₂(d))、可行环半径区间、最优环半径 d*，
 以及**在连续圆域上**求最坏点的数值校验（网格上"看起来满足"不等于满足 —— 曾因此漏掉圆域
 边缘的源）。所有结果显示在 print_cover_report 里。
 
     from cumcm.t3.covering import solve_covering_circles
-    res = solve_covering_circles()          # 缺省用 config.SURVEY_CENTERS（一般 7 点布局）
+    res = solve_covering_circles()          # 缺省用 config.SURVEY_CENTERS_UNIFORM（均匀布局）
+    res = solve_covering_circles(use_uniform=False)  # 或优化布局（config.SURVEY_CENTERS）
     res = solve_covering_circles(1200.0)    # 或指定六边形族的环半径（对照/扫描）
 
 注：`nearest_order` / `path_length` 复用 common.routing 中的同名实现（后者按公共模块命名
@@ -35,7 +39,8 @@ from cumcm.common.routing import open_path_length as path_length
 from cumcm.t3.config import (BOUNDARY_SAMPLES, CHOSEN_RING_RADIUS, COARSE_BOUNDARY,
                              COARSE_STEP, COVER_RADIUS, DISK_RATIO_5, DISK_RATIO_6,
                              DISK_RATIO_7, GRID_STEP, REGION_RADIUS, SURVEY_CENTERS,
-                             SURVEY_ROUTE_M, SURVEY_WORST_M, TOL)
+                             SURVEY_CENTERS_UNIFORM, SURVEY_ROUTE_M, SURVEY_ROUTE_UNIFORM,
+                             SURVEY_WORST_M, SURVEY_WORST_UNIFORM, TOL)
 
 
 @dataclass(frozen=True, eq=False)
@@ -369,6 +374,7 @@ class CoverSolveResult:
     six_circle_worst: float             # 6 圆方案的实算最坏距离（不可行对照）/ m
     six_circle_radius: float            # 6 圆方案的最优环半径 / m（仅六边形环这一族）
     min_circles: Dict[str, Any]         # 最少圆数的判定依据（经典 disk covering problem）
+    use_uniform: bool = False           # True=正七边形均匀布局（半径 1000 m 圆上均匀分布）
 
     @property
     def margin(self) -> float:
@@ -382,7 +388,9 @@ class CoverSolveResult:
             "region_radius_m": plan.region_radius,
             "cover_radius_m": plan.cover_radius,
             "layout_kind": ("hex 1+6（1 个中心圆 + 6 个正六边形环上圆）" if is_hex
-                            else f"general {len(plan.waypoints)} 点（config.SURVEY_CENTERS）"),
+                else ("uniform 7 点（config.SURVEY_CENTERS_UNIFORM：7 个圆心均匀分布在"
+                      "半径 1000 m 的圆上）" if self.use_uniform
+                      else f"general {len(plan.waypoints)} 点（config.SURVEY_CENTERS）")),
             "ring_radius_m": round(plan.ring_radius, 3) if is_hex else None,
             "rotation_deg": round(math.degrees(plan.rotation), 4),
             "ring_radius_chosen": (abs(plan.ring_radius - CHOSEN_RING_RADIUS) < 1e-9
@@ -471,11 +479,16 @@ def tradeoff_table(interval: Tuple[float, float], pts: np.ndarray) -> List[Dict[
 
 
 def solve_covering_circles(ring_radius: Optional[float] = None,
-                          use_hex: bool = False) -> CoverSolveResult:
+                          use_hex: bool = False,
+                          use_uniform: bool = False) -> CoverSolveResult:
     """求解 1000 m 覆盖圆的位置，并做实算校验、可行区间与权衡分析、文献方法对照。
 
-    默认使用一般 7 点布局（config.SURVEY_CENTERS，里程 ~6167 m）；给出 ring_radius 或
-    use_hex=True 时改用"1 中心 + 6 正六边形环心"的经典族（里程 6d），用于对照与参数扫描。
+    三种一般布局：
+      * 默认优化布局（config.SURVEY_CENTERS，里程 ~6167 m，余量 ~5 m）；
+      * use_uniform=True 时用"7 个圆心均匀分布在半径 1000 m 的圆上"的正七边形布局
+        （config.SURVEY_CENTERS_UNIFORM，里程 ~6207 m，**零余量** —— 最坏点恰在原点）；
+      * 给出 ring_radius 或 use_hex=True 时改用"1 中心 + 6 正六边形环心"的经典族（里程 6d），
+        用于对照与参数扫描。
     """
     if use_hex or ring_radius is not None:
         d = CHOSEN_RING_RADIUS if ring_radius is None else float(ring_radius)
@@ -485,7 +498,8 @@ def solve_covering_circles(ring_radius: Optional[float] = None,
         pts = np.vstack([region_samples(GRID_STEP, BOUNDARY_SAMPLES),
                          worst_candidates(d)])
     else:
-        layout = tuple((float(x), float(y)) for x, y in SURVEY_CENTERS)
+        layout = tuple((float(x), float(y)) for x, y in
+                       (SURVEY_CENTERS_UNIFORM if use_uniform else SURVEY_CENTERS))
         plan = CoverPlan(REGION_RADIUS, COVER_RADIUS, CHOSEN_RING_RADIUS, layout=layout)
         assert len(plan.waypoints) == 7, "覆盖圆个数应为 7"
         pts = np.vstack([region_samples(GRID_STEP, BOUNDARY_SAMPLES),
@@ -513,10 +527,10 @@ def solve_covering_circles(ring_radius: Optional[float] = None,
         if abs(length - 6.0 * d) > 1e-6:
             raise AssertionError(f"巡视里程 {length:.3f} m 与解析值 6d = {6.0 * d:.3f} m 不一致")
     else:
-        ana = SURVEY_WORST_M
+        ana = SURVEY_WORST_UNIFORM if use_uniform else SURVEY_WORST_M
         if abs(worst - ana) > 1e-3:
             raise AssertionError(f"一般布局最坏距离 {worst:.6f} m 与记录的 {ana:.6f} m 不一致")
-        if abs(length - SURVEY_ROUTE_M) > 1e-3:
+        if abs(length - (SURVEY_ROUTE_UNIFORM if use_uniform else SURVEY_ROUTE_M)) > 1e-3:
             raise AssertionError(f"一般布局里程 {length:.3f} m 与记录的 {SURVEY_ROUTE_M:.3f} m 不一致")
 
     interval = feasible_ring_interval()
@@ -532,7 +546,7 @@ def solve_covering_circles(ring_radius: Optional[float] = None,
         survey_order=order, survey_length=length,
         feasible_interval=interval, tradeoff=tradeoff_table(interval, pts),
         lattice=lattice, six_circle_worst=six_worst, six_circle_radius=six_d,
-        min_circles=min_circle_count(),
+        min_circles=min_circle_count(), use_uniform=use_uniform,
     )
 
 
@@ -734,7 +748,36 @@ def _selftest() -> int:
           f"弱下界 面积≥{mc['area_density_lower']}、弧长≥{mc['boundary_arc_lower']}"
           f" → {'✓' if ok3 else '✗'}")
 
-    ok = ok1 and ok2 and ok3
+    # [4] 均匀 7 点布局（用户指定排布）：圆心都在半径 1000 m 的圆上且均匀分布，覆盖必须成立
+    U = np.asarray([(float(x), float(y)) for x, y in SURVEY_CENTERS_UNIFORM], dtype=float)
+    ok4 = True
+    rho = np.linalg.norm(U, axis=1)
+    ok4 &= np.allclose(rho, 1000.0, atol=1e-6)                    # 都在 r=1000 圆上
+    ang = np.sort(np.mod(np.arctan2(U[:, 1], U[:, 0]), 2.0 * math.pi))
+    ok4 &= np.allclose(np.diff(np.concatenate([ang, [ang[0] + 2.0 * math.pi]])),
+                       2.0 * math.pi / 7, atol=1e-6)              # 均匀分布（正七边形）
+    ptsU = np.vstack([region_samples(GRID_STEP, BOUNDARY_SAMPLES),
+                      worst_candidates_general(U)])
+    wU = float(nearest_distances(ptsU, U).max())
+    ok4 &= wU <= COVER_RADIUS + 1e-9                              # 覆盖成立（等号，零余量）
+    for th in (0.0, 0.3, 1.1):                                    # 旋转不变
+        c, s = math.cos(th), math.sin(th)
+        Ur = U @ np.array([[c, s], [-s, c]])
+        ptsUr = np.vstack([region_samples(GRID_STEP, BOUNDARY_SAMPLES),
+                           worst_candidates_general(Ur)])
+        w = float(nearest_distances(ptsUr, Ur).max())
+        ok4 &= abs(w - wU) <= 1e-6
+    orderU = exact_open_order(7, dist_matrix(U, (0.0, 0.0)))
+    LU = path_length(U, orderU)
+    ok4 &= abs(LU - SURVEY_ROUTE_UNIFORM) <= 1e-3                 # 里程与记录一致
+    print(f"[4] 均匀 7 点布局：圆心都在 r=1000 圆上且均匀（正七边形）"
+          f" {'✓' if np.allclose(rho, 1000.0, atol=1e-6) else '✗'}；"
+          f"最坏最近距离 {wU:.4f} m（零余量，最坏点恰在原点）"
+          f" {'✓' if wU <= COVER_RADIUS + 1e-9 else '✗'}；"
+          f"任意旋转不变 {'✓' if ok4 else '✗'}；里程 {LU:.1f} m"
+          f"（记录 {SURVEY_ROUTE_UNIFORM}）{'✓' if abs(LU - SURVEY_ROUTE_UNIFORM) <= 1e-3 else '✗'}")
+
+    ok = ok1 and ok2 and ok3 and ok4
     print("\n自检结果：" + ("全部通过 ✓" if ok else "存在失败 ✗"))
     return 0 if ok else 1
 

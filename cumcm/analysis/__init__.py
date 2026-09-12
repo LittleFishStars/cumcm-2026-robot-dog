@@ -1,8 +1,7 @@
-"""cumcm.analysis —— 论文出图（问题四）。
+"""cumcm.analysis —— 分析工具。
 
-    figures_t4.py       问题四论文用图表（PDF + 背后的数据 CSV）
-
-顶层保留同名薄入口 T4_figures.py，命令行用法不变。
+（原论文出图脚本 figures_t4*.py 已于 2026-09-12 按清理要求删除，与 figures/ 一并移除；
+如后续需要出图，可重建本目录下的图表脚本。）
 """
 
-__all__ = ["figures_t4"]
+__all__: list = []

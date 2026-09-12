@@ -6,14 +6,13 @@
     cumcm/t1/         问题 1：交会定位区域
     cumcm/t3/         问题 3：确定性策略（与 T3.py 入口对应）
     cumcm/t4/         问题 4：定向 + 全向混合干扰源的确定性策略（与 T4.py 入口对应）
-    cumcm/analysis/   论文出图（问题四）
+    cumcm/analysis/   分析工具（图纸已按要求清理，2026-09-12）
 
-顶层仍保留同名薄入口（T1.py / T3.py / T4.py / T4_figures.py / sim_api.py），所以原有的
+顶层仍保留同名薄入口（T1.py / T3.py / T4.py / sim_api.py），所以原有的
 命令行用法一字不改：
 
     python T3.py --practice 10 --seed 0
     python T4.py --practice 20 --seed 0
-    python T4_figures.py
 
 分层原则：**依赖只能向下**。common 不 import 任何题目模块；t1/t3/t4 可 import common，
 t4 另可 import t1（定位区域几何底座）与 t3.probing（补测选点与 t3 完全同源，直接复用、不复制）。

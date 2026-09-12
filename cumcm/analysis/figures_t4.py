@@ -74,8 +74,9 @@ def fig_sweep_lattice(fig_dir: Path) -> None:
                 color="#5b6470", lw=0.8, ls="--", alpha=0.8, label="源生成域 1770 m")
         ax.plot(base[:, 0], base[:, 1], "o", ms=7, color="#2f6fb5", zorder=4,
                 label=f"7 覆盖基点（复用问题三巡视站布局）")
-        ax.plot(mid[:, 0], mid[:, 1], "D", ms=6, color="#d97706", zorder=4,
-                label=f"{plan.interior_n} 内部补点（r = {MID_RING_RAD:.0f} m）")
+        if plan.interior_n > 0:      # 20 点定案无内部补点，仅历史 23 点版画出
+            ax.plot(mid[:, 0], mid[:, 1], "D", ms=6, color="#d97706", zorder=4,
+                    label=f"{plan.interior_n} 内部补点（r = {MID_RING_RAD:.0f} m）")
         ax.plot(outer[:, 0], outer[:, 1], "^", ms=6, color="#7b3fa0", zorder=4,
                 label=f"{OUTER_RING_N} 均匀外圈点（r = {OUTER_RING_RAD:.0f} m，间隔 30°）")
         ax.plot(0.0, 0.0, "s", ms=7, color="#2e9e5b", zorder=5, label="原点（起点全频道扫描）")
@@ -116,9 +117,10 @@ def fig_sweep_lattice(fig_dir: Path) -> None:
         ax.set_ylabel("y / m")
         ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.10), ncol=2, fontsize=8.5,
                   framealpha=0.9)
-        ax.set_title(f"扫描布局：原点 + 7 覆盖基点 + {plan.interior_n} 内部补点 + "
-                     f"{OUTER_RING_N} 均匀外圈点（{len(pts)} 个测量位置，"
-                     f"里程 {plan.route_m/1000:.1f} km，实测听到率 ~99.997%，非严格保证）")
+        inner = f" + {plan.interior_n} 内部补点" if plan.interior_n > 0 else ""
+        ax.set_title(f"扫描布局：原点 + 7 覆盖基点{inner} + {OUTER_RING_N} 均匀外圈点"
+                     f"（{len(pts)} 个测量位置，里程 {plan.route_m/1000:.1f} km，"
+                     f"实测听到率 ~99.988%，非严格保证）")
         _save(fig, fig_dir / "fig_t4_sweep_lattice.pdf")
 
 

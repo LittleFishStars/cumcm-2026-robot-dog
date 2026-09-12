@@ -4,7 +4,7 @@
 本文件只是薄入口，真正的实现在 `cumcm/t4/` 包里：
 
     cumcm/t4/config.py     全部可调参数与物理常量（含定向源波束角、外圈半径/个数）
-    cumcm/t4/sweep.py      扫描布局：7 覆盖基点 + 3 内点 + 12 外圈点（复用问题三布局）与听到率统计
+    cumcm/t4/sweep.py      扫描布局：7 覆盖基点 + 12 外圈点（20 点定案，复用问题三布局）与听到率统计
     cumcm/t4/regions.py    DirProbRegion：定位区域（楔形交 + 接收半径内包，无 no_signal 硬约束）
     cumcm/t4/probing.py    按文献准则（Fisher σ / 交会几何）选补测点（与 t3 同源）
     cumcm/t4/strategy.py   RobotDog：扫描 + 定位清除的全部决策

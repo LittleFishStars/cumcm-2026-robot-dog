@@ -68,8 +68,8 @@ def main() -> None:
                  "手工优化布局（23 位置，17 358 m）")
         _draw_ax(axes[1], pts_n, None,
                  "神经网络搜索布局（23 位置，19 658 m）")
-        fig.suptitle("测量点布局对比：手工（文献多环带） vs 神经网络（代理 + 进化搜索）",
-                     fontsize=12)
+        fig.suptitle("测量点布局对比：人工定案（7 覆盖基点 + 12 均匀外圈）"
+                     " vs 神经网络（代理 + 进化搜索）", fontsize=12)
         fig.tight_layout(rect=(0, 0, 1, 0.96))
         out = OUT / "fig_t4_nn_layout_compare.png"
         fig.savefig(out, dpi=200)

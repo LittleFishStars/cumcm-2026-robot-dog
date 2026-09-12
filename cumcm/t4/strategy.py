@@ -27,6 +27,7 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
 
+from cumcm.common.actions import ActionRecorder
 from cumcm.common.geometry import ang_diff, bearing
 from cumcm.common.geometry import clamp_to_region as _clamp_to_region
 from cumcm.common.geometry import dist
@@ -46,7 +47,7 @@ from cumcm.t4.sweep import SweepPlan
 clamp_to_region = partial(_clamp_to_region, radius=REGION_RADIUS - REGION_MARGIN)
 
 
-class RobotDog:
+class RobotDog(ActionRecorder):
     """两阶段机器狗（问题四）。
 
     阶段一（扫描）：在出发点做全频道扫描（原点测量位置），随后按扫描方案依次走到其余
@@ -84,11 +85,14 @@ class RobotDog:
         self.sweep_opp_radius = float(sweep_opp_radius)   # 顺路补测半径 / m
         self.inline_r_min = float(inline_r_min)           # 前向顺路半径下界 / m（内外组缺省源自它）
         self.inline_r_max = float(inline_r_max)           # 前向顺路半径上界 / m
-        # 内圈 / 外圈前向半径：None 时跟随全局 inline_r_min/r_max（2026-09-12 内外分组）
+        # 内圈 / 外圈前向半径：None 时内圈跟随全局 inline_r_min/r_max（2026-09-12 内外分组）。
+        # **外圈不设半径上界**（= +inf）：源生成域半径 1770 m，估计点半径 r_est 恒 ≤ 1770，故
+        # 上界只在设到 <1770 时才起作用、且必然更差（实测 1533→6727 s、1689→6430 s；≥1767 全
+        # 为 6363 s 的平台），对 r_est 无任何约束意义，故不作为可调参数。
         self.inline_r_min_in = float(inline_r_min if inline_r_min_in is None else inline_r_min_in)
         self.inline_r_max_in = float(inline_r_max if inline_r_max_in is None else inline_r_max_in)
         self.inline_r_min_out = float(inline_r_min if inline_r_min_out is None else inline_r_min_out)
-        self.inline_r_max_out = float(inline_r_max if inline_r_max_out is None else inline_r_max_out)
+        self.inline_r_max_out = math.inf if inline_r_max_out is None else float(inline_r_max_out)
         self.inline_outer_r = float(inline_outer_r)       # 内外圈分界：本站距原点 > 该值按外圈
         self.inline_near_r = float(inline_near_r)         # 近距顺路清除半径 / m
         self.inline_max_mec_r = float(inline_max_mec_r)   # 参与顺路的区域最大 mec 半径 / m
@@ -119,18 +123,7 @@ class RobotDog:
         self.scan_steps: List[Dict[str, Any]] = []
         self._cur_step: Optional[Dict[str, Any]] = None
 
-    # ---- 日志 ----
-    def log(self, msg: str) -> None:
-        if self.verbose:
-            print(msg, flush=True)
-        if self._logfile:
-            print(msg, file=self._logfile, flush=True)
-
-    def close(self) -> None:
-        if self._logfile:
-            self._logfile.close()
-            self._logfile = None
-
+    # ---- 日志与原子动作（log / close / clear / _note / _polar_deg 等）见 cumcm.common.actions ----
     # ---- 原子动作 ----
     def measure(self, x: float, y: float, channel: int) -> dict:
         x, y = float(x), float(y)
@@ -165,44 +158,7 @@ class RobotDog:
         > 1500 m ≥ 有效接收半径 ⇒ 无论全向还是定向都必然收不到。此时测量不带新信息，跳过。
         """
         reg = self.regions.get(channel)
-        if reg is None or reg.region.is_empty:
-            return False
-        return reg.min_distance_to(at) > RECEIVE_MAX + 1.0
-
-    def clear(self, x: float, y: float, channel: int) -> bool:
-        x, y = float(x), float(y)
-        r = self.sim.clear(x, y, channel)
-        if not r.get("accepted"):
-            raise RuntimeError(f"/clear 被拒绝：{r}")
-        self.travel_m += dist(self.pos, (x, y))
-        self.pos, self.vt = np.array([x, y]), float(r["virtual_time_s"])
-        self.n_clear += 1
-        ok = r.get("clear_result") == "success"
-        if ok:
-            self.cleared.add(channel)
-            self.tracks.setdefault(channel, {})["clear_point"] = [x, y]
-        self._note("clear", x, y, channel, outcome="success" if ok else "no_target_in_range")
-        if self._cur_step is not None:
-            self._cur_step["clears"].append({"channel": int(channel), "success": bool(ok)})
-        return ok
-
-    def _note(self, kind: str, x: float, y: float, channel: int,
-              outcome: Optional[str] = None, theta: Optional[float] = None) -> None:
-        self.actions.append({
-            "seq": len(self.actions), "kind": kind, "stage": self.stage,
-            "x": float(x), "y": float(y), "channel": int(channel),
-            "outcome": outcome, "theta": theta,
-            "virtual_time_s": round(self.vt, 3), "travel_m": round(self.travel_m, 2),
-        })
-
-    def _begin_scan_step(self, index: int, label: str, at: Sequence[float],
-                         n_channels: int) -> None:
-        self._cur_step = {
-            "index": int(index), "label": label,
-            "x": float(at[0]), "y": float(at[1]), "n_channels": int(n_channels),
-            "counts": {}, "measures": [], "clears": [],
-            "virtual_time_s": round(self.vt, 3), "travel_m": round(self.travel_m, 2),
-        }
+        return reg is not None and reg.provably_out_of_reach(at, RECEIVE_MAX)
 
     def _end_scan_step(self, counts: Dict[str, int]) -> None:
         step = self._cur_step
@@ -220,9 +176,6 @@ class RobotDog:
                              for ch, reg in sorted(self.regions.items())
                              if (mec := reg.enclosing_circle) is not None}
         self.scan_steps.append(step)
-
-    def _out_of_time(self) -> bool:
-        return time.monotonic() > self.deadline
 
     def region(self, channel: int) -> DirProbRegion:
         if channel not in self.regions:
@@ -350,13 +303,6 @@ class RobotDog:
         return {"n_channels": len(self.obs), "n_precise": precise, "n_skip": self.n_skip}
 
     # ---- 阶段 2b：访问顺序 ----
-    def _clear_points(self, channels: Sequence[int]) -> np.ndarray:
-        pts = []
-        for c in channels:
-            mec = self.region(c).enclosing_circle
-            pts.append(np.array([mec[0], mec[1]]) if mec else np.array(self.pos, dtype=float))
-        return np.asarray(pts, dtype=float)
-
     def _nearest_order(self, channels: Sequence[int]) -> List[int]:
         """精确最短开放路径定序（Held-Karp；见 cumcm.t3.strategy 同名列注释）。
 
@@ -490,11 +436,6 @@ class RobotDog:
             # no_signal 对定向源不构成硬约束（可能背光），无新增区域信息，正常跳过
 
     # ---- 途中顺路清除（沿用问题三优化后的机制与参数，见 cumcm.t3.strategy，2026-09-12 同步）----
-    @staticmethod
-    def _polar_deg(p: Sequence[float]) -> float:
-        """点 p 相对区域圆心（原点）的方位角 / 度，[0, 360)。起点 (0,0) 的方位未定义。"""
-        return math.degrees(math.atan2(p[1], p[0])) % 360.0
-
     def _in_azimuth_arc(self, at: Sequence[float], next_wp: Sequence[float],
                         est: Sequence[float]) -> Optional[Tuple[float, float, float]]:
         """估计点 est 是否落在「本站→圆心」与「下一站→圆心」两条连线之间的扇区内。
@@ -503,9 +444,10 @@ class RobotDog:
           · 方位：est 与圆心的连线方向 th_est 位于 th_at 与 th_next 夹出的**较短弧**上，即
                 ang_diff(th_est, th_at) + ang_diff(th_est, th_next) == ang_diff(th_at, th_next)
             （三角不等式取等；ang_diff ∈ [0,180]，较短弧是唯一候选）；
-          · 半径：本站为内圈（距原点 ≤ inline_outer_r）用 [INLINE_R_MIN_IN, INLINE_R_MAX_IN]，
-            外圈用 [INLINE_R_MIN_OUT, INLINE_R_MAX_OUT]（下界承接原"排除近圆心点"语义并入
-            判据；外圈点 1850 m，上界放宽到 1900 不挡贴边源）。
+          · 半径：本站为内圈（距原点 ≤ inline_outer_r）用 [INLINE_R_MIN_IN, INLINE_R_MAX_IN]；
+            外圈用 [INLINE_R_MIN_OUT, ∞) —— **外圈不设上界**（源生成域 1770 m，r_est 恒 ≤1770，
+            上界只在设到 <1770 时才起作用且必然更差，故无意义）。下界承接原"排除近圆心点"
+            语义并入判据。
         反侧点（th_est 与 th_at 差 180°）由三角不等式排除；必须用角度而不用 sin（|sin 180°|=0
         会把反侧点误判成同向）。返回 (短弧进度 0~1, 距圆心半径, 与 th_at 的角度差)。
         """
@@ -659,8 +601,9 @@ class RobotDog:
             ring = "内圈"
         self.log(f"    [顺路清除] 本站 ({at[0]:.0f}, {at[1]:.0f}) → 下一站"
                  f" ({next_wp[0]:.0f}, {next_wp[1]:.0f})：方位扇区 {th_a:.0f}° ~ {th_b:.0f}°"
-                 f"（{ring}）、半径 {r_min:.0f}~{r_max:.0f} m、区域覆盖圆半径"
-                 f" ≤ {self.inline_max_mec_r:.0f} m，有 {len(picked)} 个估计点"
+                 f"（{ring}）、半径 {r_min:.0f}~"
+                 + ("∞（外圈不设上界）" if math.isinf(r_max) else f"{r_max:.0f}")
+                 + f" m、区域覆盖圆半径 ≤ {self.inline_max_mec_r:.0f} m，有 {len(picked)} 个估计点"
                  + (f"（跳过 {n_too_big} 个区域过大的频道）" if n_too_big else ""))
         n = 0
         for _key, ch, _est in picked:
@@ -767,22 +710,6 @@ class RobotDog:
             cur = np.array([x, y], dtype=float)
         self.log(f"    [多清几次] 频道{channel}：{len(pts) + 1} 个点都未命中，转入补测")
         return None
-
-    def _finish_clear(self, channel: int) -> str:
-        if self._try_clear(channel, "try-refined"):
-            return "try-refined"
-        mec = self.region(channel).enclosing_circle
-        if mec is not None:
-            cx, cy = mec[0], mec[1]
-            self.log(f"    [清除] 频道{channel} @ ({cx:.1f}, {cy:.1f}) 未命中，就地复测")
-            self.stage = "clear"
-            if self.measure(cx, cy, channel).get("measure_result") == "near" \
-                    and self.clear(cx, cy, channel):
-                return "near"
-        if self._homing(channel):
-            self.log(f"    [清除] 频道{channel} 兜底沿示向度逼近成功")
-            return "homing"
-        return "failed"
 
     def process(self, channel: int) -> None:
         rec = self.tracks.setdefault(channel, {})

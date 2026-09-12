@@ -23,8 +23,8 @@ from cumcm.common.scanfigure import STEP_DIR_NAME, reset_dir
 from cumcm.common.sim_client import API_LOG_NAME, BASE_URL, ROBOT_ID, Simulator
 from cumcm.common.sim_client import api_log as _api_log_raw
 from cumcm.t4.config import (BEARING_ERROR_DEG, CLEAR_RADIUS, INLINE_MAX_MEC_R, INLINE_NEAR_R,
-                             INLINE_R_MAX, INLINE_R_MAX_IN, INLINE_R_MAX_OUT, INLINE_R_MIN,
-                             INLINE_R_MIN_IN, INLINE_R_MIN_OUT, K_CLEAR_MAX, PROBLEM_NO,
+                             INLINE_R_MAX, INLINE_R_MAX_IN, INLINE_R_MIN, INLINE_R_MIN_IN,
+                             INLINE_R_MIN_OUT, K_CLEAR_MAX, PROBLEM_NO,
                              RESULTS_DIR, SEED, TRAJ_DIR)
 from cumcm.t4.plotting import save_scan_figures, save_trajectory, truth_points
 from cumcm.t4.report import (episode_row, observation_rows, save_plan, save_survey,
@@ -85,7 +85,6 @@ def run_practice(args: argparse.Namespace, plan: SweepPlan, verify: dict, save_d
                        inline_r_min_in=args.inline_r_min_in,
                        inline_r_max_in=args.inline_r_max_in,
                        inline_r_min_out=args.inline_r_min_out,
-                       inline_r_max_out=args.inline_r_max_out,
                        inline_near_r=args.inline_near_r,
                        inline_max_mec_r=args.inline_max_mec_r,
                        api_log=api_log)
@@ -172,7 +171,6 @@ def run_official(args: argparse.Namespace, plan: SweepPlan, verify: dict, save_d
                        inline_r_min_in=args.inline_r_min_in,
                        inline_r_max_in=args.inline_r_max_in,
                        inline_r_min_out=args.inline_r_min_out,
-                       inline_r_max_out=args.inline_r_max_out,
                        inline_near_r=args.inline_near_r,
                        inline_max_mec_r=args.inline_max_mec_r,
                        api_log=api_log)
@@ -252,9 +250,6 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--inline-r-min-out", type=float, default=INLINE_R_MIN_OUT,
                    help=f"外圈站（距原点 > INLINE_OUTER_R_M，即 1850 m 外圈点）前向顺路半径"
                         f"下界 / m（缺省 {INLINE_R_MIN_OUT:.0f}）")
-    p.add_argument("--inline-r-max-out", type=float, default=INLINE_R_MAX_OUT,
-                   help=f"外圈站前向顺路半径上界 / m（缺省 {INLINE_R_MAX_OUT:.0f}；外圈点 "
-                        f"1850 m，上界放宽不挡贴边源）")
     p.add_argument("--inline-near-r", type=float, default=INLINE_NEAR_R,
                    help=f"每站到站后的近距顺路清除半径 / m（缺省 {INLINE_NEAR_R:.0f}）")
     p.add_argument("--inline-max-mec-r", type=float, default=INLINE_MAX_MEC_R,

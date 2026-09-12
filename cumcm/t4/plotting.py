@@ -22,7 +22,7 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
 
-from cumcm.common.plotting import (C_DIR, C_FRAME, C_GRAY, C_HIT, C_MEAS, C_NEAR, C_NOSIG,
+from cumcm.common.plotting import (C_DIR, C_FRAME, C_GRAY, C_HIT, C_NEAR, C_NOSIG,
                                    C_PATH, C_SRC, C_TRY, font_context, hint_plot_once,
                                    save_png, setup_mpl_env, slug)
 from cumcm.common.scanfigure import STEP_DIR_NAME, ScanStep, draw_scan_step
@@ -76,7 +76,7 @@ def draw_trajectory(out_path: Path, actions: Sequence[Dict[str, Any]],
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     with font_context(size=10):
-        fig, ax = plt.subplots(figsize=(9.6, 9.2))
+        fig, ax = plt.subplots(figsize=(9.0, 7.6))
         th = np.linspace(0.0, 2.0 * math.pi, 361)
         cos_th, sin_th = np.cos(th), np.sin(th)
         ax.plot(REGION_RADIUS * cos_th, REGION_RADIUS * sin_th, color=C_FRAME, lw=1.4)
@@ -108,11 +108,11 @@ def draw_trajectory(out_path: Path, actions: Sequence[Dict[str, Any]],
             handles.append(Line2D([], [], color=C_PATH, lw=1.0,
                                   label=f"行驶路径（{len(actions)} 次动作）"))
             for label, key, style in (("测向有示向度", "direction", dict(
-                    marker="o", ms=4.5, ls="none", mfc=C_DIR, mec=C_DIR)),
-                    ("测向无信号", "no_signal", dict(marker="o", ms=4.0, ls="none",
-                                                     mfc=C_NOSIG, mec=C_NOSIG)),
-                    ("近距", "near", dict(marker="o", ms=5.0, ls="none", mfc=C_NEAR,
-                                          mec=C_NEAR))):
+                    marker=".", ms=5, ls="none", color=C_DIR)),
+                    ("测向无信号", "no_signal", dict(marker="x", ms=3.5, ls="none",
+                                                     color=C_NOSIG)),
+                    ("近距", "near", dict(marker="o", ms=6, ls="none", mfc="none",
+                                          mec=C_NEAR, mew=1.4))):
                 sel = [(a["x"], a["y"]) for a in actions
                        if a["kind"] == "measure" and a["outcome"] == key]
                 if sel:
@@ -166,8 +166,8 @@ def draw_trajectory(out_path: Path, actions: Sequence[Dict[str, Any]],
         ax.set_ylabel("y / m")
         if title:
             ax.set_title(title, fontsize=10)
-        ax.legend(handles=handles, loc="upper center", bbox_to_anchor=(0.5, -0.10),
-                  ncol=2, fontsize=7.5, framealpha=0.9)
+        ax.legend(handles=handles, loc="upper center", bbox_to_anchor=(0.5, -0.07),
+                  ncol=3, fontsize=7.5, framealpha=0.9)
         ax.grid(alpha=0.25, lw=0.5)
         fig.tight_layout()
         save_png(fig, out_path, dpi=TRAJ_DPI)

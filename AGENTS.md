@@ -14,11 +14,11 @@
   (`t2` may import `t1` — same wedge-intersection duct, vectorized; `t4` may import `t1` and
   `t3.probing`).
   Never import upward (e.g. `common` must not import `t3`).
-- `results/` holds **committed solve artifacts** (not gitignored): the six T2 files, the T3 plan +
-  per-episode CSV/JSON + `scan/` + `trajectory/`, and the T4 analogue. Running the code regenerates
-  them in place, and the same `--seed` is byte-identical — the only exception is `api_calls.jsonl`,
-  which carries wall-clock timestamps. Expect a dirty tree after a run; the committed artifacts are
-  the **latest** run, so refresh them deliberately rather than mixing runs.
+- `results/` holds the generated solve artifacts and is **gitignored**: `python -m t2` writes the six
+  T2 files, `--plan-only` the T3/T4 plans, practice runs the per-episode CSV/JSON + `scan/` +
+  `trajectory/`. Re-running regenerates them in place and the same `--seed` is byte-identical — the
+  only exception is `api_calls.jsonl`, which carries wall-clock timestamps. Never `git add -f` them;
+  prove reproducibility by hashing the files (see Verification) instead of with `git status`.
 - Figures were deleted at the user's request: the old `figures/` directory, the `figures_t4*.py` /
   `T4_figures.py` generators, `paper/` (paper sources incl. `make_figures.py`) and `reports/` (stage
   reports) are no longer in the repo. `python -m t2` writes its figures into `results/t2/`, problem 4's
@@ -137,8 +137,9 @@
 
 验证这类改动的做法（本仓库没有测试套件，靠下面三条证据）：
 
-1. **全量自检 + 产物零改动**：跑完五条自检与 `python -m t2`、`python -m t3 --plan-only`、`python -m t4 --plan-only`，
-   要求 `git status --porcelain -- results` 为空——空就说明产物与改动前逐字节一致。
+1. **全量自检 + 产物零改动**：改动前存基线 `find results -type f | sort | xargs sha256sum > /tmp/base.sha256`，
+   跑完五条自检与 `python -m t2`、`python -m t3 --plan-only`、`python -m t4 --plan-only` 后
+   `sha256sum -c /tmp/base.sha256` 必须全部 OK（`results/` 已不入库，不能再用 `git status` 判断）。
 2. **AST 归一化审计**：把 `HEAD` 版与工作区版都解析成 AST，剥离 docstring、函数签名注解、带注解
    赋值的注解、类型别名与 import 名单后比对 `ast.dump`，必须完全相同（注释本就不进 AST）。这一步能
    证明"只有注解/docstring/注释/导入写法变了"。为折行而提取局部变量之类的改动会被它标出来，属正常，

@@ -15,7 +15,8 @@ desktop.ini
 #   References/   参考文献 PDF（53 M，撰写论文时本地查阅用）
 resources/
 
-# 求解产物不在此列：results/ 是入库的交付物（同 seed 逐字节可复现，见 AGENTS.md）
+# 求解产物：不入库（随跑随新；同 seed 逐字节可复现，唯一例外是 api_calls.jsonl 的现实时间戳）
+results/
 
 # LaTeX 编译中间产物（交付物是 .tex 源码与编译好的 PDF）
 *.aux

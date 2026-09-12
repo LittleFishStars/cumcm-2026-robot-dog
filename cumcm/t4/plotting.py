@@ -5,7 +5,7 @@
 都能被逐行复核。
 
 绘制内容：作业圆域 1800 m 与源生成域 1770 m、扫描测量位置（原点起点 + 7 覆盖基点 +
-21 外推中点）、从原点起的行驶路径、按结果分类的动作点、干扰源真值（**定向源额外画其 ±90°
+12 外圈点）、从原点起的行驶路径、按结果分类的动作点、干扰源真值（**定向源额外画其 ±90°
 波束扇形**，一眼看出"背对波束的点听不到它"）、20 m 清除半径。
 
 逐步扫描图（<save-dir>/scan/ 下）复用 common.scanfigure 的通用画法：覆盖圆信息对问题四无
@@ -86,7 +86,7 @@ def draw_trajectory(out_path: Path, actions: Sequence[Dict[str, Any]],
                    Line2D([], [], color=C_FRAME, lw=0.8, ls="--", alpha=0.85,
                           label="源生成域 1770 m")]
 
-        # 扫描测量位置：圆域内（原点 + 7 基点）/ 圆域外（21 外推中点）分开标注
+        # 扫描测量位置：圆域内（原点 + 7 基点）/ 圆域外（12 外圈点）分开标注
         wp = plan.points
         inner = wp[np.linalg.norm(wp, axis=1) <= REGION_RADIUS + 1e-9]
         outer = wp[np.linalg.norm(wp, axis=1) > REGION_RADIUS + 1e-9]

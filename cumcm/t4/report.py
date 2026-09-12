@@ -124,7 +124,7 @@ def observation_rows(ep: int, plan: SweepPlan, meas: Dict[int, List[Meas]]) -> L
 def save_plan(plan: SweepPlan, save_dir: Path, verify: Optional[dict] = None) -> List[Path]:
     """扫描方案落盘：JSON（含听到率统计）与 CSV（测量点坐标）。"""
     save_dir.mkdir(parents=True, exist_ok=True)
-    plan = SweepPlan(extend_k=plan.extend_k, extend_clamp=plan.extend_clamp,
+    plan = SweepPlan(outer_n=plan.outer_n, outer_radius=plan.outer_radius,
                      points=plan.points, route=plan.route, route_m=plan.route_m,
                      verification=verify if verify is not None else plan.verification)
     paths = [save_dir / PLAN_JSON]

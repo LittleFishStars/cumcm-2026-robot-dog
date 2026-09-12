@@ -147,7 +147,7 @@ def run_practice(args: argparse.Namespace, plan: SweepPlan, verify: dict, save_d
 def run_official(args: argparse.Namespace, plan: SweepPlan, verify: dict, save_dir: Path) -> int:
     """官方评测接口模式：连 127.0.0.1 上已开放接口的模拟器，跑完整一局。
 
-    拿不到真值，故真值相关字段留空；扫描布局（实测听到率 ~99.8%）与演练里验证过的行为在
+    拿不到真值，故真值相关字段留空；扫描布局（实测听到率 ~99.99%）与演练里验证过的行为在
     正式模式同样成立。接口调用全程落盘 api_calls.jsonl —— 官方模式唯一证据链。
     """
     sim = Simulator(robot_id=args.robot_id, base_url=args.base_url, timeout=args.timeout)
@@ -248,7 +248,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     if not args.quiet:
         print_sweep_report(plan, verify)
     if not plan.verification:
-        plan = SweepPlan(extend_k=plan.extend_k, extend_clamp=plan.extend_clamp,
+        plan = SweepPlan(outer_n=plan.outer_n, outer_radius=plan.outer_radius,
                          points=plan.points, route=plan.route, route_m=plan.route_m,
                          verification=verify)
     paths = save_plan(plan, save_dir, verify)

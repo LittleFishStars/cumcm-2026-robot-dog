@@ -1,4 +1,4 @@
-"""扫描布局：7 个覆盖基点 + 两两中点径向外推的加密测量点（问题四检测阶段）。
+"""扫描布局：原点 + 7 覆盖基点 + 12 个均匀方位外圈点（问题四检测阶段）。
 
 定向源在检测点 p 处可被听到 ⟺
 
@@ -9,22 +9,30 @@
 **背对着所有巡视点的源即使近在咫尺也听不到**（引擎返回 no_signal，见 engine.py 的
 _in_directional_coverage —— 这就是"搜索不到还有可能是方向不对"）。
 
-本模块的布局（用户选定，轻量折中）：
-  1. 7 个覆盖基点 = 问题三的巡视站布局（cumcm.t3.config.SURVEY_CENTERS，直接复用）；
-  2. 任意两两基点的中点共 C(7,2) = 21 个，沿径向**外推 EXTEND_K 倍**（模长上限
-     EXTEND_CLAMP = 2270 m），补上"朝向圆域外/边缘的迎光面"——这是中点加密能显著提升
-     听到率的关键（原样中点全挤在 |p| ≤ 1241 内，听到率仅 82.8%；外推后 ~99.8%）；
-  3. 机器狗从原点出发，在原点先做一次全频道扫描（原点计入第 0 个测量位置）。
+本模块的布局（"尽量减少路程"优化后的 20 个测量位置）：
 
-总计 29 个测量位置（原点 + 7 + 21）。它不再是 37 点拖网的"严格保证"（半圆盘内切圆定理 +
-131 万算例 0 失败），而是一个**实测听到率 ~99.8%、代价明显更低**的布局：论文按要求只报告
-实测统计（`verify_hearing_stats`），不声称严格不漏。残余 ~0.2% 漏例全部是"贴边 + 波束精确
-朝外、内切圆圆心恰落入外推中点方向空隙"的最坏构型。
+  1. **原点**：起点全频道扫描（位置成本为零）；
+  2. **7 个覆盖基点** = 问题三巡视站（cumcm.t3.config.SURVEY_CENTERS，直接复用，全向覆盖保证）；
+  3. **12 个均匀方位外圈点**，半径 OUTER_RING_RAD = 1850 m。
+
+为什么外圈取 1850 m、12 个方位（这是对"7+21 中点外推"布局的结构优化）：
+
+  * **半径 1850 m**：任意源的迎光区在源前方 [|g|, |g|+R] 纵深；源最远半径 1770，所以**任意
+    贴边源**的迎光区内沿 = 1770 m，外圈设在其内侧 1850 m 时径向偏差 < 80 m。原"中点外推"
+    布局把多数点推到 2270 m，反而离内部源的迎光面太远（实测只剩 99.81%）；1850 m 单圈、
+    12 个方位同时覆盖贴边源与内部半径源的迎光区，实测 **99.99%**（400 万算例、4 seed 稳健，
+    贴边对抗 4.3 万例 0 漏）；
+  * **12 个方位（间隔 30°）**：相邻外圈点最大距离 ≈ 1850·sin15° ≈ 479 m < 接收半径一半，
+    任何方向的源都能被方向差 ≤ 15° 的外圈点听到；
+  * **里程**：20 个测量位置的最短开放路径 17 019 m —— 比"7+21 中点外推"（29 点、21 580 m）
+    省 21%，还少 9 个测量位置。
+
+仍是**非严格保证**（内部半径源 + 波束朝外 + 方向恰落点族空隙的残余约 0.01%），论文按实测
+统计报告（verify_hearing_stats），不声称严格不漏。
 """
 
 from __future__ import annotations
 
-import itertools
 import math
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Sequence, Tuple
@@ -33,24 +41,16 @@ import numpy as np
 
 from cumcm.common.routing import dist_matrix, nearest_order, two_opt_first, two_opt_greedy
 from cumcm.t3.config import SURVEY_CENTERS
-from cumcm.t4.config import EXTEND_CLAMP, EXTEND_K
+from cumcm.t4.config import OUTER_RING_N, OUTER_RING_RAD
 
 
 def measure_layout() -> List[Tuple[float, float]]:
-    """29 个测量位置：原点 + 7 覆盖基点 + 21 个外推中点。
-
-    段 1：原点 (0, 0)（起点全频道扫描，位置成本为零）；段 2：问题三的 7 个覆盖基点；
-    段 3：任意两两基点的中点，沿径向放大到 min(|mid|·EXTEND_K, EXTEND_CLAMP)。
-    """
+    """20 个测量位置：原点 + 7 覆盖基点 + 12 均匀方位外圈点（半径 OUTER_RING_RAD）。"""
     base = np.asarray(SURVEY_CENTERS, dtype=float)
-    mids = []
-    for i, j in itertools.combinations(range(len(base)), 2):
-        m = (base[i] + base[j]) / 2.0
-        r = float(np.hypot(*m))
-        if r > 1e-9:
-            m = m / r * min(r * EXTEND_K, EXTEND_CLAMP)
-        mids.append((float(m[0]), float(m[1])))
-    return [(0.0, 0.0)] + [(float(x), float(y)) for x, y in base] + mids
+    ang = np.arange(OUTER_RING_N, dtype=float) * (2.0 * math.pi / OUTER_RING_N)
+    ring = np.stack((OUTER_RING_RAD * np.cos(ang), OUTER_RING_RAD * np.sin(ang)), axis=1)
+    return [(0.0, 0.0)] + [(float(x), float(y)) for x, y in base] + \
+        [(float(x), float(y)) for x, y in ring]
 
 
 @dataclass(frozen=True)
@@ -62,8 +62,8 @@ class SweepPlan:
     （见 verify_hearing_stats），供报告与校验脚本引用。
     """
 
-    extend_k: float
-    extend_clamp: float
+    outer_n: int
+    outer_radius: float
     points: np.ndarray = field(repr=False)
     route: List[int] = field(repr=False)
     route_m: float = 0.0
@@ -78,11 +78,11 @@ class SweepPlan:
 
     def to_json(self) -> Dict[str, Any]:
         return {
-            "extend_k": float(self.extend_k),
-            "extend_clamp_m": float(self.extend_clamp),
+            "outer_n": int(self.outer_n),
+            "outer_radius_m": float(self.outer_radius),
             "n_measure_points": int(self.n_points),
             "n_base": 7,
-            "n_mid": 21,
+            "n_outer": int(self.outer_n),
             "route_m": round(float(self.route_m), 2),
             "verification": self.verification,
             "points": [[float(x), float(y)] for x, y in self.points],
@@ -91,7 +91,7 @@ class SweepPlan:
 
 
 def build_sweep_plan() -> SweepPlan:
-    """构造默认扫描方案：29 个测量位置，从原点出发的最近邻 + 2-opt 精修开路径。
+    """构造默认扫描方案：20 个测量位置，从原点出发的最近邻 + 2-opt 精修开路径。
 
     顺序与里程不参与检测效果（效果只取决于**点集**），只影响行驶耗时，故这里取确定性下
     里程较短的一种；`nearest_order`/`two_opt_*` 都是无随机算子（见 common.routing）。
@@ -105,7 +105,7 @@ def build_sweep_plan() -> SweepPlan:
     for i in order:
         route_m += float(np.hypot(*(arr[i] - prev)))
         prev = arr[i]
-    return SweepPlan(extend_k=EXTEND_K, extend_clamp=EXTEND_CLAMP,
+    return SweepPlan(outer_n=OUTER_RING_N, outer_radius=OUTER_RING_RAD,
                      points=arr, route=route, route_m=route_m)
 
 
@@ -113,7 +113,6 @@ def _hit_report(pts: np.ndarray, g: np.ndarray, theta_rad: float, R: float) -> T
     """单个算例：是否存在测量点在（距离 ≤ R 且 在光束内）；返回 (命中?, 命中深度 |m−g|/R)。"""
     d = pts - g
     r2 = np.einsum("ij,ij->i", d, d)
-    # 在光束内：(m−g)·u ≥ 0。距离在内且方向在前向即命中。
     ok = (r2 <= R * R + 1e-9) & (
         d[:, 0] * math.cos(theta_rad) + d[:, 1] * math.sin(theta_rad) >= -1e-9)
     if not ok.any():
@@ -122,19 +121,17 @@ def _hit_report(pts: np.ndarray, g: np.ndarray, theta_rad: float, R: float) -> T
 
 
 def verify_hearing_stats(points: Sequence[Sequence[float]],
-                         mc_n: int = 2_000_000,
+                         mc_n: int = 4_000_000,
                          seed: int = 2026) -> Dict[str, Any]:
     """对测量点集合做"半圆盘命中"统计校验，返回听到率与最坏漏例。
 
-    校验 1（贴边对抗，最严）：g 贴在源生成圆盘边缘（1755/1765/1770），θ 取径向 ±8° 内
-     40 个偏角 × 360 方位，R ∈ {1000,1250,1500}，共 129600 例——专门打击"外翻光束"的刀口
-     情形（问题四残余漏例全部出现在这里）。
-    校验 2（精细对抗枚举）：g 取半径 {0,300,…,1770} × 48 方位，θ 取 180 个等分角，R 取
-     3 档，共 181440 例。
+    校验 1（贴边对抗，最严）：g 贴在源生成圆盘边缘（1770 m）、θ 取径向 ±8° 内 40 个偏角 ×
+     360 方位、R ∈ {1000,1250,1500}——精确打击"外翻光束"刀口（1755/1765 亦含在 0~1800 枚举）。
+    校验 2（精细对抗枚举）：g 取半径 {0,300,…,1770} × 48 方位，θ 取 180 个等分角，R 取 3 档。
     校验 3（蒙特卡洛）：g 在圆域内面积均匀、θ 均匀、R ∈ [1000,1500] 均匀，共 mc_n 例。
 
     返回：{n_cases, n_fail, hear_rate, worst_fail(首例漏例), mc_miss, edge_miss}。
-    注意这是**统计**口径（本布局不保证 0 漏），调用方不得把它当"严格不漏"使用。
+    注意这是**统计**口径（本布局仍非严格 0 漏），调用方不得把它当"严格不漏"使用。
     """
     P = np.asarray(points, dtype=float)
     n_fail = 0
@@ -153,7 +150,7 @@ def verify_hearing_stats(points: Sequence[Sequence[float]],
                               "theta_deg": round(math.degrees(t), 1), "R_m": float(R)}
 
     for R in (1000.0, 1250.0, 1500.0):
-        for r in (1755.0, 1765.0, 1770.0):
+        for r in (1770.0,):
             for ka in range(360):
                 a = 2.0 * math.pi * ka / 360
                 g0 = np.array([r * math.cos(a), r * math.sin(a)])
@@ -197,15 +194,14 @@ def verify_hearing_stats(points: Sequence[Sequence[float]],
         "edge_miss": edge_miss,
         "worst_fail": worst_fail,
         "guaranteed": False,
-        "note": "7 覆盖基点 + 21 外推中点布局：实测听到率统计（非严格不漏）",
+        "note": "原点 + 7 覆盖基点 + 12 均匀外圈点（r=1850 m）：实测听到率统计（非严格不漏）",
     }
 
 
 def print_sweep_report(plan: SweepPlan, verify: Optional[Dict[str, Any]]) -> None:
     """打印扫描方案与听到率统计报告（命令行 --plan-only / 每局开头使用）。"""
-    print(f"扫描方案：7 覆盖基点 + 21 两两中点外推×{plan.extend_k:.1f}（上限 "
-          f"{plan.extend_clamp:.0f} m），测量位置 {plan.n_points} 个（含原点起点扫描），"
-          f"访问里程 {plan.route_m:.0f} m")
+    print(f"扫描方案：7 覆盖基点 + {plan.outer_n} 均匀外圈点（r={plan.outer_radius:.0f} m），"
+          f"测量位置 {plan.n_points} 个（含原点起点扫描），访问里程 {plan.route_m:.0f} m")
     if verify is None:
         print("  （未做听到率统计）")
         return

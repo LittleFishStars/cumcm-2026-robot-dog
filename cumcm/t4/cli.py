@@ -23,7 +23,8 @@ from cumcm.common.scanfigure import STEP_DIR_NAME, reset_dir
 from cumcm.common.sim_client import API_LOG_NAME, BASE_URL, ROBOT_ID, Simulator
 from cumcm.common.sim_client import api_log as _api_log_raw
 from cumcm.t4.config import (BEARING_ERROR_DEG, CLEAR_RADIUS, INLINE_MAX_MEC_R, INLINE_NEAR_R,
-                             INLINE_R_MAX, INLINE_R_MIN, K_CLEAR_MAX, PROBLEM_NO,
+                             INLINE_R_MAX, INLINE_R_MAX_IN, INLINE_R_MAX_OUT, INLINE_R_MIN,
+                             INLINE_R_MIN_IN, INLINE_R_MIN_OUT, K_CLEAR_MAX, PROBLEM_NO,
                              RESULTS_DIR, SEED, TRAJ_DIR)
 from cumcm.t4.plotting import save_scan_figures, save_trajectory, truth_points
 from cumcm.t4.report import (episode_row, observation_rows, save_plan, save_survey,
@@ -243,16 +244,17 @@ def build_parser() -> argparse.ArgumentParser:
                         f"未单独指定内外圈时先作用于两组）")
     p.add_argument("--inline-r-max", type=float, default=INLINE_R_MAX,
                    help=f"站点间前向顺路清除的估计点半径**上界** / m（缺省 {INLINE_R_MAX:.0f}）")
-    p.add_argument("--inline-r-min-in", type=float, default=None,
-                   help="内圈站（距原点≤1800）前向顺路半径下界 / m（None=跟随 --inline-r-min）")
-    p.add_argument("--inline-r-max-in", type=float, default=None,
-                   help="内圈站前向顺路半径上界 / m（None=跟随 --inline-r-max）")
-    p.add_argument("--inline-r-min-out", type=float, default=None,
-                   help="外圈站（距原点>1800，即 1850 m 外圈点）前向顺路半径下界 / m"
-                        "（None=跟随 --inline-r-min）")
-    p.add_argument("--inline-r-max-out", type=float, default=None,
-                   help="外圈站前向顺路半径上界 / m（None=跟随 --inline-r-max；外圈点 1850 m，"
-                        "建议上界放宽到 ~1900 不挡贴边源）")
+    p.add_argument("--inline-r-min-in", type=float, default=INLINE_R_MIN_IN,
+                   help=f"内圈站（距原点 ≤ INLINE_OUTER_R_M）前向顺路半径下界 / m"
+                        f"（缺省 {INLINE_R_MIN_IN:.0f}，二分搜索收敛值）")
+    p.add_argument("--inline-r-max-in", type=float, default=INLINE_R_MAX_IN,
+                   help=f"内圈站前向顺路半径上界 / m（缺省 {INLINE_R_MAX_IN:.0f}）")
+    p.add_argument("--inline-r-min-out", type=float, default=INLINE_R_MIN_OUT,
+                   help=f"外圈站（距原点 > INLINE_OUTER_R_M，即 1850 m 外圈点）前向顺路半径"
+                        f"下界 / m（缺省 {INLINE_R_MIN_OUT:.0f}）")
+    p.add_argument("--inline-r-max-out", type=float, default=INLINE_R_MAX_OUT,
+                   help=f"外圈站前向顺路半径上界 / m（缺省 {INLINE_R_MAX_OUT:.0f}；外圈点 "
+                        f"1850 m，上界放宽不挡贴边源）")
     p.add_argument("--inline-near-r", type=float, default=INLINE_NEAR_R,
                    help=f"每站到站后的近距顺路清除半径 / m（缺省 {INLINE_NEAR_R:.0f}）")
     p.add_argument("--inline-max-mec-r", type=float, default=INLINE_MAX_MEC_R,

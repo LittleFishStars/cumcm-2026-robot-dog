@@ -273,8 +273,9 @@ def _edge_miss_fast(layout: np.ndarray, n_azi: int = 90,
 
 def ga_search(net: nn.Module, n_free: int, n_pop: int = 300,
               n_elite: int = 20, n_gen: int = 40, mc_elite: int = 40_000,
-              w_omni: float = 0.5, w_edge: float = 0.4, seed: int = 9,
-              dev: str = "cpu", log_every: int = 5) -> Tuple[np.ndarray, dict]:
+              w_omni: float = 0.5, w_edge: float = 0.4, w_route: float = 0.0,
+              seed: int = 9, dev: str = "cpu", log_every: int = 5
+              ) -> Tuple[np.ndarray, dict]:
     """代理(MNN)引导 + 精英精确验证的进化布局搜索。
 
     每代：代理对种群排序 → top 精英做蒙特卡洛精评（真实缺听率锚定）→ 精英保留并变异
@@ -288,7 +289,12 @@ def ga_search(net: nn.Module, n_free: int, n_pop: int = 300,
         a = np.linspace(0, 2 * math.pi, n, endpoint=False) + rot
         return np.stack([r * np.cos(a), r * np.sin(a)], 1)
 
-    manual = np.asarray(measure_layout()[1:], dtype=float)
+    manual0 = np.asarray(measure_layout()[1:], dtype=float)
+    if len(manual0) >= n_free:                 # 点数不足时均匀抽样子集
+        idx = np.linspace(0, len(manual0) - 1, n_free).round().astype(int)
+        manual = manual0[idx]
+    else:
+        manual = manual0
     pop = np.empty((n_pop, n_free, 2), dtype=float)
     for i in range(n_pop):
         r = rng.random()
@@ -311,6 +317,7 @@ def ga_search(net: nn.Module, n_free: int, n_pop: int = 300,
     best_overall: Optional[np.ndarray] = None
     best_score = float("inf")
     history = []
+    rec: dict = {"history": history, "elite": []}
     for gen in range(n_gen):
         for i in range(n_pop):
             feats[i] = featurize(pop[i])
@@ -322,9 +329,13 @@ def ga_search(net: nn.Module, n_free: int, n_pop: int = 300,
         real = np.array([fast_miss(pop[i], n=mc_elite, seed=seed + gen * 31 + k)
                          for k, i in enumerate(cand_idx)])
         edge = np.array([_edge_miss_fast(pop[i]) for i in cand_idx])
-        rsc = real[:, 0] + w_omni * real[:, 1] + w_edge * edge
+        rt = np.array([route_of(pop[i]) for i in cand_idx]) / 1000.0
+        rsc = real[:, 0] + w_omni * real[:, 1] + w_edge * edge + w_route * rt
         order = np.argsort(rsc)[:n_elite]
         elite = cand_idx[order]
+        elite_meta = [(float(real[order[k], 0]), float(real[order[k], 1]),
+                        float(edge[order[k]]), float(rt[order[k]] * 1000.0))
+                      for k in range(n_elite)]
         cur = rsc[order[0]]
         if cur < best_score:
             best_score, best_overall = cur, pop[elite[0]].copy()
@@ -333,6 +344,8 @@ def ga_search(net: nn.Module, n_free: int, n_pop: int = 300,
                   f"（定向 {real[order[0],0]:.5f} 贴边 {edge[order[0]]:.4f}，"
                   f"候选池 {len(cand_idx)}）")
         history.append(float(best_score))
+        rec["elite"] = [(pop[elite[k]].copy(),) + elite_meta[k]
+                        for k in range(n_elite)]
         # 生成下一代：精英 20 直传 + 精英变异 + 交叉
         newpop = np.empty_like(pop)
         newpop[:n_elite] = pop[elite]
@@ -358,7 +371,8 @@ def ga_search(net: nn.Module, n_free: int, n_pop: int = 300,
             newpop[k] = child
             k += 1
         pop = newpop
-    return best_overall, {"history": history, "best_score": best_score}
+    rec["best_score"] = best_score
+    return best_overall, rec
 
 
 # --------------------------------------------------------------------------
@@ -408,6 +422,7 @@ def main() -> None:
     ap.add_argument("--ga-gen", type=int, default=40)
     ap.add_argument("--ga-elite", type=int, default=20)
     ap.add_argument("--ga-mc", type=int, default=100_000)
+    ap.add_argument("--ga-route-w", type=float, default=0.0003)
     ap.add_argument("--validate-n", type=int, default=400_000)
     ap.add_argument("--seed", type=int, default=11)
     ap.add_argument("--device", type=str, default="cpu")
@@ -446,10 +461,22 @@ def main() -> None:
 
     # ---- 代理引导 + 精英保真的遗传搜索（替代连续爬山/单轮初筛，鲁棒且收敛）----
     best, rec = ga_search(net, a.n_free, n_pop=a.ga_pop, n_elite=a.ga_elite,
-                          n_gen=a.ga_gen, mc_elite=a.ga_mc,
+                          n_gen=a.ga_gen, mc_elite=a.ga_mc, w_route=a.ga_route_w,
                           seed=a.seed + 3, dev=a.device)
     best = best.astype(float)
     np.save(BEST_PATH, best)
+    if rec.get("elite"):
+        el = rec["elite"]
+        el_pts = np.stack([e[0] for e in el])
+        el_dir = np.array([e[1] for e in el])
+        el_route = np.array([e[4] for e in el])
+        np.savez("results/t4/.nn_elite.npz", pts=el_pts, dir=el_dir,
+                 route=el_route, omni=np.array([e[2] for e in el]),
+                 edge=np.array([e[3] for e in el]))
+        print("精英榜（前 8，供演练实测虚拟耗时）：")
+        for k in range(min(8, len(el))):
+            print(f"  #{k + 1}: 定向缺听 {el_dir[k]*100:.4f}% 全向 {el[k][2]*100:.4f}% "
+                  f"贴边 {el[k][3]:.0f} 路线 {el_route[k]:.0f} m")
 
     # ---- 最优布局的最终精确复核（40 万 MC + 贴边对抗 + TSP）----
     v = validate(best, mc_n=a.validate_n)

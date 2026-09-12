@@ -21,7 +21,8 @@ from cumcm.common.practice_arena import PracticeArena
 from cumcm.common.sim_client import API_LOG_NAME, BASE_URL, ROBOT_ID, Simulator
 from cumcm.common.sim_client import api_log as _api_log_raw
 from cumcm.t3.config import (BEARING_ERROR_DEG, CHOSEN_RING_RADIUS, CLEAR_RADIUS, COVER_RADIUS,
-                             INLINE_R_MAX, INLINE_R_MIN, K_CLEAR_MAX, RESULTS_DIR, SEED, TRAJ_DIR)
+                             INLINE_MAX_MEC_R, INLINE_NEAR_R, INLINE_R_MAX, INLINE_R_MIN,
+                             K_CLEAR_MAX, RESULTS_DIR, SEED, TRAJ_DIR)
 from cumcm.t3.covering import (CoverSolveResult, optimal_ring_radius, print_cover_report, solve_covering_circles)
 from cumcm.common.scanfigure import STEP_DIR_NAME, reset_dir
 from cumcm.t3.plotting import save_scan_figures, save_trajectory, truth_points
@@ -83,8 +84,10 @@ def run_practice(args: argparse.Namespace, res: CoverSolveResult, save_dir: Path
                                              timeout=args.timeout),
                            verbose=not args.quiet, logfile=args.log, episode=ep + 1,
                            clear=clear, k_clear_max=args.k_clear_max,
-                           inline_radius_max=(None if args.inline_radius_max <= 0
-                                            else args.inline_radius_max),
+                           inline_r_min=args.inline_r_min,
+                           inline_r_max=args.inline_r_max,
+                           inline_near_r=args.inline_near_r,
+                           inline_max_mec_r=args.inline_max_mec_r,
                            rotate=not args.no_rotate, api_log=api_log)
             stats = dog.run(res.plan, res.survey_order)
             arena.finish_episode()
@@ -172,8 +175,10 @@ def run_official(args: argparse.Namespace, res: CoverSolveResult, save_dir: Path
     with _api_log(args, not args.quiet) as api_log:
         dog = RobotDog(sim, verbose=not args.quiet, logfile=args.log, episode=1,
                        clear=not args.survey_only, k_clear_max=args.k_clear_max,
-                           inline_radius_max=(None if args.inline_radius_max <= 0
-                                            else args.inline_radius_max),
+                       inline_r_min=args.inline_r_min,
+                       inline_r_max=args.inline_r_max,
+                       inline_near_r=args.inline_near_r,
+                       inline_max_mec_r=args.inline_max_mec_r,
                        rotate=not args.no_rotate, api_log=api_log)
         stats = dog.run(res.plan, res.survey_order)
         print(f"完成：清除 {stats['cleared']} 个，巡视 {stats['waypoints_visited']} 个圆心，"
@@ -256,9 +261,15 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--k-clear-max", type=int, default=K_CLEAR_MAX,
                    help=f"试清未中后最多再补清几个点（用 K 个半径 20 m 的圆覆盖定位区域；"
                         f"缺省 {K_CLEAR_MAX}，只在能盖满区域时才用，盖不满则转入补测）")
-    p.add_argument("--inline-radius-max", type=float, default=0.0,
-                   help=f"站点间前向顺路清除的估计点半径**上界** / m（0=缺省 {INLINE_R_MAX:.0f}；"
-                        f"下界固定 {INLINE_R_MIN:.0f}。本参数为二分搜索最优半径而设）")
+    p.add_argument("--inline-r-min", type=float, default=INLINE_R_MIN,
+                   help=f"站点间前向顺路清除的估计点半径**下界** / m（缺省 {INLINE_R_MIN:.0f}）")
+    p.add_argument("--inline-r-max", type=float, default=INLINE_R_MAX,
+                   help=f"站点间前向顺路清除的估计点半径**上界** / m（缺省 {INLINE_R_MAX:.0f}）")
+    p.add_argument("--inline-near-r", type=float, default=INLINE_NEAR_R,
+                   help=f"每站到站后的近距顺路清除半径 / m（缺省 {INLINE_NEAR_R:.0f}）")
+    p.add_argument("--inline-max-mec-r", type=float, default=INLINE_MAX_MEC_R,
+                   help=f"参与顺路清除的区域最大最小覆盖圆半径 / m（缺省 {INLINE_MAX_MEC_R:.0f}；"
+                        f"区域更大的频道不参与顺路，留给阶段二）")
     p.add_argument("--survey-only", action="store_true",
                    help="只做阶段一（巡视扫描 + 覆盖核对），不做定位与清除")
     p.add_argument("--traj-dir", default=TRAJ_DIR,

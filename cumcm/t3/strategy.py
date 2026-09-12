@@ -70,7 +70,11 @@ class RobotDog:
     def __init__(self, sim, verbose: bool = True, logfile: Optional[str] = None,
                  episode: int = 0, clear: bool = True,
                  k_clear_max: int = K_CLEAR_MAX,
-                 inline_radius_max: Optional[float] = None,  # None=前向上界取 INLINE_R_MAX
+                 inline_r_min: float = INLINE_R_MIN,
+                 inline_r_max: float = INLINE_R_MAX,
+                 inline_near_r: float = INLINE_NEAR_R,
+                 inline_max_mec_r: float = INLINE_MAX_MEC_R,
+                 inline_radius_max: Optional[float] = None,  # None=前向上界取 inline_r_max
                  rotate: bool = True,
                  api_log=None) -> None:
         # 传入 api_log 时套一层记录代理：4 个接口的每一次调用都会落盘
@@ -78,9 +82,13 @@ class RobotDog:
         self.sim = sim if api_log is None else RecordedSim(sim, api_log, episode)
         self.verbose = verbose
         self.clear_enabled = clear
-        self.k_clear_max = int(k_clear_max)
+        self.k_clear_max = int(k_clear_max)                   # 覆盖定位区域的 20m 圆最多补几个
+        self.inline_r_min = float(inline_r_min)               # 前向顺路半径下界 / m
+        self.inline_r_max = float(inline_r_max)               # 前向顺路半径上界 / m
+        self.inline_near_r = float(inline_near_r)             # 近距顺路清除半径 / m（距当前点）
+        self.inline_max_mec_r = float(inline_max_mec_r)       # 参与顺路的区域最大 mec 半径 / m
         self.inline_radius_max = (None if inline_radius_max is None
-                                  else float(inline_radius_max))  # 前向半径上界 / m（None=INLINE_R_MAX）
+                                  else float(inline_radius_max))  # 兼容旧参数：覆盖前向上界 / m
         self.rotate = bool(rotate)                           # 起始扫描后是否旋转覆盖圆布局
         # 过程日志用 "w"：每局开头重写，于是整份日志只描述**最新一局**。
         # 原先用 "a" 追加，跨局、跨运行无限累积，几轮演练后文件里混着几百局的内容难以查阅。
@@ -493,7 +501,7 @@ class RobotDog:
           · 半径：INLINE_R_MIN ≤ r_est ≤ r_max —— 用户 2026-09-12 指定前向顺路只清距原点
             600~1500 m 之间的估计点（下界 600 承接原"排除近圆心点"的语义并入判据本身，
             上界 1500 = 接收半径上界，比原来的"两站所在半径"更宽）；r_max 固定上界可用
-            inline_radius_max 覆盖（CLI --inline-radius-max）。
+            inline_r_max 或兼容参数 inline_radius_max 覆盖（CLI --inline-r-max）。
 
         反侧点（th_est 与 th_at 差 180°）会被三角不等式排除；必须用**角度**比较而不能用
         sin：|sin 180°| = 0，反侧点会被误判成同向。
@@ -501,10 +509,10 @@ class RobotDog:
         返回 (在短弧上的进度 0~1, 距圆心半径, 与 th_at 的角度差)；并列时按频道号定序。
         """
         r_est = math.hypot(est[0], est[1])
-        if r_est < INLINE_R_MIN - 1e-6:
+        if r_est < self.inline_r_min - 1e-6:
             return None                              # 距原点太近，不在前向清的范围
         r_max = (self.inline_radius_max if self.inline_radius_max is not None
-                 else INLINE_R_MAX)
+                 else self.inline_r_max)
         if r_est > r_max + 1e-6:
             return None                              # 超出半径上界
         th_at = self._polar_deg(at)
@@ -570,14 +578,15 @@ class RobotDog:
                      f"（{why}，留到阶段二处理）")
         return 0
 
-    def _nearby_clear(self, radius: float = INLINE_NEAR_R) -> int:
-        """每站到站后的近距顺路清除：距当前点 radius（缺省 100 m）以内的估计点全清。
+    def _nearby_clear(self, radius: Optional[float] = None) -> int:
+        """每站到站后的近距顺路清除：距当前点 radius（缺省 self.inline_near_r）以内的估计点全清。
 
         用户 2026-09-12 指定（替代原"站点间后向"）：不分方位，只要估计点距当前点 ≤ 100 m
         就清，清法同为"覆盖圆圆心处清、多个圆就清多次"（_cover_clear）。顺序按距离由近到远。
-        只有**区域小**（最小覆盖圆半径 ≤ INLINE_MAX_MEC_R）的频道才参与（大区域命中率低，
+        只有**区域小**（最小覆盖圆半径 ≤ self.inline_max_mec_r）的频道才参与（大区域命中率低，
         不值得顺路试，交给阶段二）。返回本段清除的频道数。
         """
+        radius = self.inline_near_r if radius is None else float(radius)
         if not self.clear_enabled or self._out_of_time():
             return 0
         cur = np.array(self.pos, dtype=float)
@@ -586,7 +595,7 @@ class RobotDog:
             if ch in self.cleared:
                 continue
             mec = self.region(ch).enclosing_circle
-            if mec is None or mec[2] > INLINE_MAX_MEC_R:
+            if mec is None or mec[2] > self.inline_max_mec_r:
                 continue                              # 区域为空/退化，或区域太大不参与顺路
             d = float(np.linalg.norm(np.asarray(mec[:2]) - cur))
             if d <= radius + 1e-6:
@@ -631,7 +640,7 @@ class RobotDog:
             mec = self.region(ch).enclosing_circle
             if mec is None:
                 continue                              # 区域为空/退化：连估计点都没有
-            if mec[2] > INLINE_MAX_MEC_R:
+            if mec[2] > self.inline_max_mec_r:
                 n_too_big += 1
                 continue                              # 区域太大：命中率低，不参与顺路（阶段二处理）
             est = (float(mec[0]), float(mec[1]))
@@ -644,11 +653,11 @@ class RobotDog:
         picked.sort(key=lambda p: (p[0], p[1]))       # 沿扇区方位由近到远依次清
         th_a = self._polar_deg(at)
         th_b = self._polar_deg(next_wp)
-        r_hi = self.inline_radius_max if self.inline_radius_max is not None else INLINE_R_MAX
+        r_hi = self.inline_radius_max if self.inline_radius_max is not None else self.inline_r_max
         self.log(f"    [顺路清除] 本站 ({at[0]:.0f}, {at[1]:.0f}) → 下一站"
                  f" ({next_wp[0]:.0f}, {next_wp[1]:.0f})：与圆心的连线方向在 {th_a:.0f}° ~ "
                  f"{th_b:.0f}° 之间（方位扇区 {ang_diff(th_a, th_b):.0f}°）、半径 "
-                 f"{INLINE_R_MIN:.0f}~{r_hi:.0f} m、区域覆盖圆半径 ≤ {INLINE_MAX_MEC_R:.0f} m，"
+                 f"{self.inline_r_min:.0f}~{r_hi:.0f} m、区域覆盖圆半径 ≤ {self.inline_max_mec_r:.0f} m，"
                  f"有 {len(picked)} 个估计点" + (f"（跳过 {n_too_big} 个区域过大的频道）"
                                                 if n_too_big else ""))
         n = 0

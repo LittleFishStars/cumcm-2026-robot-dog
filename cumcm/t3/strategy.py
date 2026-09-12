@@ -33,10 +33,10 @@ import numpy as np
 
 from functools import partial
 
-from cumcm.common.geometry import ang_diff, bearing, dist
+from cumcm.common.actions import ActionRecorder
+from cumcm.common.geometry import ang_diff, dist
 from cumcm.common.geometry import clamp_to_region as _clamp_to_region
-from cumcm.common.routing import (dist_matrix, exact_open_by_end, exact_open_order,
-                                  nearest_order)
+from cumcm.common.routing import dist_matrix, exact_open_by_end, exact_open_order
 from cumcm.common.sim_client import RecordedSim
 from cumcm.t3.config import (BEARING_ERROR_DEG, CHANNELS, CLEAR_RADIUS, CLIP_ERR, CLIP_SIDES,
                              COVER_RADIUS, HOMING_CAP, HOMING_MAX, HOMING_STEP,
@@ -55,7 +55,7 @@ from cumcm.t3.regions import Meas, Obs, ProbRegion
 clamp_to_region = partial(_clamp_to_region, radius=REGION_RADIUS - REGION_MARGIN)
 
 
-class RobotDog:
+class RobotDog(ActionRecorder):
     """两阶段机器狗。
 
     阶段一（巡视扫描）：按覆盖圆方案依次走到 7 个圆心，在每个圆心对未采够的频道测向，把
@@ -130,20 +130,7 @@ class RobotDog:
         self.scan_steps: List[Dict[str, Any]] = []
         self._cur_step: Optional[Dict[str, Any]] = None
 
-    # ---- 日志 ----
-    def log(self, msg: str) -> None:
-        if self.verbose:
-            print(msg, flush=True)
-        if self._logfile:
-            print(msg, file=self._logfile, flush=True)
-
-    def close(self) -> None:
-        """关闭日志文件（幂等）。"""
-        if self._logfile:
-            self._logfile.close()
-            self._logfile = None
-
-    # ---- 原子动作 ----
+    # ---- 日志与原子动作（log / close / clear / _note / _polar_deg 等）见 cumcm.common.actions ----
     def measure(self, x: float, y: float, channel: int) -> dict:
         """测向；direction 时记录示向度并同步进该频道的定位区域。"""
         x, y = float(x), float(y)
@@ -175,51 +162,7 @@ class RobotDog:
         > 1500 m ≥ 有效接收半径 ⇒ 必然收不到信号。此时这次测量不会带来任何新信息，直接跳过。
         """
         reg = self.regions.get(channel)
-        if reg is None or reg.region.is_empty:
-            return False
-        return reg.min_distance_to(at) > RECEIVE_MAX + 1.0
-
-    def clear(self, x: float, y: float, channel: int) -> bool:
-        """清除；返回是否成功。"""
-        x, y = float(x), float(y)
-        r = self.sim.clear(x, y, channel)
-        if not r.get("accepted"):
-            raise RuntimeError(f"/clear 被拒绝：{r}")
-        self.travel_m += dist(self.pos, (x, y))
-        self.pos, self.vt = np.array([x, y]), float(r["virtual_time_s"])
-        self.n_clear += 1
-        ok = r.get("clear_result") == "success"
-        if ok:
-            self.cleared.add(channel)
-            self.tracks.setdefault(channel, {})["clear_point"] = [x, y]
-        self._note("clear", x, y, channel, outcome="success" if ok else "no_target_in_range")
-        if self._cur_step is not None:
-            self._cur_step["clears"].append({"channel": int(channel), "success": bool(ok)})
-        return ok
-
-    def _note(self, kind: str, x: float, y: float, channel: int,
-              outcome: Optional[str] = None, theta: Optional[float] = None) -> None:
-        """登记一次动作（/measure 或 /clear），供逐局轨迹图与轨迹表使用。
-
-        记的是**动作点**（机器狗实际到达的坐标），与日志逐点对应；画图与落盘都在 /exit 之后
-        进行，不占用现实时间预算，也不影响任何实时决策。
-        """
-        self.actions.append({
-            "seq": len(self.actions), "kind": kind, "stage": self.stage,
-            "x": float(x), "y": float(y), "channel": int(channel),
-            "outcome": outcome, "theta": theta,
-            "virtual_time_s": round(self.vt, 3), "travel_m": round(self.travel_m, 2),
-        })
-
-    def _begin_scan_step(self, index: int, label: str, at: Sequence[float],
-                         n_channels: int) -> None:
-        """开始记录一步扫描（见 `scan_steps`）。动作由 measure/clear 自动挂到当前步上。"""
-        self._cur_step = {
-            "index": int(index), "label": label,
-            "x": float(at[0]), "y": float(at[1]), "n_channels": int(n_channels),
-            "counts": {}, "measures": [], "clears": [],
-            "virtual_time_s": round(self.vt, 3), "travel_m": round(self.travel_m, 2),
-        }
+        return reg is not None and reg.provably_out_of_reach(at, RECEIVE_MAX)
 
     def _end_scan_step(self, counts: Dict[str, int]) -> None:
         """收尾一步扫描：填统计与本步结束时的状态快照，然后登记（供收尾统一出图）。"""
@@ -238,9 +181,6 @@ class RobotDog:
         step["regions"] = {ch: verts for ch, reg in sorted(self.regions.items())
                            if len(verts := list(reg.vertices)) >= 3}
         self.scan_steps.append(step)
-
-    def _out_of_time(self) -> bool:
-        return time.monotonic() > self.deadline
 
     def region(self, channel: int) -> ProbRegion:
         """取该频道的"可能源集合"（ProbRegion）。
@@ -493,12 +433,6 @@ class RobotDog:
         """是否（近似）位于区域圆心（原点）—— 起点(0,0) 特判用。"""
         return math.hypot(p[0], p[1]) <= 1.0
 
-    @staticmethod
-    def _polar_deg(p: Sequence[float]) -> float:
-        """点 p 相对区域圆心（原点）的方位角 / 度，[0, 360)。起点(0,0) 的方位未定义，
-        调用方须先用 _at_origin 排除。"""
-        return math.degrees(math.atan2(p[1], p[0])) % 360.0
-
     def _in_azimuth_arc(self, at: Sequence[float], next_wp: Sequence[float],
                         est: Sequence[float]) -> Optional[Tuple[float, float, float]]:
         """估计点 est 是否落在「本站→圆心」与「下一站→圆心」两条连线之间的扇区内。
@@ -725,17 +659,6 @@ class RobotDog:
         idx = exact_open_order(len(channels), dist_matrix(pts, self.pos))
         return [channels[int(i)] for i in idx]
 
-    def _clear_points(self, channels: Sequence[int]) -> np.ndarray:
-        """各频道的清缺点（定位区域最小覆盖圆圆心）；拿不到估计点的退回当前位置。
-
-        返回的数组与 `channels` 同序，故 2-opt 的下标可直接映射回频道号。
-        """
-        pts = []
-        for c in channels:
-            mec = self.region(c).enclosing_circle
-            pts.append(np.array([mec[0], mec[1]]) if mec else np.array(self.pos, dtype=float))
-        return np.asarray(pts, dtype=float)
-
     # ---- 阶段 2b：按文献准则补测缩小定位区域 ----
     def refine(self, channel: int) -> int:
         """补测直到定位区域直径 < 40 m（或达到轮次/候选上限）；返回实际补测次数。"""
@@ -940,23 +863,6 @@ class RobotDog:
             cur = np.array([x, y], dtype=float)
         self.log(f"    [多清几次] 频道{channel}：{len(pts) + 1} 个点都未命中，转入补测")
         return None
-
-    def _finish_clear(self, channel: int) -> str:
-        """补测之后的收尾：再到新的估计点试清，失败则就地复测，最后兜底沿示向度逼近。"""
-        if self._try_clear(channel, "try-refined"):
-            return "try-refined"
-        mec = self.region(channel).enclosing_circle
-        if mec is not None:
-            cx, cy = mec[0], mec[1]
-            self.log(f"    [清除] 频道{channel} @ ({cx:.1f}, {cy:.1f}) 未命中，就地复测")
-            self.stage = "clear"
-            if self.measure(cx, cy, channel).get("measure_result") == "near" \
-                    and self.clear(cx, cy, channel):
-                return "near"
-        if self._homing(channel):
-            self.log(f"    [清除] 频道{channel} 兜底沿示向度逼近成功")
-            return "homing"
-        return "failed"
 
     def process(self, channel: int) -> None:
         """一个频道的完整处理：走到估计点先试清，未命中再补测缩小、然后再清。"""

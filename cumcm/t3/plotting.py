@@ -8,12 +8,15 @@
 序号）、从原点起的行驶路径、按结果分类的动作点（测得示向度 / 无信号 / 近距 / 清除尝试 /
 清除成功）、干扰源真值与 20 m 清除半径。
 
+与问题四共用的那部分画法（动作点分类、真值源、清除半径小圆、图例排版、轨迹表与落盘编排）
+在 `cumcm.common.trajfigure`；本模块只管问题三独有的元素（7 个覆盖圆与圆心访问序号）与
+问题三口径的图例文字。
+
 输出目录是 `<save-dir>/trajectory/`，落在 results/t3/ 结果树下。
 """
 
 from __future__ import annotations
 
-import csv
 import math
 import re
 from pathlib import Path
@@ -21,26 +24,18 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
 
-from cumcm.common.plotting import (C_COVER, C_DIR, C_FRAME, C_HIT, C_NEAR, C_NOSIG,
-                                   C_PATH, C_SRC, C_TRY, font_context, hint_plot_once,
-                                   save_png, setup_mpl_env, slug)
-from cumcm.common.scanfigure import STEP_DIR_NAME, ScanStep, draw_scan_step
+from cumcm.common.plotting import (C_COVER, C_FRAME, C_PATH, C_SRC, font_context, no_plot_hint,
+                                   save_png, setup_mpl_env)
+from cumcm.common.scanfigure import (STEP_DIR_NAME, draw_scan_step, scan_figure_path,
+                                     scan_step_of)
+from cumcm.common.trajfigure import (MEASURE_LABELS_T3, plot_action_points,
+                                     plot_source_markers, truth_points)
+from cumcm.common.trajfigure import save_trajectory as _save_trajectory
 from cumcm.t3.config import (CLEAR_RADIUS, COVER_RADIUS, RECEIVE_MAX, REGION_RADIUS,
                              TRAJ_DIR, TRAJ_DPI)
 from cumcm.t3.covering import CoverPlan
 
-
-def truth_points(truth: Optional[Sequence[dict]]) -> List[Dict[str, float]]:
-    """把引擎的源真值统一成 {channel, x, y}，供绘图使用（raw 引擎格式与核对行都能吃）。"""
-    out: List[Dict[str, float]] = []
-    for j in truth or []:
-        if "position" in j:                       # 引擎原始格式：{"position": {"x": .., "y": ..}}
-            pos = j["position"]
-            x, y = float(pos["x"]), float(pos["y"])
-        else:                                     # 核对行格式：{"x": .., "y": ..}
-            x, y = float(j["x"]), float(j["y"])
-        out.append({"channel": float(j["channel"]), "x": x, "y": y})
-    return out
+__all__ = ["truth_points", "draw_trajectory", "save_trajectory", "save_scan_figures"]
 
 
 def draw_trajectory(out_path: Path, actions: Sequence[Dict[str, Any]],
@@ -65,6 +60,7 @@ def draw_trajectory(out_path: Path, actions: Sequence[Dict[str, Any]],
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
+    out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     with font_context(size=10):
         from matplotlib.lines import Line2D
@@ -105,51 +101,17 @@ def draw_trajectory(out_path: Path, actions: Sequence[Dict[str, Any]],
                     zorder=4.0)
             handles.append(Line2D([], [], color=C_PATH, lw=1.0,
                                   label=f"行驶路径（{len(actions)} 次动作）"))
-            groups = (("direction", dict(marker=".", ms=5, ls="none", color=C_DIR),
-                       "测得示向度"),
-                      ("no_signal", dict(marker="x", ms=3.5, ls="none", color=C_NOSIG),
-                       "无信号"),
-                      ("near", dict(marker="o", ms=6, ls="none", mfc="none", mec=C_NEAR,
-                                    mew=1.4), "近距 near"))
-            for kind, style, label in groups:
-                sel = [(a["x"], a["y"]) for a in actions
-                       if a["kind"] == "measure" and a["outcome"] == kind]
-                if not sel:
-                    continue
-                arr = np.asarray(sel, dtype=float)
-                ax.plot(arr[:, 0], arr[:, 1], zorder=5.0, **style)
-                handles.append(Line2D([], [], label=f"{label}（{len(arr)} 次）", **style))
-            tries = [(a["x"], a["y"]) for a in actions if a["kind"] == "clear"]
-            if tries:
-                arr = np.asarray(tries, dtype=float)
-                ax.plot(arr[:, 0], arr[:, 1], marker="^", ms=5.5, ls="none", mfc="none",
-                        mec=C_TRY, mew=1.2, zorder=6.0)
-                handles.append(Line2D([], [], marker="^", ms=5.5, ls="none", mfc="none",
-                                      mec=C_TRY, mew=1.2,
-                                      label=f"清除尝试（{len(arr)} 次）"))
-                ok = np.asarray([(a["x"], a["y"]) for a in actions
-                                 if a["kind"] == "clear" and a["outcome"] == "success"],
-                                dtype=float)
-                if len(ok):
-                    # 清除落点必然紧贴真值（20 m 内），故画在最上层才看得见
-                    ax.plot(ok[:, 0], ok[:, 1], marker="*", ms=11, ls="none", color=C_HIT,
-                            zorder=8.0)
-                    handles.append(Line2D([], [], marker="*", ms=11, ls="none",
-                                          color=C_HIT, label=f"清除成功（{len(ok)} 个）"))
+            # 动作点按结果分类（测得示向度 / 无信号 / 近距 / 清除尝试 / 清除成功）见公共画法
+            plot_action_points(ax, actions, handles, MEASURE_LABELS_T3)
 
         # 干扰源真值（仅演练模式）与 20 m 清除半径
         if sources:
-            arr = np.asarray([(s["x"], s["y"]) for s in sources], dtype=float)
-            ax.plot(arr[:, 0], arr[:, 1], marker="X", ms=8, ls="none", color=C_SRC,
-                    zorder=7.0)
-            # 每个源一个半径 20 m 的圆：列方向必须是"每个圆一列"，否则会被连成一团
-            ax.plot(arr[:, 0][None, :] + CLEAR_RADIUS * cos_th[:, None],
-                    arr[:, 1][None, :] + CLEAR_RADIUS * sin_th[:, None],
-                    color=C_SRC, lw=0.7, alpha=0.75, zorder=1.5)
+            plot_source_markers(ax, sources, cos_th, sin_th, CLEAR_RADIUS)
             handles.append(Line2D([], [], marker="X", ms=8, ls="none", color=C_SRC,
-                                  label=f"干扰源真值（{len(arr)} 个）"))
+                                  label=f"干扰源真值（{len(sources)} 个）"))
             handles.append(Line2D([], [], color=C_SRC, lw=0.7, alpha=0.75,
-                                  label=f"清除半径 {CLEAR_RADIUS:.0f} m（全图视场 3600 m，需放大才可见）"))
+                                  label=f"清除半径 {CLEAR_RADIUS:.0f} m（全图视场 3600 m，"
+                                        f"需放大才可见）"))
 
         ax.plot(0.0, 0.0, marker="s", ms=6, color="black")
         handles.append(Line2D([], [], marker="s", ms=6, ls="none", color="black",
@@ -167,6 +129,22 @@ def draw_trajectory(out_path: Path, actions: Sequence[Dict[str, Any]],
         save_png(fig, out_path, dpi=TRAJ_DPI)
         plt.close(fig)
     return out_path
+
+
+def save_trajectory(save_dir: Path, name: str, actions: Sequence[Dict[str, Any]],
+                    plan: CoverPlan, order: Sequence[int] = (),
+                    sources: Sequence[Dict[str, Any]] = (),
+                    title: Optional[str] = None,
+                    traj_dir: str = TRAJ_DIR) -> List[Path]:
+    """落盘一局的轨迹：同名 PNG（图）与 CSV（轨迹表），返回已写出的文件列表。
+
+    轨迹表让"图上每个点"都能与过程日志逐点对账（序号、动作类型、阶段、坐标、结果、频道、
+    虚拟时刻、累计里程）。matplotlib 缺失只提示一次并跳过出图，轨迹表照常写出。
+    """
+    return _save_trajectory(
+        save_dir, name, actions,
+        lambda png: draw_trajectory(png, actions, plan, order, sources, title),
+        traj_dir)
 
 
 def save_scan_figures(save_dir: Path, name: str, steps: Sequence[Dict[str, Any]],
@@ -193,30 +171,16 @@ def save_scan_figures(save_dir: Path, name: str, steps: Sequence[Dict[str, Any]]
             if wp_i is not None and wp_i not in visited:
                 visited.append(wp_i)
         # 文件名只用 ASCII 与安全字符，避免不同文件系统下的编码问题
-        safe = slug(str(raw.get("label", f"step{k}")))
-        out = out_dir / f"{Path(name).name}_s{k:02d}_{safe}.png"
+        out = scan_figure_path(out_dir, name, k, raw)
         try:
-            draw_scan_step(out, ScanStep(
-                index=idx, label=str(raw.get("label", "")),
-                x=float(raw["x"]), y=float(raw["y"]),
-                n_channels=int(raw.get("n_channels", 0)),
-                counts=dict(raw.get("counts", {})),
-                virtual_time_s=float(raw.get("virtual_time_s", 0.0)),
-                travel_m=float(raw.get("travel_m", 0.0)),
-                measures=list(raw.get("measures", [])),
-                clears=list(raw.get("clears", [])),
-                path=[tuple(map(float, p)) for p in raw.get("path", [])],
-                cleared=list(raw.get("cleared", [])),
-                regions=raw.get("regions") or None,
-                estimates=raw.get("estimates") or None,
-            ), cover_centers=wp, visit_order=list(order), visited=list(visited),
-                cover_radius=COVER_RADIUS, region_radius=REGION_RADIUS,
-                gen_radius=REGION_RADIUS - 30.0, ray_len=RECEIVE_MAX,
-                sources=sources, clear_radius=CLEAR_RADIUS,
-                title=f"第 {k} 步扫描 / 共 {len(steps)} 步：{raw.get('label', '')}")
+            draw_scan_step(out, scan_step_of(raw, k), cover_centers=wp, visit_order=list(order),
+                           visited=list(visited), cover_radius=COVER_RADIUS,
+                           region_radius=REGION_RADIUS, gen_radius=REGION_RADIUS - 30.0,
+                           ray_len=RECEIVE_MAX, sources=sources, clear_radius=CLEAR_RADIUS,
+                           title=f"第 {k} 步扫描 / 共 {len(steps)} 步：{raw.get('label', '')}")
             paths.append(out)
         except ImportError:
-            _no_plot_hint()
+            no_plot_hint()
             return paths
     return paths
 
@@ -229,41 +193,3 @@ def _waypoint_of_label(label: str, order: Sequence[int], step_i: int) -> Optiona
     if 1 <= step_i <= len(order):
         return int(order[step_i - 1])
     return None
-
-
-def save_trajectory(save_dir: Path, name: str, actions: Sequence[Dict[str, Any]],
-                    plan: CoverPlan, order: Sequence[int] = (),
-                    sources: Sequence[Dict[str, Any]] = (),
-                    title: Optional[str] = None,
-                    traj_dir: str = TRAJ_DIR) -> List[Path]:
-    """落盘一局的轨迹：同名 PNG（图）与 CSV（轨迹表），返回已写出的文件列表。
-
-    轨迹表让"图上每个点"都能与过程日志逐点对账（序号、动作类型、阶段、坐标、结果、频道、
-    虚拟时刻、累计里程）。matplotlib 缺失只提示一次并跳过出图，轨迹表照常写出。
-    """
-    out_dir = save_dir / traj_dir
-    out_dir.mkdir(parents=True, exist_ok=True)
-    csv_path = out_dir / f"{name}.csv"
-    with csv_path.open("w", newline="", encoding="utf-8") as f:
-        w = csv.writer(f)
-        w.writerow(["seq", "kind", "stage", "x_m", "y_m", "channel", "outcome",
-                    "theta_deg", "virtual_time_s", "travel_m"])
-        for a in actions:
-            w.writerow([a["seq"], a["kind"], a["stage"], f"{a['x']:.2f}", f"{a['y']:.2f}",
-                        a["channel"], a["outcome"] or "",
-                        "" if a["theta"] is None else f"{a['theta']:.2f}",
-                        f"{a['virtual_time_s']:.3f}", f"{a['travel_m']:.2f}"])
-    paths = [csv_path]
-    try:
-        paths.insert(0, draw_trajectory(out_dir / f"{name}.png", actions, plan, order,
-                                        sources, title))
-    except ImportError:
-        _no_plot_hint()
-    return paths
-
-
-
-def _no_plot_hint() -> None:
-    """说明"这一局的图没生成"以及怎么才能生成（只打印一次，避免每局刷屏）。"""
-    hint_plot_once("提示：未安装 matplotlib，已跳过出图。装上即可自动生成：\n"
-                   "      .venv/bin/pip install matplotlib")

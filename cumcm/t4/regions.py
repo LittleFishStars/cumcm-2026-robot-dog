@@ -10,10 +10,11 @@
 
 no_signal 一律**不**作为区域约束（它给出的"源在覆盖范围之外或背向"无法转成可证明的圆盘
 内/外约束）。代价是单条射线只能给出"一条贯穿圆域的长带 ∩ 接收半径内包"，定位收敛完全靠
-**广角度的多视角交会**——这正由扫描阶段 23 个测量位置自然提供。
+**广角度的多视角交会**——这正由扫描阶段 20 个测量位置自然提供。
 
 保守性由两种相反方向的多边形近似保证：交（"在内"）用外接多边形、差（"在外"）用内接多边形。
 本类只做交集运算（楔形交 ∩ 圆域 ∩ 圆盘内包），全部是凸集交集，故区域保持凸、不会裂成多块。
+叠加机制本身（增量、惰性、缓存）在 `cumcm.common.disc_region`。
 
 `Obs` 是一条示向度（用于射线交会）；`Meas` 是一次测量的完整记录（含 no_signal，保留用于
 核对与出图——只是不作为区域约束）。
@@ -21,14 +22,11 @@ no_signal 一律**不**作为区域约束（它给出的"源在覆盖范围之�
 
 from __future__ import annotations
 
-import math
-from typing import Any, Dict, List, NamedTuple, Optional, Sequence, Tuple
+from typing import NamedTuple, Optional
 
-import shapely
-from shapely import Point
-
+from cumcm.common.disc_region import DiscConstraintMixin
 from cumcm.t1 import TriangulationRegion
-from cumcm.t4.config import EXCL_QUAD, NEAR_RADIUS, RECEIVE_MAX
+from cumcm.t4.config import EXCL_QUAD
 
 
 class Obs(NamedTuple):
@@ -59,86 +57,25 @@ class Meas(NamedTuple):
     stage: str = "sweep"
 
 
-class DirProbRegion(TriangulationRegion):
+class DirProbRegion(DiscConstraintMixin, TriangulationRegion):
     """问题四的"可能源集合"：交会楔形 ∩ 目标圆域，再叠加"direction ⇒ 接收半径内包"。
 
     与问题三 ProbRegion 的差别：**只有 add_inside（direction/near 给出的圆盘内约束），没有
-    add_outside**。原因是定向源使 no_signal 无法转成"源在圆盘外"的可证明约束（见模块文档）。
+    add_outside** —— `WITH_OUTSIDE = False`，一旦误调 add_outside 会直接报错，不会悄悄改变
+    区域语义。原因是定向源使 no_signal 无法转成"源在圆盘外"的可证明约束（见模块文档）。
 
-    所有运算都是凸集交集，区域保持凸，因此 `vertices`/`diameter`/`enclosing_circle` 直接按
-    父类（t1.TriangulationRegion）的凸多边形口径计算即可；这里只把圆盘内包增量叠加上去并
-    用 shapely 的最小覆盖圆给出 `enclosing_circle`。
+    所有运算都是凸集交集，区域保持凸，因此 `vertices` / `diameter` / `enclosing_circle` 按
+    凸多边形的口径计算即可（`vertices` 的多块分支在这里永不触发）。
     """
 
+    WITH_OUTSIDE = False
+
     def __init__(self, err: float = 1.0, radius: Optional[float] = None,
-                 sides: Optional[int] = None) -> None:
-        super().__init__(err, radius, sides)
-        self._inside: List[Tuple[float, float, float]] = []      # 源在此圆盘内
-        self._applied_in = 0
-        self._cache: Dict[str, Any] = {}
-
-    def add_inside(self, x: float, y: float, r: float) -> "DirProbRegion":
-        """叠加"源在以 (x, y) 为心、r 为半径的圆盘内"（direction 用 1500，near 用 5）。"""
-        self._inside.append((float(x), float(y), float(r)))
-        return self
-
-    def disc(self, x: float, y: float, r: float, inscribed: bool):
-        """圆盘的正多边形近似：inscribed=True 内接（⊆ 真圆盘），False 外接（⊇ 真圆盘）。
-
-        本类只用外接（交集方向），inscribed 参数保留以与 t3.regions 的接口保持一致。
-        """
-        rr = float(r) if inscribed else float(r) / math.cos(math.pi / (4.0 * EXCL_QUAD))
-        return Point(float(x), float(y)).buffer(rr, quad_segs=EXCL_QUAD)
-
-    @property
-    def region(self):
-        """楔形交 ∩ 圆域 之上再叠加圆盘内包（增量、惰性，语义见父类）。"""
-        geom = super().region
-        if self._applied_in < len(self._inside):
-            for x, y, r in self._inside[self._applied_in:]:
-                geom = geom.intersection(self.disc(x, y, r, False))
-            self._applied_in = len(self._inside)
-            self._region = geom                 # 覆盖父类缓存，后续增量楔形交由此继续
-            self._cache.clear()
-        return self._region
-
-    def _sig(self) -> tuple:
-        return (len(self._nodes), self._done, self._applied_in)
-
-    def _memo(self, key: str, compute):
-        self.region                             # 先让几何追平，再取签名
-        sig = self._sig()
-        if self._cache.get("sig") != sig:
-            self._cache = {"sig": sig}
-        if key not in self._cache:
-            self._cache[key] = compute()
-        return self._cache[key]
-
-    @property
-    def vertices(self):
-        """区域顶点（凸多边形外环，逆时针）；区域为空/退化时返回 []。"""
-        region = self.region
-        if region.is_empty or region.geom_type != "Polygon":
-            return []
-        pts = [(x, y) for x, y, *_ in region.exterior.coords[:-1]]
-        return pts if region.exterior.is_ccw else pts[::-1]
+                 sides: Optional[int] = None, quad: int = EXCL_QUAD) -> None:
+        """err / radius / sides 见父类；quad 为圆盘近似的正多边形精度（见 config.EXCL_QUAD）。"""
+        super().__init__(err, radius, sides, quad)
 
     @property
     def diameter(self):
+        """区域直径 / m：父类按顶点算最远点对（本题区域恒为凸，即为精确值）。"""
         return self._memo("diameter", lambda: TriangulationRegion.diameter.fget(self))
-
-    @property
-    def enclosing_circle(self):
-        def compute():
-            if not self.vertices:
-                return None
-            center = shapely.minimum_bounding_circle(self.region).centroid
-            return (center.x, center.y, float(shapely.minimum_bounding_radius(self.region)))
-        return self._memo("mec", compute)
-
-    def min_distance_to(self, p: Sequence[float]) -> float:
-        """区域（可能源集合）到点 p 的最小距离 / m；区域为空时返回 0。"""
-        geom = self.region
-        if geom.is_empty:
-            return 0.0
-        return float(geom.distance(Point(float(p[0]), float(p[1]))))

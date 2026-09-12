@@ -21,7 +21,7 @@ import ast
 import builtins
 import sys
 from pathlib import Path
-from typing import List
+from typing import List, Tuple
 
 BUILTINS = set(dir(builtins)) | {
     "__file__", "__name__", "__doc__", "__package__", "__class__", "__spec__", "__loader__",

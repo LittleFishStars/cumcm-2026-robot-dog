@@ -101,3 +101,14 @@ def hint_plot_once(reason: str) -> None:
         _PLOT_HINTED = True
         print(reason)
 
+
+# "这一局的图没能生成"的唯一文案：原先在两族绘图里各抄了一遍（问题四还多留了一份死代码），
+# 集中到这里后，改处置办法只需改一处，也不会出现两族口径不一致。
+NO_PLOT_HINT = ("提示：未安装 matplotlib，已跳过出图。装上即可自动生成：\n"
+                "      .venv/bin/pip install matplotlib")
+
+
+def no_plot_hint() -> None:
+    """说明"图没能生成"以及怎么才能生成（只打印一次，避免逐局、逐步骤刷屏）。"""
+    hint_plot_once(NO_PLOT_HINT)
+

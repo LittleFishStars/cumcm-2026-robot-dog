@@ -8,8 +8,12 @@
 **一步扫描是什么**：机器狗停在某个位置，把"尚未采够示向度且未清除"的频道按频道号升序测
 一遍。T3 的一步 = 起点全频道扫描 + 每个巡视站各一次。
 
-本模块只负责画，不负责取数：调用方把自己的记录整理成 `ScanStep` 传进来，两族画法共用同一套
-视觉约定。
+本模块只负责画，不负责取数：调用方把自己的记录整理成 `ScanStep` 传进来（`scan_step_of` 是从
+策略记录构造它的公共入口），两族画法共用同一套视觉约定。
+
+**画法分块**：`draw_scan_step` 只做编排，每一类元素一个 `_draw_*` 私有函数（圆域、覆盖圆、
+行驶路径、本步测向、就地清除、估计区域、真值源、收尾排版），块的先后顺序即叠放顺序，
+与图例顺序一致。
 
 matplotlib 只在绘图函数内导入，故未安装时只会抛 `ImportError`、由调用方忽略 ——
 官方测试机上没有 matplotlib 也能正常完成整局（`.venv/bin/pip install matplotlib` 即可启用）。
@@ -28,9 +32,10 @@ import numpy as np
 
 from cumcm.common.plotting import (C_COVER, C_DIR, C_FRAME, C_HIT, C_MEAS, C_NEAR,
                                    C_NOSIG, C_PATH, C_SRC, C_TRY, font_context, save_png,
-                                   setup_mpl_env)
+                                   setup_mpl_env, slug)
 
-__all__ = ["ScanStep", "draw_scan_step", "reset_dir", "STEP_DIR_NAME"]
+__all__ = ["ScanStep", "scan_step_of", "scan_figure_path", "draw_scan_step",
+           "reset_dir", "STEP_DIR_NAME"]
 
 STEP_DIR_NAME = "scan"          # 扫描图落在 <save-dir>/scan/ 下（与 trajectory/ 并列）
 
@@ -80,6 +85,37 @@ class ScanStep:
         return "，".join(parts)
 
 
+def scan_step_of(raw: Dict[str, Any], k: int) -> ScanStep:
+    """由机器狗登记的一步扫描记录（dict）构造 `ScanStep`。
+
+    键名契约见 `cumcm.common.actions.ActionRecorder._begin_scan_step` / 各题 `_end_scan_step`；
+    两族策略的记录格式一致，故这里只留一份转换。
+    """
+    return ScanStep(
+        index=int(raw.get("index", k)), label=str(raw.get("label", "")),
+        x=float(raw["x"]), y=float(raw["y"]),
+        n_channels=int(raw.get("n_channels", 0)),
+        counts=dict(raw.get("counts", {})),
+        virtual_time_s=float(raw.get("virtual_time_s", 0.0)),
+        travel_m=float(raw.get("travel_m", 0.0)),
+        measures=list(raw.get("measures", [])),
+        clears=list(raw.get("clears", [])),
+        path=[tuple(map(float, p)) for p in raw.get("path", [])],
+        cleared=list(raw.get("cleared", [])),
+        regions=raw.get("regions") or None,
+        estimates=raw.get("estimates") or None,
+    )
+
+
+def scan_figure_path(out_dir: Path, name: str, k: int, raw: Dict[str, Any]) -> Path:
+    """一步扫描图的路径：`<局号>_s<步序>_<标签>.png`，排序后与执行顺序一致。
+
+    标签经 `slug` 压成安全文件名片段，避免标签里的空格/括号在不同文件系统上出问题。
+    """
+    safe = slug(str(raw.get("label", f"step{k}")))
+    return Path(out_dir) / f"{Path(name).name}_s{k:02d}_{safe}.png"
+
+
 def reset_dir(path: Path) -> None:
     """清空一个输出目录（只保留最新一局用；目录不存在则什么都不做）。
 
@@ -115,7 +151,7 @@ def draw_scan_step(out_path: Path, step: ScanStep, *,
 
     图上元素：作业圆域、各覆盖圆、已访问/未访问圆心（当前站加粗）、到本步的行驶路径、
     本步测向点（按结果分类）与示向度射线、本步近距清除、本步结束时的估计（区域轮廓或 σ 圆）、
-    干扰源真值。
+    干扰源真值。各元素由下面的 `_draw_*` 依次叠加，顺序即层次与图例顺序。
     """
     setup_mpl_env()
     import matplotlib
@@ -131,121 +167,15 @@ def draw_scan_step(out_path: Path, step: ScanStep, *,
         th = np.linspace(0.0, 2.0 * math.pi, 361)
         cos_th, sin_th = np.cos(th), np.sin(th)
 
-        # 作业圆域与源生成域
-        ax.plot(region_radius * cos_th, region_radius * sin_th, color=C_FRAME, lw=1.4)
-        handles = [Line2D([], [], color=C_FRAME, lw=1.4,
-                          label=f"作业圆域 {region_radius:.0f} m")]
-        if gen_radius:
-            ax.plot(gen_radius * cos_th, gen_radius * sin_th, color=C_FRAME, lw=0.8,
-                    ls="--", alpha=0.85)
-            handles.append(Line2D([], [], color=C_FRAME, lw=0.8, ls="--", alpha=0.85,
-                                  label=f"源生成域 {gen_radius:.0f} m"))
-
-        # 覆盖圆：本步所在的站用粗线强调，其余细线
-        wp = np.asarray(cover_centers, dtype=float) if len(cover_centers) else np.zeros((0, 2))
-        cur_idx = -1
-        if len(wp):
-            for i, (cx, cy) in enumerate(wp):
-                if float(np.hypot(cx - step.x, cy - step.y)) <= 1.0:
-                    cur_idx = i
-                ax.plot(cx + cover_radius * cos_th, cy + cover_radius * sin_th,
-                        color=C_COVER, lw=0.6, alpha=0.42, zorder=1.0)
-            if cur_idx >= 0:                       # 当前站所在的覆盖圆描粗，一眼看出人在哪
-                cx, cy = wp[cur_idx]
-                ax.plot(cx + cover_radius * cos_th, cy + cover_radius * sin_th,
-                        color=C_COVER, lw=1.6, alpha=0.9, zorder=1.2)
-            if len(visited):
-                vis = wp[np.asarray(list(visited), dtype=int)]
-                ax.plot(vis[:, 0], vis[:, 1], marker="o", ms=5.0, ls="none",
-                        mfc=C_COVER, mec=C_COVER, alpha=0.75, zorder=3.0)
-            ax.plot(wp[:, 0], wp[:, 1], marker="o", ms=4.5, ls="none", mfc="none",
-                    mec=C_COVER, mew=1.2, zorder=3.0)
-            for k, idx in enumerate(visit_order or range(len(wp))):
-                ax.annotate(f"{k + 1}", (wp[idx, 0], wp[idx, 1]), textcoords="offset points",
-                            xytext=(5, 4), fontsize=8, color=C_COVER)
-            handles.append(Line2D([], [], color=C_COVER, lw=0.6, alpha=0.42,
-                                  label=f"{len(wp)} 个覆盖圆（半径 {cover_radius:.0f} m）"))
-            handles.append(Line2D([], [], marker="o", ms=5.0, ls="none", mfc=C_COVER,
-                                  mec=C_COVER, alpha=0.75, label="已访问的圆心"))
-
-        # 到本步为止的行驶路径
-        if step.path:
-            arr = np.asarray(step.path, dtype=float)
-            ax.plot(arr[:, 0], arr[:, 1], "-", lw=1.0, color=C_PATH, alpha=0.75, zorder=4.0)
-            handles.append(Line2D([], [], color=C_PATH, lw=1.0,
-                                  label=f"到本步的行驶路径（累计 {step.travel_m:.0f} m）"))
-
-        # 本步的测向点，按结果分类；示向度另画一条射线（源必在该方向上）
-        groups = (("direction", dict(marker="o", ms=6.0, ls="none", color=C_DIR), "有示向度"),
-                  ("no_signal", dict(marker="x", ms=5.0, ls="none", color=C_NOSIG), "无信号"),
-                  ("near", dict(marker="o", ms=7.0, ls="none", mfc="none", mec=C_NEAR,
-                                mew=1.5), "近距 near"))
-        for kind, style, label in groups:
-            sel = [m for m in step.measures if m.get("outcome") == kind]
-            if not sel:
-                continue
-            arr = np.asarray([(step.x, step.y)] * len(sel), dtype=float)   # 本步都在同一站
-            ax.plot(arr[:, 0], arr[:, 1], zorder=6.0, **style)
-            handles.append(Line2D([], [], label=f"{label}（{len(sel)} 次）", **style))
-        rays = [m for m in step.measures
-                if m.get("outcome") == "direction" and m.get("theta") is not None]
-        if rays:
-            # theta 为示向度（度）：从测量点沿该方向画到接收半径上限，直观看出"这条约束
-            # 把源限制在哪条射线上"。逐条画线但不逐条进图例，否则图例会被撑爆。
-            for m in rays:
-                rad = math.radians(float(m["theta"]))
-                ax.plot([step.x, step.x + ray_len * math.cos(rad)],
-                        [step.y, step.y + ray_len * math.sin(rad)],
-                        color=C_DIR, lw=0.8, alpha=0.55, zorder=5.0)
-            handles.append(Line2D([], [], color=C_DIR, lw=0.8, alpha=0.55,
-                                  label=f"示向度射线（长 {ray_len:.0f} m，{len(rays)} 条）"))
-
-        # 本步就地清除（近距命中）
-        if step.clears:
-            ok = [(step.x, step.y) for c in step.clears if c.get("success")]
-            if ok:
-                arr = np.asarray(ok, dtype=float)
-                # 就地清除与扫描点在同一坐标，必须画在扫描点之上才看得见
-                ax.plot(arr[:, 0], arr[:, 1], marker="*", ms=15, ls="none", color=C_HIT,
-                        zorder=11.0)
-                handles.append(Line2D([], [], marker="*", ms=13, ls="none", color=C_HIT,
-                                      label=f"本步就地清除（{len(ok)} 个）"))
-            bad = len(step.clears) - len(ok)
-            if bad:
-                arr = np.asarray([(step.x, step.y)] * bad, dtype=float)
-                ax.plot(arr[:, 0], arr[:, 1], marker="^", ms=6.5, ls="none", mfc="none",
-                        mec=C_TRY, mew=1.3, zorder=7.0)
-                handles.append(Line2D([], [], marker="^", ms=6.5, ls="none", mfc="none",
-                                      mec=C_TRY, mew=1.3, label=f"清除未中（{bad} 次）"))
-
-        # 本步结束时的估计：按用户要求（2026-09-12）去掉"定位估计 1σ 圆 / 中心十字"（橙黄小圈与
-        # 射线混在一起杂乱），但**保留可能源区域的多边形轮廓**（区域形状信息仍有价值）。
-        if step.regions:
-            widths = []
-            for ch, ring in sorted(step.regions.items()):
-                pts = list(ring)
-                if len(pts) < 3:
-                    continue
-                arr = np.asarray(pts + [pts[0]], dtype=float)
-                ax.plot(arr[:, 0], arr[:, 1], color=C_MEAS, lw=0.8, alpha=0.7, zorder=5.5)
-                # 区域"宽度"取包围盒对角线：用来量化"信息收缩到什么程度"（逐步对比即可看到
-                # 从几百米收到几十米）。用包围盒而非精确直径，是画图取值的廉价近似。
-                widths.append(float(np.hypot(np.max(arr[:, 0]) - np.min(arr[:, 0]),
-                                             np.max(arr[:, 1]) - np.min(arr[:, 1]))))
-            med = float(np.median(widths)) if widths else 0.0
-            handles.append(Line2D([], [], color=C_MEAS, lw=0.8, alpha=0.7,
-                                  label=f"可能源区域（{len(widths)} 个频道，中位宽 {med:.0f} m）"))
-
-        # 干扰源真值（仅演练模式有）与清除半径
-        if sources:
-            arr = np.asarray([(s["x"], s["y"]) for s in sources], dtype=float)
-            ax.plot(arr[:, 0], arr[:, 1], marker="X", ms=8, ls="none", color=C_SRC,
-                    zorder=8.0)
-            ax.plot(arr[:, 0][None, :] + clear_radius * cos_th[:, None],
-                    arr[:, 1][None, :] + clear_radius * sin_th[:, None],
-                    color=C_SRC, lw=0.7, alpha=0.7, zorder=1.5)
-            handles.append(Line2D([], [], marker="X", ms=8, ls="none", color=C_SRC,
-                                  label=f"干扰源真值（{len(arr)} 个）"))
+        handles: List[Any] = []
+        _draw_frame(ax, handles, cos_th, sin_th, region_radius, gen_radius)
+        _draw_cover_circles(ax, handles, step, cos_th, sin_th, cover_centers, visit_order,
+                            visited, cover_radius)
+        _draw_path(ax, handles, step)
+        _draw_measures(ax, handles, step, ray_len)
+        _draw_local_clears(ax, handles, step)
+        _draw_regions(ax, handles, step)
+        _draw_sources(ax, handles, sources, cos_th, sin_th, clear_radius)
 
         # 当前站位置：画在最上层，是本图的主角
         ax.plot(step.x, step.y, marker="s", ms=7, color="black", zorder=10.0)
@@ -265,3 +195,161 @@ def draw_scan_step(out_path: Path, step: ScanStep, *,
         save_png(fig, out_path, dpi=160.0)
         plt.close(fig)
     return out_path
+
+
+# ---------------------------------------------------------------------------
+# 各元素的分块画法（顺序即叠放顺序，与图例顺序一致）
+# ---------------------------------------------------------------------------
+def _draw_frame(ax, handles, cos_th, sin_th, region_radius: float,
+                gen_radius: Optional[float]) -> None:
+    """作业圆域与源生成域（后者虚线，仅在给定 gen_radius 时画）。"""
+    from matplotlib.lines import Line2D
+
+    ax.plot(region_radius * cos_th, region_radius * sin_th, color=C_FRAME, lw=1.4)
+    handles.append(Line2D([], [], color=C_FRAME, lw=1.4,
+                          label=f"作业圆域 {region_radius:.0f} m"))
+    if gen_radius:
+        ax.plot(gen_radius * cos_th, gen_radius * sin_th, color=C_FRAME, lw=0.8,
+                ls="--", alpha=0.85)
+        handles.append(Line2D([], [], color=C_FRAME, lw=0.8, ls="--", alpha=0.85,
+                              label=f"源生成域 {gen_radius:.0f} m"))
+
+
+def _draw_cover_circles(ax, handles, step: ScanStep, cos_th, sin_th,
+                        cover_centers: Sequence[Point], visit_order: Sequence[int],
+                        visited: Sequence[int], cover_radius: float) -> None:
+    """覆盖圆与圆心：本步所在的站用粗线强调，已访问的圆心填实，圆心标注访问序号。"""
+    from matplotlib.lines import Line2D
+
+    wp = np.asarray(cover_centers, dtype=float) if len(cover_centers) else np.zeros((0, 2))
+    if not len(wp):
+        return
+    cur_idx = -1
+    for i, (cx, cy) in enumerate(wp):
+        if float(np.hypot(cx - step.x, cy - step.y)) <= 1.0:
+            cur_idx = i
+        ax.plot(cx + cover_radius * cos_th, cy + cover_radius * sin_th,
+                color=C_COVER, lw=0.6, alpha=0.42, zorder=1.0)
+    if cur_idx >= 0:                       # 当前站所在的覆盖圆描粗，一眼看出人在哪
+        cx, cy = wp[cur_idx]
+        ax.plot(cx + cover_radius * cos_th, cy + cover_radius * sin_th,
+                color=C_COVER, lw=1.6, alpha=0.9, zorder=1.2)
+    if len(visited):
+        vis = wp[np.asarray(list(visited), dtype=int)]
+        ax.plot(vis[:, 0], vis[:, 1], marker="o", ms=5.0, ls="none",
+                mfc=C_COVER, mec=C_COVER, alpha=0.75, zorder=3.0)
+    ax.plot(wp[:, 0], wp[:, 1], marker="o", ms=4.5, ls="none", mfc="none",
+            mec=C_COVER, mew=1.2, zorder=3.0)
+    for k, idx in enumerate(visit_order or range(len(wp))):
+        ax.annotate(f"{k + 1}", (wp[idx, 0], wp[idx, 1]), textcoords="offset points",
+                    xytext=(5, 4), fontsize=8, color=C_COVER)
+    handles.append(Line2D([], [], color=C_COVER, lw=0.6, alpha=0.42,
+                          label=f"{len(wp)} 个覆盖圆（半径 {cover_radius:.0f} m）"))
+    handles.append(Line2D([], [], marker="o", ms=5.0, ls="none", mfc=C_COVER,
+                          mec=C_COVER, alpha=0.75, label="已访问的圆心"))
+
+
+def _draw_path(ax, handles, step: ScanStep) -> None:
+    """到本步为止的行驶路径。"""
+    from matplotlib.lines import Line2D
+
+    if not step.path:
+        return
+    arr = np.asarray(step.path, dtype=float)
+    ax.plot(arr[:, 0], arr[:, 1], "-", lw=1.0, color=C_PATH, alpha=0.75, zorder=4.0)
+    handles.append(Line2D([], [], color=C_PATH, lw=1.0,
+                          label=f"到本步的行驶路径（累计 {step.travel_m:.0f} m）"))
+
+
+def _draw_measures(ax, handles, step: ScanStep, ray_len: float) -> None:
+    """本步的测向点（按结果分类）与示向度射线。"""
+    from matplotlib.lines import Line2D
+
+    groups = (("direction", dict(marker="o", ms=6.0, ls="none", color=C_DIR), "有示向度"),
+              ("no_signal", dict(marker="x", ms=5.0, ls="none", color=C_NOSIG), "无信号"),
+              ("near", dict(marker="o", ms=7.0, ls="none", mfc="none", mec=C_NEAR,
+                            mew=1.5), "近距 near"))
+    for kind, style, label in groups:
+        sel = [m for m in step.measures if m.get("outcome") == kind]
+        if not sel:
+            continue
+        arr = np.asarray([(step.x, step.y)] * len(sel), dtype=float)   # 本步都在同一站
+        ax.plot(arr[:, 0], arr[:, 1], zorder=6.0, **style)
+        handles.append(Line2D([], [], label=f"{label}（{len(sel)} 次）", **style))
+    rays = [m for m in step.measures
+            if m.get("outcome") == "direction" and m.get("theta") is not None]
+    if not rays:
+        return
+    # theta 为示向度（度）：从测量点沿该方向画到接收半径上限，直观看出"这条约束把源限制在
+    # 哪条射线上"。逐条画线但不逐条进图例，否则图例会被撑爆。
+    for m in rays:
+        rad = math.radians(float(m["theta"]))
+        ax.plot([step.x, step.x + ray_len * math.cos(rad)],
+                [step.y, step.y + ray_len * math.sin(rad)],
+                color=C_DIR, lw=0.8, alpha=0.55, zorder=5.0)
+    handles.append(Line2D([], [], color=C_DIR, lw=0.8, alpha=0.55,
+                          label=f"示向度射线（长 {ray_len:.0f} m，{len(rays)} 条）"))
+
+
+def _draw_local_clears(ax, handles, step: ScanStep) -> None:
+    """本步就地清除（近距命中）与未中次数。"""
+    from matplotlib.lines import Line2D
+
+    if not step.clears:
+        return
+    ok = [(step.x, step.y) for c in step.clears if c.get("success")]
+    if ok:
+        arr = np.asarray(ok, dtype=float)
+        # 就地清除与扫描点在同一坐标，必须画在扫描点之上才看得见
+        ax.plot(arr[:, 0], arr[:, 1], marker="*", ms=15, ls="none", color=C_HIT, zorder=11.0)
+        handles.append(Line2D([], [], marker="*", ms=13, ls="none", color=C_HIT,
+                              label=f"本步就地清除（{len(ok)} 个）"))
+    bad = len(step.clears) - len(ok)
+    if bad:
+        arr = np.asarray([(step.x, step.y)] * bad, dtype=float)
+        ax.plot(arr[:, 0], arr[:, 1], marker="^", ms=6.5, ls="none", mfc="none",
+                mec=C_TRY, mew=1.3, zorder=7.0)
+        handles.append(Line2D([], [], marker="^", ms=6.5, ls="none", mfc="none",
+                              mec=C_TRY, mew=1.3, label=f"清除未中（{bad} 次）"))
+
+
+def _draw_regions(ax, handles, step: ScanStep) -> None:
+    """本步结束时的可能源区域轮廓。
+
+    按用户要求（2026-09-12）去掉"定位估计 1σ 圆 / 中心十字"（橙黄小圈与射线混在一起杂乱），
+    但**保留可能源区域的多边形轮廓**（区域形状信息仍有价值）。
+    """
+    from matplotlib.lines import Line2D
+
+    if not step.regions:
+        return
+    widths = []
+    for _ch, ring in sorted(step.regions.items()):
+        pts = list(ring)
+        if len(pts) < 3:
+            continue
+        arr = np.asarray(pts + [pts[0]], dtype=float)
+        ax.plot(arr[:, 0], arr[:, 1], color=C_MEAS, lw=0.8, alpha=0.7, zorder=5.5)
+        # 区域"宽度"取包围盒对角线：用来量化"信息收缩到什么程度"（逐步对比即可看到从几百米
+        # 收到几十米）。用包围盒而非精确直径，是画图取值的廉价近似。
+        widths.append(float(np.hypot(np.max(arr[:, 0]) - np.min(arr[:, 0]),
+                                     np.max(arr[:, 1]) - np.min(arr[:, 1]))))
+    med = float(np.median(widths)) if widths else 0.0
+    handles.append(Line2D([], [], color=C_MEAS, lw=0.8, alpha=0.7,
+                          label=f"可能源区域（{len(widths)} 个频道，中位宽 {med:.0f} m）"))
+
+
+def _draw_sources(ax, handles, sources: Sequence[Dict[str, Any]], cos_th, sin_th,
+                  clear_radius: float) -> None:
+    """干扰源真值（仅演练模式有）与清除半径小圆。"""
+    from matplotlib.lines import Line2D
+
+    if not sources:
+        return
+    arr = np.asarray([(s["x"], s["y"]) for s in sources], dtype=float)
+    ax.plot(arr[:, 0], arr[:, 1], marker="X", ms=8, ls="none", color=C_SRC, zorder=8.0)
+    ax.plot(arr[:, 0][None, :] + clear_radius * cos_th[:, None],
+            arr[:, 1][None, :] + clear_radius * sin_th[:, None],
+            color=C_SRC, lw=0.7, alpha=0.7, zorder=1.5)
+    handles.append(Line2D([], [], marker="X", ms=8, ls="none", color=C_SRC,
+                          label=f"干扰源真值（{len(arr)} 个）"))

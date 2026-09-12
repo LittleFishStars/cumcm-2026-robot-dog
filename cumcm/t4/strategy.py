@@ -28,7 +28,7 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 import numpy as np
 
 from cumcm.common.actions import ActionRecorder
-from cumcm.common.geometry import ang_diff, bearing
+from cumcm.common.geometry import ang_diff
 from cumcm.common.geometry import clamp_to_region as _clamp_to_region
 from cumcm.common.geometry import dist
 from cumcm.common.routing import dist_matrix, exact_open_order
@@ -124,7 +124,6 @@ class RobotDog(ActionRecorder):
         self._cur_step: Optional[Dict[str, Any]] = None
 
     # ---- 日志与原子动作（log / close / clear / _note / _polar_deg 等）见 cumcm.common.actions ----
-    # ---- 原子动作 ----
     def measure(self, x: float, y: float, channel: int) -> dict:
         x, y = float(x), float(y)
         r = self.sim.measure(x, y, channel)

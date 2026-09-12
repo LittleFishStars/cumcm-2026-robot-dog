@@ -194,23 +194,6 @@ def train_net(X: np.ndarray, Y: np.ndarray, epochs: int = 80,
 # --------------------------------------------------------------------------
 # 4. 搜索：多起点局部搜索（高斯扰动爬山）
 # --------------------------------------------------------------------------
-def build_seeds(n_free: int) -> List[np.ndarray]:
-    """搜索起点：结构启发（环 / 环+内部点 / 双环 / 贴边环）的确定性起点。"""
-    seeds = []
-
-    def ring(n, r, rot=0.0):
-        a = np.linspace(0, 2 * math.pi, n, endpoint=False) + rot
-        return np.stack([r * np.cos(a), r * np.sin(a)], 1)
-
-    seeds.append(ring(19, 1850.0))                                    # 19 点单环
-    seeds.append(np.vstack([ring(13, 1850.0), ring(6, 850.0, 0.26)]))  # 环 + 内 6
-    seeds.append(ring(19, 1500.0))                                    # 内移环
-    seeds.append(ring(19, 1850.0, 0.26))                              # 环旋转
-    seeds.append(np.vstack([ring(12, 1850.0), ring(7, 1150.0, 0.26)]))  # 双环
-    seeds.append(ring(19, 1750.0))                                    # 贴边环
-    return seeds
-
-
 def search(net: nn.Module, n_free: int, starts: Sequence[np.ndarray],
            iters: int = 4000, sigma: float = 120.0, w_omni: float = 0.5,
            seed: int = 3, dev: str = "cpu") -> Tuple[np.ndarray, float]:

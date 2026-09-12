@@ -126,8 +126,8 @@ def fig_sweep_lattice(fig_dir: Path, plan) -> None:
                     fontsize=9, color=C_SRC)
 
         ax.set_aspect("equal")
-        ax.set_xlim(-2500, 2500)
-        ax.set_ylim(-2500, 2500)
+        ax.set_xlim(-2650, 2650)      # 留白：贴边定向源的半圆盘上缘可达 ~2562 m
+        ax.set_ylim(-2650, 2650)
         ax.grid(alpha=0.25, lw=0.5)
         ax.set_xlabel("x / m")
         ax.set_ylabel("y / m")
@@ -156,13 +156,14 @@ def fig_episode_clear(survey: Dict[str, Any], fig_dir: Path) -> None:
         ax1.plot(xs, nsrc, "X", ms=8, color=C_SRC, label="全向 + 定向源总数")
         ax1.set_xlabel("seed")
         ax1.set_ylabel("干扰源数")
-        ax1.set_ylim(0, max(max(nsrc) + 2, 18))
+        ax1.set_ylim(0, max(max(nsrc) + 4, 20))     # 柱顶留白，避免图例/标记贴边
         ax2 = ax1.twinx()
         ax2.plot(xs, vt, "o-", ms=5, color=C_OUTER, label="虚拟时间 / min")
         ax2.set_ylabel("虚拟时间 / min")
         h1, l1 = ax1.get_legend_handles_labels()
         h2, l2 = ax2.get_legend_handles_labels()
-        ax1.legend(h1 + h2, l1 + l2, loc="upper right", fontsize=8.5)
+        ax1.legend(h1 + h2, l1 + l2, loc="upper center", bbox_to_anchor=(0.5, -0.13),
+                   ncol=4, fontsize=8.5, framealpha=0.9)   # 放到坐标区外，不压柱顶
         ax1.set_title(f"问题四演练 {len(rows)} 局：{sum(cleared)}/{sum(nsrc)} 个源全部清除，"
                       f"平均虚拟时间 {np.mean(vt):.1f} min")
         _save(fig, fig_dir / "fig_t4_episode_clear.pdf")
@@ -210,11 +211,13 @@ def fig_localization_error(survey: Dict[str, Any], fig_dir: Path) -> None:
                 label="该局最差单源定位误差")
         ax.axhline(CLEAR_RADIUS, color=C_SRC, ls="--", lw=1.2,
                    label=f"清除半径 {CLEAR_RADIUS:.0f} m")
+        ax.set_ylim(0.0, max(max(maxs), CLEAR_RADIUS) * 1.25)
         ax.set_xlabel("演练局（seed 升序）")
         ax.set_ylabel("定位误差 / m")
         ax.set_title(f"清除点定位误差：局均 {np.mean(errs):.2f} m（最大 {np.max(maxs):.2f} m），"
                      f"全部 ≤ {CLEAR_RADIUS:.0f} m")
-        ax.legend(fontsize=8.5)
+        ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.13), ncol=3, fontsize=8.5,
+                  framealpha=0.9)      # 放到坐标区外，避免被曲线穿过
         _save(fig, fig_dir / "fig_t4_localization_error.pdf")
 
 
@@ -241,7 +244,8 @@ def fig_cost(survey: Dict[str, Any], plan, fig_dir: Path) -> None:
         ax.set_title(f"时间构成：检测扫描行驶固定 {sweep_min:.1f} min"
                      f"（占均值 {np.mean(vt) / 60.0:.1f} min 的 {sweep_min / np.mean(vt / 60.0) * 100:.0f}%），"
                      f"其余为收尾定位与测向")
-        ax.legend(fontsize=8.5)
+        ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.13), ncol=3, fontsize=8.5,
+                  framealpha=0.9)      # 放到坐标区外，不压总时间折线
         _save(fig, fig_dir / "fig_t4_cost.pdf")
 
 
@@ -262,10 +266,14 @@ def fig_directional_concept(fig_dir: Path) -> None:
         ax.add_patch(Polygon(np.vstack([arc, np.array([0.0, 0.0])]), closed=True,
                              facecolor=C_OK, alpha=0.14, edgecolor=C_OK, lw=1.2,
                              label=f"定向源检测区（R = {R:.0f} m，±90°）"))
+        back_deg = (math.degrees(thb) + 180.0) % 360.0        # 背光侧（红点）所在方位
         for k in range(0, 360, 30):
             a = math.radians(k)
-            d = 1580.0
-            ax.plot(d * math.cos(a), d * math.sin(a), ".", color="black", ms=5)
+            d = 1250.0        # 标注环半径：留在坐标区内，别顶到标题上
+            # 背光侧红点（1.15R）正压在 210° 方位上，该处标注沿径向再外推，避免被圆盘盖住
+            if abs((k - back_deg + 180.0) % 360.0 - 180.0) < 20.0:
+                d = 1480.0
+            ax.plot(1250.0 * math.cos(a), 1250.0 * math.sin(a), ".", color="black", ms=5)
             ax.annotate(f"{k}°", (d * math.cos(a), d * math.sin(a)), textcoords="offset points",
                         xytext=(4, 4), fontsize=7.5, color="black")
         front = np.array([R * math.cos(thb), R * math.sin(thb)]) * 1.15
@@ -283,11 +291,13 @@ def fig_directional_concept(fig_dir: Path) -> None:
                  head_width=40, length_includes_head=True)
         ax.set_aspect("equal")
         ax.set_xlim(-1750, 1750)
-        ax.set_ylim(-1400, 1400)
+        ax.set_ylim(-1450, 1450)
         ax.grid(alpha=0.25, lw=0.5)
         ax.set_xlabel("x / m")
         ax.set_ylabel("y / m")
-        ax.legend(loc="upper right", fontsize=8.5)
+        # 图例放坐标区下方：右上角会压住 90°/60° 两个方位标注与环顶数据点
+        ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.10), ncol=2, fontsize=8.5,
+                  framealpha=0.9)
         ax.set_title("问题四的核心差异：同一距离，方向不对就听不到（no_signal 不再是'源太远'）")
         _save(fig, fig_dir / "fig_t4_directional_concept.pdf")
 
@@ -377,11 +387,13 @@ def fig_nn_speed_compare(results_dir: Path, fig_dir: Path) -> None:
         for i, (b, t, r, n) in enumerate(zip(bars, times, rates, npts)):
             ax.text(b.get_x() + b.get_width() / 2, t + top * 0.02, f"{t:.0f} s", ha="center",
                     va="bottom", fontsize=10)
-            ax.text(b.get_x() + b.get_width() / 2, t * 0.94, f"听率 {r:.2f}%\n{n} 位置",
-                    ha="center", va="top", fontsize=8, color="white")
+            # 深蓝柱用白字，浅灰柱用深色字（白字对比度仅约 2.6:1，打印会发糊）
+            ax.text(b.get_x() + b.get_width() / 2, t * 0.94, f"听率 {r:.3f}%\n{n} 位置",
+                    ha="center", va="top", fontsize=8,
+                    color="white" if abs(t - best) < 1e-9 else "#1f2937")
         ax.axhline(best, color="#2563eb", ls="--", lw=1.0, alpha=0.6)
-        ax.text(len(arms) - 0.45, best * 1.02, f"最小 {best:.0f} s", color="#2563eb",
-                fontsize=8, ha="right")
+        ax.text(len(arms) - 0.62, best * 1.04, f"最小 {best:.0f} s", color="#2563eb",
+                fontsize=8, ha="right")     # 留在坐标区内，别压右边框
         ax.set_xticks(range(len(arms)))
         ax.set_xticklabels(names, fontsize=8.5)
         ax.set_ylabel("20 局平均虚拟时间 / s", fontsize=10)

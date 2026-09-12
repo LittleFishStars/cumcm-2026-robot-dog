@@ -272,6 +272,8 @@ seed16=12/12(5580s)   seed17=14/14(6209s)   seed18=11/11(7133s)   seed19=15/15(6
 布局对照（人工 20 / 人工 23 / NN 12 外圈 / NN 11 外圈 / NN 自由）的统一口径实测汇总在
 `results/t4/.nn_arm_speed.json`，点集见其 `note`；重跑方式：
 `T4.py --practice 20 --seed 0 --layout-file <布局.npy> --save-dir <临时目录>`。
+（2026-09-13 之前的逐局速度日志 `results/t4/.speed20_p1.log`、`.speed20_nn11.log` 记录的是参数修订
+之前、以"人工 20 点版 6 850 s"为基准的旧实测，已被上述统一口径汇总取代并删除，可从 git 历史取回。）
 
 ## 7. 复现
 

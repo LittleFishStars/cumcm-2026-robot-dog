@@ -3,7 +3,9 @@
 模式：
   --baseline20  人工 20 点版：7 覆盖基点 + 12×1850 均匀外圈（文献环带结构）；
   --elite N     NN-GA 在外圈约束下搜索的精英榜（results/t4/.nn_speed_elite.npz）；
-  --best        当前最优（.nn_speed_best.npy）。
+  --best        当前最优（.nn_speed_best.npy）；
+  --layout-file 直接指定一份 (K,2) 布局点（首个点应为原点起点），用于论文里的
+                布局对照（人工 23 点历史候选 / 神经网络精英布局等）。
 
 布局统一组装：原点 + 7 基点 + 外圈点；路线 = 最近邻 + 2-opt（确定性）。
 """
@@ -21,22 +23,12 @@ from cumcm.common.sim_client import Simulator
 from cumcm.t3.config import SURVEY_CENTERS
 from cumcm.t4.nn_layout_speed import assemble
 from cumcm.t4.strategy import RobotDog
-from cumcm.t4.sweep import SweepPlan
+from cumcm.t4.sweep import SweepPlan, plan_from_points
 
 
 def make_plan(points: np.ndarray) -> SweepPlan:
-    pts = np.asarray(points, dtype=float)
-    D = dist_matrix(pts, (0.0, 0.0))
-    order = two_opt_greedy(two_opt_first(nearest_order(pts, start=(0.0, 0.0)), D), D)
-    m = 0.0
-    prev = pts[0]
-    for i in order:
-        m += float(np.hypot(*(pts[i] - prev)))
-        prev = pts[i]
-    n_outer = int((np.hypot(pts[:, 0], pts[:, 1]) > 1200.0).sum())
-    return SweepPlan(outer_n=n_outer, outer_radius=1850.0,
-                     interior_n=max(0, len(pts) - 1 - n_outer),
-                     interior_radius=900.0, points=pts, route=list(order), route_m=m)
+    """直接复用求解器里的构造口径（最近邻 + 2-opt 开路径），保证与定案布局同口径。"""
+    return plan_from_points(points)
 
 
 def baseline20() -> np.ndarray:
@@ -50,6 +42,7 @@ def main() -> None:
     ap.add_argument("--baseline20", action="store_true")
     ap.add_argument("--elite", type=int, default=0, help="精英榜前 N 个逐演（0=不演）")
     ap.add_argument("--best", action="store_true")
+    ap.add_argument("--layout-file", default=None, help="(K,2) 布局 npy，点来自 build_sweep_plan 同款路线")
     ap.add_argument("--seeds", type=int, nargs="*", default=[0, 1])
     ap.add_argument("--robot-port", type=int, default=2001)
     ap.add_argument("--console-port", type=int, default=8095)
@@ -75,6 +68,9 @@ def main() -> None:
             run("baseline20(7基点+12环)", baseline20(), a.seeds)
         if a.best:
             run("nn-best", assemble(np.load("results/t4/.nn_speed_best.npy")), a.seeds)
+        if a.layout_file:
+            pts = np.load(a.layout_file)
+            run(f"layout({Path(a.layout_file).stem},{len(pts)}点)", pts, a.seeds)
         if a.elite > 0:
             z = np.load("results/t4/.nn_speed_elite.npz")
             for i in range(min(a.elite, len(z["dir"]))):

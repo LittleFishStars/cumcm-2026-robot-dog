@@ -30,7 +30,8 @@ from cumcm.t4.plotting import save_scan_figures, save_trajectory, truth_points
 from cumcm.t4.report import (episode_row, observation_rows, save_plan, save_survey,
                              truth_check)
 from cumcm.t4.strategy import RobotDog
-from cumcm.t4.sweep import SweepPlan, build_sweep_plan, print_sweep_report, verify_hearing_stats
+from cumcm.t4.sweep import (SweepPlan, build_sweep_plan, plan_from_points,
+                            print_sweep_report, verify_hearing_stats)
 
 
 def _api_log(args: argparse.Namespace, echo: bool):
@@ -262,6 +263,8 @@ def build_parser() -> argparse.ArgumentParser:
                    help=f"轨迹图输出子目录（相对 --save-dir；缺省 {TRAJ_DIR}）")
     p.add_argument("--no-plot", action="store_true",
                    help=f"不出逐局轨迹图（缺省每局在 <save-dir>/{TRAJ_DIR}/ 生成同名 png + csv）")
+    p.add_argument("--layout-file", default=None,
+                   help="改用指定 (K,2) 布局 npy（论文布局对照实验用；缺省用 solver 里的 20 点定案）")
     p.add_argument("--quiet", action="store_true", help="只输出汇总，不打印过程")
     return p
 
@@ -280,7 +283,12 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     print("=" * 78)
 
     # 第一步：求扫描方案并做听到率统计（只需一次；随后所有局共用这份点集）
-    plan = build_sweep_plan()
+    if args.layout_file:
+        plan = plan_from_points(np.load(args.layout_file))
+        print(f"布局来源：{args.layout_file}（{plan.n_points} 个测量位置，里程 "
+              f"{plan.route_m / 1000:.2f} km）")
+    else:
+        plan = build_sweep_plan()
     verify = verify_hearing_stats(plan.points)
     if not args.quiet:
         print_sweep_report(plan, verify)

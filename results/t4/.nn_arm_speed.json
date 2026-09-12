@@ -1,0 +1,72 @@
+{
+ "note": "各布局在 2026-09-13 新采纳参数下的 20 局（seed 0-19）实测；由 T4.py --practice 20 --layout-file 生成，听率由 cumcm.t4.sweep.verify_hearing_stats 对同一 4 224 640 例口径重算；各布局点集：人工 20 点 = cumcm.t4.sweep.build_sweep_plan()，人工 23 点 = results/t4/.manual23_layout.npy，NN 12/11 外圈 = results/t4/.nn_speed_elite12.npz / .nn_speed_elite11.npz 的 pts[0] 经 assemble()，NN 自由 23 点 = results/t4/.nn_best_layout.npy + 原点",
+ "arms": [
+  {
+   "key": "human20",
+   "label": "人工 20 点（定案）",
+   "n_points": 20,
+   "hear_rate": 0.999891,
+   "n_episodes": 20,
+   "mean_virtual_s": 6444.8,
+   "min_s": 5580,
+   "max_s": 7861,
+   "mean_travel_m": 24392,
+   "cleared": 256,
+   "sources": 256
+  },
+  {
+   "key": "human23",
+   "label": "人工 23 点（历史候选）",
+   "n_points": 23,
+   "hear_rate": 0.999974,
+   "n_episodes": 20,
+   "mean_virtual_s": 6687.9,
+   "min_s": 5864,
+   "max_s": 7740,
+   "mean_travel_m": 24454,
+   "cleared": 256,
+   "sources": 256
+  },
+  {
+   "key": "nn12",
+   "label": "神经网络 12 外圈",
+   "n_points": 20,
+   "hear_rate": 0.999218,
+   "n_episodes": 20,
+   "mean_virtual_s": 6947.4,
+   "min_s": 6014,
+   "max_s": 7978,
+   "mean_travel_m": 26458,
+   "cleared": 256,
+   "sources": 256
+  },
+  {
+   "key": "nn11",
+   "label": "神经网络 11 外圈",
+   "n_points": 19,
+   "hear_rate": 0.997778,
+   "n_episodes": 20,
+   "mean_virtual_s": 6723.5,
+   "min_s": 5685,
+   "max_s": 7679,
+   "mean_travel_m": 25410,
+   "cleared": 255,
+   "sources": 256
+  }
+ ],
+ "extra": [
+  {
+   "key": "nnfree",
+   "label": "神经网络自由 23 位置",
+   "n_points": 23,
+   "hear_rate": 0.999419,
+   "n_episodes": 2,
+   "mean_virtual_s": 7696.6,
+   "min_s": 6960,
+   "max_s": 8433,
+   "mean_travel_m": 29605,
+   "cleared": 27,
+   "sources": 27
+  }
+ ]
+}

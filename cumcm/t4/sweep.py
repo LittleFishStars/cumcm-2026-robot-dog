@@ -136,6 +136,29 @@ def build_sweep_plan() -> SweepPlan:
                      points=arr, route=route, route_m=route_m)
 
 
+def plan_from_points(points: Sequence[Sequence[float]]) -> SweepPlan:
+    """按给定点集构造扫描方案（供布局对照实验复现同一路线口径）。
+
+    与 :func:`build_sweep_plan` 用完全相同的确定性排序（最近邻 + 2-opt 开路径），故
+    "某布局在 20 局演练里耗时多少"这一对照口径与定案布局一致。点集第 0 个应为原点。
+    报告用的 `outer_n` / `interior_n` 按半径粗分（> 1200 m 记外圈），只影响报告文字。
+    """
+    arr = np.asarray(points, dtype=float)
+    assert arr.ndim == 2 and arr.shape[1] == 2, "点集形状应为 (K, 2)"
+    D = dist_matrix(arr, (0.0, 0.0))
+    order = two_opt_greedy(two_opt_first(nearest_order(arr, start=(0.0, 0.0)), D), D)
+    route = list(order)
+    route_m = 0.0
+    prev = arr[0]
+    for i in order:
+        route_m += float(np.hypot(*(arr[i] - prev)))
+        prev = arr[i]
+    n_outer = int((np.hypot(arr[:, 0], arr[:, 1]) > 1200.0).sum())
+    return SweepPlan(outer_n=n_outer, outer_radius=OUTER_RING_RAD,
+                     interior_n=max(0, len(arr) - 1 - n_outer), interior_radius=MID_RING_RAD,
+                     points=arr, route=route, route_m=route_m)
+
+
 def _hit_report(pts: np.ndarray, g: np.ndarray, theta_rad: float, R: float) -> Tuple[bool, float]:
     """单个算例：是否存在测量点在（距离 ≤ R 且 在光束内）；返回 (命中?, 命中深度 |m−g|/R)。
 

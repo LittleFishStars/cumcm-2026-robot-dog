@@ -637,8 +637,6 @@ class RobotDog:
             self.log(f"    本段顺路清除 {n} 个，累计已清 {len(self.cleared)} 个")
         return n
 
-        return n
-
     # ---- 阶段 2a：巡视后的定位诊断（只记录，不改变处理流程）----
     def diagnose(self) -> Dict[str, int]:
         """记录每个频道巡视后的定位区域直径/有界性，并统计"估计已够准"的个数。

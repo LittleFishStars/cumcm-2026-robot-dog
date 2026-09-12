@@ -27,3 +27,9 @@ jammers-py/
 # 参考文献 PDF（53 M，撰写论文时本地查阅用；体积不适合入库）
 # README 与 reports/ 里引用的结论都写了出处，不依赖这些 PDF 文件本身
 References/
+
+# LaTeX 编译中间产物（交付物是 .tex 源码与编译好的 main.pdf）
+*.aux
+*.toc
+*.out
+*.synctex.gz

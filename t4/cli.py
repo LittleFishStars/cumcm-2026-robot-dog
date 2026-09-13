@@ -1,12 +1,4 @@
-"""运行编排与命令行入口（问题四）：两种模式加参数解析
-
-* `run_practice`：本地演练。jammers-py 生成问题四场景，定向源与全向源混合，能拿到真值；
-* `run_official`：正式模式。连官方模拟器，真值不可见，策略与演练完全一样。
-
-命令行入口就是本模块，`python -m t4`，用法跟 `python -m t3` 保持一致。--practice 跑演练，
---plan-only 只求方案，不带参数就连官方模拟器。三档输出见 common/console：缺省每步 1~2 行关键
-结论，--verbose 还原完整过程，含 `=` 分隔线、每局阶段统计明细与图路径，--quiet 只留最终产物路径。
-"""
+"""问题四的运行编排与命令行入口"""
 
 from __future__ import annotations
 

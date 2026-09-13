@@ -1,30 +1,4 @@
-"""覆盖圆的求解与校验，阶段一的几何底座
-
-问题很短：用尽量少的半径 1000 m 的圆盖住半径 1800 m 的作业圆域，使圆域内任意一点到最近
-圆心的距离都 ≤ 1000 m，也就是有效接收半径的下界。做到了这一点，机器狗走到任一圆心都能
-听到全域的源。
-
-最少个数由 disk covering problem 的已证明最优值定死为 7，推导见 min_circle_count。剩下的
-自由度是圆心怎么摆：7 个点要保证"圆域内任一点到最近圆心 ≤ 1000 m"，同时让从原点出发走遍
-它们的开放路径尽量短，还得给各方位源留下像样的交会几何。经典的正六边形族，1 个中心圆加
-6 个环圆，里程恒为 6d，最好也就 6737.73 m。两种一般 7 点布局靠 CLI `--layout` 切换，缺省
-是 uniform：
-* uniform 用 SURVEY_CENTERS_UNIFORM：7 点均匀分布在半径 1000 m 的圆上，正七边形，里程
-  ~6207 m，零余量；换来的是圆周对称，定位误差更均衡，实测降 −14%；
-* optimized 用 SURVEY_CENTERS：7 点被数值优化推到距原点约 1000 m 处，里程 ~6167 m，
-  余量 5 m。
-本模块给出解析的最坏最近距离 D(d) = max(d/√3, g₂(d))、可行环半径区间和最优环半径 d*，另外
-在连续圆域上实算最坏点做数值校验。这一步不能省：网格上"看起来满足"离真正满足还差得远，
-当初就是这么漏掉圆域边缘的源的。结果全部在 print_cover_report 里。
-
-    from t3.covering import solve_covering_circles
-    res = solve_covering_circles()          # 缺省用 config.SURVEY_CENTERS_UNIFORM，均匀布局
-    res = solve_covering_circles(use_uniform=False)  # 或优化布局 config.SURVEY_CENTERS
-    res = solve_covering_circles(1200.0)    # 或指定六边形族的环半径，用于对照和扫描
-
-注：`nearest_order` / `path_length` 复用 common.routing 中的同名实现。后者在公共模块里叫
-open_path_length，这里保留别名，只为贴合"走遍圆心的总里程"这一说法。
-"""
+"""覆盖圆的求解与校验：7 个半径 1000 m 的圆盖住半径 1800 m 的作业圆域"""
 
 from __future__ import annotations
 

@@ -1,21 +1,4 @@
-"""逐局轨迹图：问题三、问题四共用的那部分画法与落盘
-
-为什么只抽一部分：两题的轨迹图骨架相同，圆域、本题特有点位、行驶路径、按结果分类的动作点、
-真值源、起点、图例，但"本题特有点位"与图例文字的口径不一样。问题三画 7 个覆盖圆与圆心访问
-序号，问题四画 20 个测量位置与定向源波束扇形。所以这里只收逐字相同的部分：
-
-* `truth_points`：把引擎的源真值统一成绘图用的最小字典，原始格式与核对行格式都吃；
-* `plot_action_points`：按测量结果与清除动作分类画点并生成图例项。测向分测得示向度 / 无信号 /
-  近距三档，清除分尝试与成功。分类规则、点型、层次与图例计数两题完全一致，只有图例文字由
-  各题传入，问题四更强调"测向"二字；
-* `plot_source_markers`：真值源的红叉与每个源一圈的 20 m 清除半径。"每圆一列"的列方向写法
-  极易写错，只留一份；
-* `write_trajectory_csv`：轨迹表，11 列的格式与精度两题必须一致，逐点可与过程日志对账；
-* `save_trajectory`：落盘编排，建目录、写轨迹表、出图，缺 matplotlib 时只提示一次。
-
-缺 matplotlib 时那句提示也只有一份，就是 `NO_PLOT_HINT`，原先在两题里写了三遍。
-matplotlib 仍只在绘图函数内导入：官方测试机上没有它也能正常完成整局。
-"""
+"""逐局轨迹图：问题三、问题四共用的那部分画法与落盘"""
 
 from __future__ import annotations
 
@@ -46,6 +29,7 @@ _TRY_STYLE: dict[str, Any] = dict(marker="^", ms=5.5, ls="none", mfc="none", mec
 _HIT_STYLE: dict[str, Any] = dict(marker="*", ms=11, ls="none", color=C_HIT)
 
 
+# 本模块只收两题逐字相同的那部分画法，点位与图例文字由调用方传入
 def truth_points(truth: Sequence[dict] | None) -> list[dict[str, Any]]:
     """把引擎的源真值统一成 `{channel, x, y, kind, direction_deg}`，供绘图使用
 

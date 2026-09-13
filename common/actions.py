@@ -1,24 +1,4 @@
-"""机器狗的动作记录、过程日志与"与模拟器交互的基础动作"，问题三、问题四共用
-
-这三样东西在两题里是同一份契约，不该各写一遍：
-
-* 动作记录的 schema，也就是 `actions` 里的键，被 `common.trajfigure` 的轨迹图与轨迹表按名
-  读取，而轨迹图、轨迹表本身又是公共代码。谁改了键名忘改另一处，图上就会静默少一类点；
-* 一步扫描的记录 schema，`scan_steps` 里的键，被 `common.scanfigure` 的逐步扫描图读取，同理；
-* 原子动作 `clear`、`_note` 对 `travel_m`/`vt`/`n_clear`/`cleared`/`tracks` 的更新顺序两题必须
-  一致，不然"里程与虚拟时刻"的口径会在两题之间慢慢漂开。
-
-所以这里把这些逐字相同的实现收成一份混合器，各题 `RobotDog` 只管继承：
-
-    class RobotDog(ActionRecorder):
-        '''...本题特有的两阶段策略...'''
-
-本模块不绑定任何一题的 config。用到阈值、半径的地方，`_provable_no_signal`、`_apply_meas`
-这些，仍留在各题策略里，那里能直接引用各自的 config 常量。
-
-`_finish_clear` 虽然带着清除流程，但两题逐字相同，都调子类的 `_try_clear` / `_homing`，
-索性一并放这儿。
-"""
+"""动作记录、过程日志与基础动作，问题三、问题四共用一份"""
 
 from __future__ import annotations
 
@@ -89,7 +69,8 @@ class ActionRecorder:
         """登记一次动作，/measure 或 /clear，供逐局轨迹图与轨迹表使用
 
         记的是动作点，也就是机器狗实际到达的坐标，与日志逐点对应。画图和落盘都在 /exit
-        之后进行，不占用现实时间预算，也不影响任何实时决策。
+        之后进行，不占用现实时间预算，也不影响任何实时决策。键名被 `common.trajfigure`
+        和 `common.scanfigure` 按名字读取，改名要同步这两处。
         """
         self.actions.append({
             "seq": len(self.actions), "kind": kind, "stage": self.stage,

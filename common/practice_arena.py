@@ -1,14 +1,4 @@
-"""本地演练场：拉起或复用 jammers-py 模拟器，另加它的控制台 REST
-
-各入口原先各写了一份几乎相同的 PracticeArena，这里合并成一份取各版之并的实现，严格增强：
-
-* 复用已在运行的实例，多会话并行演练时免得抢端口；
-* 连续开局遇到 409 就重试，上一局会话未完全释放时短暂等一会儿。
-
-可复现性要点：jammers-py 的 `generate_scenario` 只把 seed 用在干扰源布局上，示向度噪声种子
-`noise_seed_hex` 每次随机。`start_episode` 把它覆写成由 seed 派生的确定值，于是同一个 `--seed`
-必然得到同一份扫描结果，布局与噪声都固定，新旧策略才能严格对照。
-"""
+"""本地演练场：拉起或复用 jammers-py，并操作它的控制台 REST 接口"""
 
 from __future__ import annotations
 

@@ -125,7 +125,8 @@ the same floating-point operations as the scalar reference, which keeps `python 
 this reason: replacing `np.hypot` by `sqrt(x²+y²)` in the T2 diameter pair loop, which shifted the
 last bits of `t2_second_site.json`.
 
-Design rationale lives in the module docstrings. `README.md` only covers environment and usage.
+Design rationale lives in the docstrings, mostly on the functions and constants that carry it. `README.md`
+only covers environment and usage.
 
 ## Code style (follows the author's conventions in `~/Projects`)
 
@@ -163,8 +164,12 @@ the author's own habit across `~/Projects/python/MBridge`, `~/Projects/python/GN
   ```
 
   The sample shows the layout only (4-space indent inside a section, written as `name: description` /
-  `type: description`); the real text is Chinese. The maths, constraints and pitfalls already recorded
-  in existing module docstrings are content. Do not trim them away in the name of brevity.
+  `type: description`); the real text is Chinese. Whatever a function docstring already records about
+  maths, constraints and pitfalls is content, so keep it there.
+- Module docstrings are one-line introductions, not design notes: say what the file is for in a
+  sentence or two, three lines at the very most. Constraints, derivations, traps and history belong
+  in the function docstring or comment that carries them, in the commit message, or in the paper; do
+  not restate them at the top of the file.
 - Type annotations: annotate parameters and return values on every function and method, including
   `-> None` on `__init__` and on internal `_helper`s. Use only builtin generics and `|`:
   `list[float]`, `tuple[float, float]`, `dict[str, Any]`, `float | None` — never

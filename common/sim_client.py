@@ -1,28 +1,4 @@
-"""模拟器 HTTP+JSON 接口层，也就是题目附件 2 的 4 条指令，外加调用日志
-
-里面三个东西，从薄到厚：
-
-* `Simulator`：最薄的一层。补齐 arena_id/robot_id、生成 request_id、POST 出去、解析 JSON。
-* `ApiLog`：把每次调用的请求参数和原始响应写成 JSONL，能与模拟器自己的日志逐行对照。
-* `RecordedSim`：记录代理。4 个接口原样转发，每次调用顺手交给 ApiLog 落盘。
-
-    from common.sim_client import Simulator
-
-    sim = Simulator(robot_id="<参赛队号>")   # 队号一律运行时传入，代码里不留任何队号
-    sim.enter()
-    r = sim.measure(300, 400, 1)             # r["measure_result"]: no_signal / near / direction
-    if r["measure_result"] == "direction":
-        r["svd_deg"]                         # 示向度，含 ±1° 误差
-    sim.clear(300, 0, 3)                     # r["clear_result"]: success / no_target_in_range
-    sim.exit()
-
-协议上有两点要留意。HTTP 错误由 urllib 抛 HTTPError；业务拒绝不一样，它是 HTTP 200 但
-accepted=false，不抛异常，看返回值里的 accepted 判断。网络中断后重试同一动作时，把原
-request_id 传进来复用原请求，别让一次断线在模拟器侧变成两次动作。
-
-顶层原先还有个 `sim_api.py` 兼容垫片，已经删了。要这些名字直接从本模块导入：
-`from common.sim_client import Simulator`。
-"""
+"""模拟器 HTTP+JSON 接口层与调用日志，也就是附件 2 的 4 条指令"""
 
 from __future__ import annotations
 

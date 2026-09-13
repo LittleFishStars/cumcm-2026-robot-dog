@@ -1,24 +1,4 @@
-"""问题 1：交会定位法的定位区域，基于 shapely/GEOS 与 numpy。
-
-检测点 S 处测得示向度 theta、测向误差 ±err，题目里 err=1°，干扰源必落在以 S 为顶点、张角
-2*err 的楔形内。把楔形写成一个足够长的三角形多边形，定位区域就是所有楔形之交再与目标圆域
-取交。
-
-目标圆域用 buffer 生成内接正 64 边形。顶点精确落在半径 1800 m 的圆上，圆域横跨 3600 m；
-弦与真圆的最大偏差是 1800*(1-cos(π/64)) ≈ 2.17 m。几何运算全部交给库：交集用 shapely(GEOS)、
-面积用 region.area、直径用 numpy 成对距离、最小覆盖圆用 minimum_bounding_circle、包含判断用
-covers。
-
-增量性：add_node 只追加检测点，region 惰性求解并缓存"已并入多少个"。逐点读结果时每次只对
-新楔形求一次交，历史约束不重算。问题三的 ProbRegion 正是靠这个增量接口，在楔形交之上再叠加
-圆盘约束。
-
-语义：区域已被圆域截断，所以 area / diameter / enclosing_circle 拿到的都是截断后的有限值。
-"定位是否只靠检测点就确定了"由 bounded 单独回答，有顶点落在圆域边界上说明该方向约束不足，
-此时为 False。
-
-依赖 shapely>=2.1、numpy。命令行入口：`python -m t1`。
-"""
+"""问题 1：交会定位法的定位区域，基于 shapely/GEOS 与 numpy"""
 
 from math import atan2, cos, degrees, hypot, radians, sin
 

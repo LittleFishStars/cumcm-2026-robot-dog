@@ -1,28 +1,4 @@
-"""圆盘硬约束的"可能源集合"：问题三、问题四共用的区域叠加机制
-
-它只做一件事：在父类 `t1.TriangulationRegion` 的"楔形交 ∩ 目标圆域"之上，再叠加每次测量给出的
-圆盘硬约束。源在某圆盘内用交，拿外接多边形近似；源在某圆盘外用差，拿内接多边形近似。两种近似
-方向相反，所以真源永远不会被切掉。论证见 `t3/regions.py` 与 `t4/regions.py`，那两处只需说明
-本题有哪些约束，不必再各写一遍同样的几何机制。
-
-为什么是混合器而不是基类：分层约定是 `common <- t1/t3/t4`，`common` 不能反向依赖 `t1`，所以这里
-不继承 `TriangulationRegion`，只约定宿主类必须把它排在 MRO 中 `TriangulationRegion` 之前：
-
-    class ProbRegion(DiscConstraintMixin, TriangulationRegion):
-        WITH_OUTSIDE = True          # 本题的"收不到 ⇒ 源在圆盘外"是可证明约束
-
-宿主类须提供下面这些，都由 `TriangulationRegion` 给出：
-
-* `region` 属性：楔形交 ∩ 圆域的增量几何。本类用 `super().region` 取它，拿到后继续增量维护
-  `_region`，圆盘约束与楔形约束共享同一份缓存；
-* `_nodes` / `_done` / `_region`：父类的增量状态，几何签名靠它们判断要不要重算。
-
-增量性是这么来的：`add_inside` / `add_outside` 只追加约束，`region` 惰性求解并缓存"已并入几条"。
-反复读直径、最小覆盖圆时只补新增的那几条，历史约束不重算。
-
-近似参数 `quad`：圆盘用正 `4×quad` 边形近似，取各题 config 的 `EXCL_QUAD`，16 就是正 64 边形。
-交用外接，半径 ×1/cos(π/4q)，是 ⊇ 真圆盘；差用内接，半径不变，是 ⊆ 真圆盘。
-"""
+"""圆盘硬约束的可能源集合，问题三、问题四共用的区域叠加机制"""
 
 from __future__ import annotations
 
@@ -44,7 +20,8 @@ class DiscConstraintMixin:
     """把"源在圆盘内 / 圆盘外"的硬约束增量叠加到宿主类的 `region` 上
 
     子类只要声明本题有哪几类约束，也就是 `WITH_OUTSIDE`，再绑定各自的圆盘近似精度，
-    几何机制全在这里。
+    几何机制全在这里。宿主类须把它排在 MRO 中 `TriangulationRegion` 之前，否则 `region`
+    取不到基类的多边形。
     """
 
     WITH_OUTSIDE = False        # 子类按题意打开：可证明"收不到 ⇒ 源在圆盘外"时才开

@@ -64,9 +64,10 @@ mathematical-modelling problems 1-4).
   carries only its commit pointer, so run `git submodule update --init jammers-py` once.
   While it is absent, only the offline commands above run; once present, `--practice` and
   ground-truth checks work.
-- It needs **no third-party packages** (standard library only); its own `data/` (practice statistics
-  DB + behaviour logs, which contain the team id) and `figures/` are generated at run time and are
-  excluded from the submission package.
+- It needs **no third-party packages** (standard library only; its former `tools/` plot script, which
+  pulled in matplotlib/numpy, was deleted on request). Its `data/` (practice statistics DB +
+  behaviour logs, which contain the team id) is generated at run time and is excluded from the
+  submission package.
 - `uv run python -m simulator --help` or `cd jammers-py; uv run python run.py`.
 
 ## Running against the official simulator

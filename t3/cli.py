@@ -15,7 +15,8 @@ from typing import Sequence
 
 import numpy as np
 
-from common.console import relax_console_encoding
+from common.console import (LEVEL_NORMAL, LEVEL_QUIET, LEVEL_VERBOSE, is_quiet, is_verbose,
+                            relax_console_encoding, set_level)
 from common.paths import default_jammers_dir
 from common.practice_arena import PracticeArena
 from common.sim_client import API_LOG_NAME, BASE_URL, ROBOT_ID, Simulator
@@ -48,7 +49,7 @@ def _api_log(args: argparse.Namespace, echo: bool) -> "AbstractContextManager[Ap
 
 
 def _episode_printer(clear: bool) -> "Callable[[dict, dict, int | None], None]":
-    """按模式打印本局小结（只在需要时输出清除相关字段）
+    """按模式打印本局小结（只在需要时输出清除相关字段）；过程明细仅 `--verbose` 时输出
 
     Args:
         clear: 是否做了阶段二（定位与清除）；False 时只报巡视扫描相关字段
@@ -57,13 +58,15 @@ def _episode_printer(clear: bool) -> "Callable[[dict, dict, int | None], None]":
         Callable[[dict, dict, int | None], None]: 打印函数 show(stats, check, n_sources)
     """
     def show(stats: dict, check: dict, n_sources: int | None) -> None:
-        """打印一局的巡视小结与覆盖核对结果
+        """打印一局的巡视小结与覆盖核对结果（详细档；缺省档只在外面打一行结论）
 
         Args:
             stats: 本局统计（圆心数、里程、虚拟时间、测向次数、清除个数等）
             check: 真值核对结果（定位误差、最坏最近距离等；官方模式无真值时为 None）
             n_sources: 本局干扰源个数（官方模式无真值时为 None）
         """
+        if not is_verbose():
+            return
         print(f"本局：巡视 {stats['waypoints_visited']} 个圆心，里程 {stats['travel_m']:.0f} m，"
               f"虚拟时间 {stats['virtual_time_s']:.0f} s，测向 {stats['n_measure']} 次；"
               f"听到 {stats['channels_heard']}/{n_sources} 个源"
@@ -93,19 +96,25 @@ def run_practice(args: argparse.Namespace, res: CoverSolveResult, save_dir: Path
     show = _episode_printer(clear)
     rows: list[dict] = []
     observations: list[dict] = []
-    with _api_log(args, not args.quiet) as api_log, \
+    with _api_log(args, is_verbose()) as api_log, \
             PracticeArena(jammers_dir, robot_id=args.robot_id,
                           robot_port=args.robot_port, console_port=args.console_port,
                           reuse_existing=not args.no_reuse) as arena:
-        print(f"jammers-py 已就绪：机器狗接口 {arena.robot_url}，控制台 {arena.console_url}")
+        # 演练场地址只报一次：缺省档并进"演练 N 局"那一行，详细档单独一行
+        if is_verbose():
+            print(f"jammers-py 已就绪：机器狗接口 {arena.robot_url}，控制台 {arena.console_url}")
+        elif not is_quiet():
+            print(f"演练 {args.practice} 局（jammers-py：机器狗接口 {arena.robot_url}，"
+                  f"控制台 {arena.console_url}）")
         for ep in range(args.practice):
             seed = args.seed + ep
             truth = arena.start_episode(seed)
-            print(f"\n----- 演练第 {ep + 1}/{args.practice} 局（seed={seed}，"
-                  f"干扰源 {len(truth)} 个）-----")
+            if is_verbose():
+                print(f"\n----- 演练第 {ep + 1}/{args.practice} 局（seed={seed}，"
+                      f"干扰源 {len(truth)} 个）-----")
             dog = RobotDog(Simulator(robot_id=args.robot_id, base_url=arena.robot_url,
                                              timeout=args.timeout),
-                           verbose=not args.quiet, logfile=args.log, episode=ep + 1,
+                           verbose=is_verbose(), logfile=args.log, episode=ep + 1,
                            clear=clear, k_clear_max=args.k_clear_max,
                            inline_r_min=args.inline_r_min,
                            inline_r_max=args.inline_r_max,
@@ -120,6 +129,10 @@ def run_practice(args: argparse.Namespace, res: CoverSolveResult, save_dir: Path
             rows.append(episode_row(ep + 1, seed, truth, dog, stats, check))
             observations.extend(observation_rows(ep + 1, dog.plan, dog.meas))
             show(stats, check, len(truth))
+            if not is_verbose() and not is_quiet():        # 缺省档：每局一行结论
+                print(f"第 {ep + 1}/{args.practice} 局（seed={seed}）：清除 "
+                      f"{stats['cleared']}/{len(truth)}，里程 {stats['travel_m']:.0f} m，"
+                      f"虚拟时间 {stats['virtual_time_s']:.0f} s，测向 {stats['n_measure']} 次")
             if not args.no_plot:                    # 出图在 /exit 之后，不占现实时间预算
                 name = f"ep{ep + 1:02d}_seed{seed}"
                 tp = truth_points(truth)
@@ -136,41 +149,50 @@ def run_practice(args: argparse.Namespace, res: CoverSolveResult, save_dir: Path
                                           dog.survey_order_used, tp)
                 # 打印**绝对**路径：--save-dir 缺省是相对路径，在不同工作目录下运行会把图
                 # 写到别处，只报相对路径时"图在哪"很容易看岔（报 None 张更会让人以为没出图）。
-                print("  总轨迹图：" + "，".join(str(Path(f).resolve()) for f in files))
-                print(f"  逐步扫描结果图：{len(scans)} 张 → "
-                      f"{(save_dir / STEP_DIR_NAME).resolve()}/"
-                      + ("（已清掉上一局的图，只保留本局）" if ep else ""))
-    print("\n" + "=" * 78)
-    if clear:
-        print(f"汇总（{len(rows)} 局）：平均清除比例 "
-              f"{np.mean([r['clear_ratio'] for r in rows]):.4f}"
-              f"（{sum(r['cleared'] for r in rows)}/{sum(r['n_sources'] for r in rows)}），"
-              f"平均 {np.mean([r['avg_time_s'] for r in rows if r['avg_time_s']]):.1f} s/个，"
-              f"平均虚拟时间 {np.mean([r['virtual_time_s'] for r in rows]):.0f} s，"
-              f"平均测向 {np.mean([r['n_measure'] for r in rows]):.0f} 次"
-              f"（其中补测 {np.mean([r['n_probe'] for r in rows]):.0f} 次；"
-              f"判定必无信号而跳过 {np.mean([r['n_skip_measure'] for r in rows]):.0f} 次）")
-        print(f"  定位误差：均值 "
-              f"{np.mean([r['localize_err_mean_m'] for r in rows if r['localize_err_mean_m']]):.2f}"
-              f" m，最差单源 "
-              f"{max([r['localize_err_max_m'] for r in rows if r['localize_err_max_m']] or [0]):.2f}"
-              f" m；巡视后估计已够准的源（诊断）"
-              f"{sum(r['n_precise_at_survey'] for r in rows)}/{sum(r['n_sources'] for r in rows)} 个")
-        print("逐局：" + "  ".join(f"seed{r['seed']}={r['cleared']}/{r['n_sources']}"
-                                  for r in rows))
-        print(f"  布局旋转：平均 {np.mean([r['rotation_deg'] for r in rows]):.1f}°"
-              f"（起始扫描平均听到 {np.mean([r['n_face_scanned'] for r in rows]):.1f} 个源，"
-              f"旋转把落脚站对准源最密集的方向；零成本）")
-    else:
-        print(f"汇总（{len(rows)} 局，仅巡视扫描）：平均里程 "
-              f"{np.mean([r['travel_m'] for r in rows]):.0f} m，平均虚拟时间 "
-              f"{np.mean([r['virtual_time_s'] for r in rows]):.0f} s，平均测向 "
-              f"{np.mean([r['n_measure'] for r in rows]):.0f} 次，"
-              f"共听到 {sum(r['channels_heard'] for r in rows)}/"
-              f"{sum(r['n_sources'] for r in rows)} 个源")
-        print("逐局：" + "  ".join(f"seed{r['seed']}={r['channels_heard']}/{r['n_sources']}"
-                                  for r in rows))
-    print("=" * 78)
+                if is_verbose():
+                    print("  总轨迹图：" + "，".join(str(Path(f).resolve()) for f in files))
+                    print(f"  逐步扫描结果图：{len(scans)} 张 → "
+                          f"{(save_dir / STEP_DIR_NAME).resolve()}/"
+                          + ("（已清掉上一局的图，只保留本局）" if ep else ""))
+        if not args.no_plot and not is_verbose() and not is_quiet():
+            # 缺省档：图形目录只留最新一局，故报一行"图在哪"即可
+            print(f"图（只保留最新一局）：{(save_dir / args.traj_dir).resolve()}/、"
+                  f"{(save_dir / STEP_DIR_NAME).resolve()}/")
+    if is_verbose():
+        print("\n" + "=" * 78)
+    if not is_quiet():
+        if clear:
+            print(f"汇总（{len(rows)} 局）：平均清除比例 "
+                  f"{np.mean([r['clear_ratio'] for r in rows]):.4f}"
+                  f"（{sum(r['cleared'] for r in rows)}/{sum(r['n_sources'] for r in rows)}），"
+                  f"平均 {np.mean([r['avg_time_s'] for r in rows if r['avg_time_s']]):.1f} s/个，"
+                  f"平均虚拟时间 {np.mean([r['virtual_time_s'] for r in rows]):.0f} s，"
+                  f"平均测向 {np.mean([r['n_measure'] for r in rows]):.0f} 次"
+                  f"（其中补测 {np.mean([r['n_probe'] for r in rows]):.0f} 次；"
+                  f"判定必无信号而跳过 {np.mean([r['n_skip_measure'] for r in rows]):.0f} 次）")
+            print(f"  定位误差：均值 "
+                  f"{np.mean([r['localize_err_mean_m'] for r in rows if r['localize_err_mean_m']]):.2f}"
+                  f" m，最差单源 "
+                  f"{max([r['localize_err_max_m'] for r in rows if r['localize_err_max_m']] or [0]):.2f}"
+                  f" m；巡视后估计已够准的源（诊断）"
+                  f"{sum(r['n_precise_at_survey'] for r in rows)}/"
+                  f"{sum(r['n_sources'] for r in rows)} 个")
+            print("逐局：" + "  ".join(f"seed{r['seed']}={r['cleared']}/{r['n_sources']}"
+                                      for r in rows))
+            print(f"  布局旋转：平均 {np.mean([r['rotation_deg'] for r in rows]):.1f}°"
+                  f"（起始扫描平均听到 {np.mean([r['n_face_scanned'] for r in rows]):.1f} 个源，"
+                  f"旋转把落脚站对准源最密集的方向；零成本）")
+        else:
+            print(f"汇总（{len(rows)} 局，仅巡视扫描）：平均里程 "
+                  f"{np.mean([r['travel_m'] for r in rows]):.0f} m，平均虚拟时间 "
+                  f"{np.mean([r['virtual_time_s'] for r in rows]):.0f} s，平均测向 "
+                  f"{np.mean([r['n_measure'] for r in rows]):.0f} 次，"
+                  f"共听到 {sum(r['channels_heard'] for r in rows)}/"
+                  f"{sum(r['n_sources'] for r in rows)} 个源")
+            print("逐局：" + "  ".join(f"seed{r['seed']}={r['channels_heard']}/{r['n_sources']}"
+                                      for r in rows))
+    if is_verbose():
+        print("=" * 78)
     paths = (save_plan(res, save_dir)
              + save_survey(save_dir, rows, observations, res.to_json(),
                            {"mode": "practice", "problem_no": 3,
@@ -178,7 +200,7 @@ def run_practice(args: argparse.Namespace, res: CoverSolveResult, save_dir: Path
                             "episodes": args.practice,
                             "bearing_error_deg": BEARING_ERROR_DEG}))
     print("结果已保存：" + "，".join(str(p) for p in paths))
-    if api_log is not None:
+    if api_log is not None and not is_quiet():
         api_log.report()
     return 0
 
@@ -194,9 +216,10 @@ def run_official(args: argparse.Namespace, res: CoverSolveResult, save_dir: Path
     没有真值，这份逐次请求/响应的记录就是唯一的证据链，事后可据此复核每次测量与清除。
     """
     sim = Simulator(robot_id=args.robot_id, base_url=args.base_url, timeout=args.timeout)
-    print(f"连接模拟器 {args.base_url}（robot_id={args.robot_id}）")
-    with _api_log(args, not args.quiet) as api_log:
-        dog = RobotDog(sim, verbose=not args.quiet, logfile=args.log, episode=1,
+    if is_verbose():
+        print(f"连接模拟器 {args.base_url}（robot_id={args.robot_id}）")
+    with _api_log(args, is_verbose()) as api_log:
+        dog = RobotDog(sim, verbose=is_verbose(), logfile=args.log, episode=1,
                        clear=not args.survey_only, k_clear_max=args.k_clear_max,
                        inline_r_min=args.inline_r_min,
                        inline_r_max=args.inline_r_max,
@@ -204,10 +227,11 @@ def run_official(args: argparse.Namespace, res: CoverSolveResult, save_dir: Path
                        inline_max_mec_r=args.inline_max_mec_r,
                        rotate=not args.no_rotate, api_log=api_log)
         stats = dog.run(res.plan, res.survey_order)
-        print(f"完成：清除 {stats['cleared']} 个，巡视 {stats['waypoints_visited']} 个圆心，"
-              f"里程 {stats['travel_m']:.0f} m，虚拟时间 {stats['virtual_time_s']:.0f} s，"
-              f"测向 {stats['n_measure']} 次（补测 {stats['n_probe']} 次），"
-              f"听到 {stats['channels_heard']} 个频道（{stats['n_bearings']} 条示向度）")
+        if not is_quiet():
+            print(f"完成：清除 {stats['cleared']} 个，巡视 {stats['waypoints_visited']} 个圆心，"
+                  f"里程 {stats['travel_m']:.0f} m，虚拟时间 {stats['virtual_time_s']:.0f} s，"
+                  f"测向 {stats['n_measure']} 次（补测 {stats['n_probe']} 次），"
+                  f"听到 {stats['channels_heard']} 个频道（{stats['n_bearings']} 条示向度）")
         # 官方模式的场景由平台生成，不受我们的 --seed 控制，故 seed 记为 None 以免误读
         row = episode_row(1, None, None, dog, stats,
                           truth_check(None, dog.plan, dog.obs, dog.cleared, dog.tracks))
@@ -222,9 +246,13 @@ def run_official(args: argparse.Namespace, res: CoverSolveResult, save_dir: Path
                 traj_dir=args.traj_dir)
             scans = save_scan_figures(save_dir, "ep01", dog.scan_steps,
                                       dog.plan, dog.survey_order_used, ())
-            print("总轨迹图：" + "，".join(str(Path(f).resolve()) for f in files))
-            print(f"逐步扫描结果图：{len(scans)} 张 → "
-                  f"{(save_dir / STEP_DIR_NAME).resolve()}/")
+            if is_verbose():
+                print("总轨迹图：" + "，".join(str(Path(f).resolve()) for f in files))
+                print(f"逐步扫描结果图：{len(scans)} 张 → "
+                      f"{(save_dir / STEP_DIR_NAME).resolve()}/")
+            elif not is_quiet():
+                print(f"图：{(save_dir / args.traj_dir).resolve()}/、"
+                      f"{(save_dir / STEP_DIR_NAME).resolve()}/")
         paths = (save_plan(res, save_dir)
                  + save_survey(save_dir, [row], observation_rows(1, dog.plan, dog.meas),
                                res.to_json(),
@@ -234,7 +262,7 @@ def run_official(args: argparse.Namespace, res: CoverSolveResult, save_dir: Path
                                 "bearing_error_deg": BEARING_ERROR_DEG,
                                 "note": "官方模式接口不返回真值，故真值相关字段为 null"}))
         print("结果已保存：" + "，".join(str(p) for p in paths))
-        if api_log is not None:
+        if api_log is not None and not is_quiet():
             api_log.report()
     return 0
 
@@ -306,7 +334,10 @@ def build_parser() -> argparse.ArgumentParser:
                    help="不做起始扫描后的布局旋转（保持设计基准朝向，用于对照实验）")
     p.add_argument("--no-plot", action="store_true",
                    help=f"不出逐局轨迹图（缺省每局在 <save-dir>/{TRAJ_DIR}/ 生成同名 png + csv）")
-    p.add_argument("--quiet", action="store_true", help="只输出汇总，不打印过程")
+    p.add_argument("--quiet", action="store_true",
+                   help="只输出最终结论与产物路径（比缺省更安静，供批处理用）")
+    p.add_argument("--verbose", action="store_true",
+                   help="打印完整过程（覆盖校验明细、每局阶段统计、接口回显等；与 --quiet 同时给出时以它为准）")
     return p
 
 
@@ -315,10 +346,12 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     即 `python -m t3` 不带任何参数时**直接连官方模拟器**（缺省 http://127.0.0.1:2026）跑完一局。
     三种模式共用同一次覆盖圆求解与同一份策略代码，差别只在
-    "场景从哪来"与"结果写哪去"。
+    "场景从哪来"与"结果写哪去"。输出缺省只报关键结论（每步 1~2 行），
+    `--verbose` 还原完整过程，`--quiet` 只留最终产物路径。
     """
     relax_console_encoding()
     args = build_parser().parse_args(argv)
+    set_level(LEVEL_VERBOSE if args.verbose else LEVEL_QUIET if args.quiet else LEVEL_NORMAL)
     official = not args.practice and not args.plan_only
     # 官方模式与演练写同一目录：一个结果目录 = 最新一次运行，不按模式分家。
     # 代价是官方跑一局就会覆盖该目录里的演练批产物，故"先跑演练批 → 验证/出图"是一个
@@ -327,17 +360,26 @@ def main(argv: Sequence[str] | None = None) -> int:
         args.save_dir = RESULTS_DIR
     save_dir = Path(args.save_dir)
 
-    print("=" * 78)
-    print("2026 CUMCM B 题 · 问题三：机器狗搜索与清除干扰源（确定性策略）")
-    print("=" * 78)
+    if is_verbose():
+        print("=" * 78)
+    if not is_quiet():
+        print("2026 CUMCM B 题 · 问题三：机器狗搜索与清除干扰源（确定性策略）")
+    if is_verbose():
+        print("=" * 78)
 
     res = solve_covering_circles(args.ring_radius, use_hex=args.hex_layout,
                                  use_uniform=not args.hex_layout
                                  and args.ring_radius is None
                                  and args.layout == "uniform")
-    if not args.quiet:
+    if is_verbose():
         print_cover_report(res)
+    elif not is_quiet():                        # 缺省档：覆盖方案一行结论
+        plan = res.plan
+        print(f"覆盖圆：{len(plan.waypoints)} 个（r = {plan.cover_radius:.0f} m），"
+              f"最坏最近距离 {res.worst_distance:.3f} m（余量 {res.margin:.3f} m、"
+              f"采样覆盖 {res.coverage_ratio * 100:.2f}%），巡视里程 {res.survey_length:.0f} m")
     paths = save_plan(res, save_dir)
+    # 覆盖圆方案是三种模式共同的产物，故这一行在缺省与 --quiet 下都保留（--quiet 只留产物路径）
     print("覆盖圆方案已保存：" + "，".join(str(p) for p in paths))
 
     try:
@@ -356,7 +398,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             print("本地验证策略可用 --practice N（自动拉起 jammers-py，无需官方模拟器）。",
                   file=sys.stderr)
         return 1
-    print("提示：不加参数即连官方模拟器；加 --practice N 跑本地演练（自动拉起 jammers-py）。")
+    if is_verbose():
+        print("提示：不加参数即连官方模拟器；加 --practice N 跑本地演练（自动拉起 jammers-py）。")
     return 0
 
 

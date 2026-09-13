@@ -34,6 +34,10 @@ mathematical-modelling problems 1-4).
   Never invoke a bare system `python`; the shipped `.venv` interpreter (`.venv/bin/python`) is the only
   other supported entry, and README documents both for the submission package. Prefer
   `uv run python -X utf8 -m <package>` so Chinese output renders.
+- **Console output has three levels**, defined once in `common/console.py` and wired in each package's
+  CLI: default prints a line or two of conclusions per step, `--verbose` prints the full process
+  report, `--quiet` prints artifact paths only. New printing must respect that split — process detail
+  goes behind `is_verbose()`, conclusions stay on plain `print`.
 
 ## Commands that work offline
 

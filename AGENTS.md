@@ -19,12 +19,13 @@ reaches into `common`; `t2` and `t3` import `t1`; `t4` imports `t1` plus `t3.pro
 because its measurement layout is built around problem 3's seven cover centers. Nothing reaches
 upward, `common` importing `t3` for instance is out of the question.
 
-`results/` is gitignored output, and it now carries four trees: `results/t3/` and `results/t4/` are
-the formal evaluation runs (official mode, one episode each, `meta.mode` is `official`, truth fields
-null), `results/t2/` is the six T2 files, and `results/practice/t3/` plus `results/practice/t4/` are
-the local 10-episode practice batch. Never rerun with the default `--save-dir`: official and practice
-both write `results/t3/` and `results/t4/`, which would overwrite the formal run artifacts. The formal
-ones cannot be reproduced at all, each was one of the three official attempts.
+`results/` is gitignored output, and it now carries four trees: `results/t3/{1,2,3}/` and
+`results/t4/{1,2,3}/` are the three formal evaluation attempts per problem (official mode, one episode
+each, `meta.mode` is `official`, truth fields null), `results/t2/` is the six T2 files, and
+`results/practice/t3/` plus `results/practice/t4/` are the local 10-episode practice batch. Never rerun
+with the default `--save-dir`: it points at `results/t3/` and `results/t4/`, which are the parent
+directories of the numbered attempts, so a careless run scatters unnumbered files beside them. The
+formal runs cannot be reproduced at all, each was one of the three official attempts.
 
 `python -m t2` writes the six T2 files, `--plan-only` writes the T3/T4 plans, a practice run writes the
 per-episode CSV/JSON plus `scan/` and `trajectory/`. Both `t3_survey.json` and `t4_survey.json` carry a
@@ -121,8 +122,9 @@ takes `--robot-port` and `--console-port`, so run practice as
 `--practice 20 --no-reuse --robot-port 2111 --console-port 8091` for instance. Never test-run against
 the official simulator: each run eats one of the 3 official attempts.
 
-Official and practice modes write the same `--save-dir` (`results/t3/`), so one directory means the
-latest run. `--plan-only` writes only the plan.
+Official and practice modes write the same `--save-dir`, so one directory means the latest run. When
+you rerun anything by hand, pass `--save-dir` explicitly rather than letting it default into
+`results/t3/` or `results/t4/`. `--plan-only` writes only the plan.
 
 Every API call is appended to `<save-dir>/api_calls.jsonl`. Official mode has no ground truth, which
 makes that log the only evidence trail; `meta.mode` tells runs apart.

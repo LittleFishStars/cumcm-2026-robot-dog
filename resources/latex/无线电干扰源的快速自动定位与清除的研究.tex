@@ -20,7 +20,6 @@
 % 图片与表格
 % ============================================================
 \usepackage{graphicx}      % 插入图片
-\usepackage{caption}
 \usepackage{float}         % 控制浮动体位置（H 选项）
 \usepackage[section]{placeins} % 防止图表跨节浮动
 \usepackage{subcaption}    % 子图
@@ -102,10 +101,12 @@
 % ============================================================
 % 标题格式设置
 % ============================================================
-\CTEXsetup[format={\heiti\centering\zihao{3}\bfseries}]{section}     % 一级标题：三号加粗居中
-\CTEXsetup[format={\heiti\zihao{-4}\bfseries}]{subsection}          % 二级标题：小四加粗
-\CTEXsetup[format={\heiti\zihao{5}\bfseries}]{subsubsection}         % 三级标题：五号加粗
-\CTEXsetup[format={\zihao{-5}\bfseries}]{paragraph}
+\ctexset{
+    section/format={\heiti\centering\zihao{3}\bfseries},        % 一级标题：三号加粗居中
+    subsection/format={\heiti\zihao{-4}\bfseries},        % 二级标题：小四加粗
+    subsubsection/format={\heiti\zihao{5}\bfseries},        % 三级标题：五号加粗
+    paragraph/format={\zihao{-5}\bfseries},
+}
 
 % ============================================================
 % 文档开始
@@ -242,7 +243,7 @@
 	\(r_{\text{near}}\) & 到站后近距顺路清除半径（m） \\
 	\(\rho_{\text{mec}}\) & 参与顺路的区域最小覆盖圆半径上限（m） \\
 	\(J,\sigma_{\text{pos}}\) & 补测选点用的 Fisher 信息矩阵与位置预测标准差（m） \\
-	\(K\) & 多点覆盖试清的补清圆数（问题三取 \(7\)，问题四取 \(4\)） \\
+	\(K\) & 多点覆盖试清的补清圆数 \\
 	\(r_{\text{clear}}=20\) m & 光学精确清除半径 \\
 	\multicolumn{2}{@{}l}{\heiti 问题四} \\
 	\(g\) & 定向源位置 \\
@@ -348,7 +349,7 @@
 
 	\begin{enumerate}
 		\item 初始化 \(\Omega\leftarrow\) 目标圆域的内接正 64 边形。
-		\item 对每个检测点 \(S_i\)：按 \S1.2 构造楔形三角形，令 \(\Omega\leftarrow\Omega\cap W_i\)；若 \(\Omega\) 变为空集则提前终止。
+		\item 对每个检测点 \(S_i\)：按 \\S4.1.1 构造楔形三角形，令 \(\Omega\leftarrow\Omega\cap W_i\)；若 \(\Omega\) 变为空集则提前终止。
 		\item 提取 \(\Omega\) 的全部顶点 \(V=\{v_1,\dots,v_m\}\)。
 		\item 枚举顶点对求直径：\(D\leftarrow\max_{j<k}\lVert v_j-v_k\rVert\)，同时记录达到直径的顶点对 \(P^*,Q^*\)。
 		\item 取圆心 \(O=\tfrac12(P^*+Q^*)\)、半径 \(D/2\)。
@@ -358,13 +359,13 @@
 
 	\subsubsection*{4.2.2 \quad 核心几何运算的数学原理}
 
-	（1）楔形三角形的构造. 直接由 \S1.2 的顶点公式给出，取 \(L=2(\lVert S_i\rVert+R)\)。
+	（1）楔形三角形的构造. 直接由 \\S4.1.1 的顶点公式给出，取 \(L=2(\lVert S_i\rVert+R)\)。
 
 	（2）凸多边形求交（半平面裁剪）. 两凸多边形之交仍是凸多边形，可依次用其中一个多边形的每条有向边所在直线去“裁剪”另一个多边形。设裁剪直线为 \(ax+by+c=0\)，定义线性符号函数 \(f(x,y)=ax+by+c\)，保留 \(f\ge0\)（或 \(f\le0\)）的一侧：沿多边形边界逐边行进，保留位于保留侧内的顶点，并在跨越裁剪线的边上按其与直线的比例插入交点，即得裁剪后的多边形。逐条边处理，最终结果就是两多边形的交集。整个过程只含加、乘、比较与线性插值，结果精确且始终保持凸性。
 
-	（3）直径的计算. 由 \S1.5，直接对所有顶点对计算欧氏距离并取最大；对凸多边形亦可用旋转卡壳法按 \(O(m)\) 完成。
+	（3）直径的计算. 由 \\S4.1.4，直接对所有顶点对计算欧氏距离并取最大；对凸多边形亦可用旋转卡壳法按 \(O(m)\) 完成。
 
-	（4）覆盖圆的判定. 由 \S1.6，圆心取直径线段中点、半径取 \(D/2\)，只需比较各顶点到圆心的距离与 \(D/2\)，无需求解一般的最小覆盖圆。
+	（4）覆盖圆的判定. 由 \\S4.1.5，圆心取直径线段中点、半径取 \(D/2\)，只需比较各顶点到圆心的距离与 \(D/2\)，无需求解一般的最小覆盖圆。
 
 	\subsubsection*{4.2.3 \quad 计算复杂度}
 
@@ -386,7 +387,7 @@
 		\centering
 		\caption{仿真算例的检测点与示向度}
 		\label{tab:p1-bearing}
-		\begin{tabular}{cccc}
+		\\begin{tabular}{ccc}
 			\toprule
 			检测点 & 坐标 (m) & 示向度 \(\theta_i\) (\(^\circ\)) \\
 			\midrule
@@ -477,7 +478,7 @@
 	\[
 		\frac{D}{2}\le r_{\min}\le\frac{D}{\sqrt3},
 	\]
-	但 \(r_{\min}\le D/2\) 不能作为“以多边形直径为直径的圆覆盖区域”的判据，因为固定圆心（直径线段中点）后所需的半径 \(r^*\) 一般会大于 \(r_{\min}\)。事实上，由于直径两端点相距 \(D\)，任何半径 \(D/2\) 的圆若同时含这两点，其圆心必为其中点，故 \S1.6 的判据 \(r^*\le D/2\) 才是唯一正确的判据。
+	但 \(r_{\min}\le D/2\) 不能作为“以多边形直径为直径的圆覆盖区域”的判据，因为固定圆心（直径线段中点）后所需的半径 \(r^*\) 一般会大于 \(r_{\min}\)。事实上，由于直径两端点相距 \(D\)，任何半径 \(D/2\) 的圆若同时含这两点，其圆心必为其中点，故 \\S4.1.5 的判据 \(r^*\le D/2\) 才是唯一正确的判据。
 
 	\subsubsection*{4.4.4 误差传播分析}
 
@@ -703,7 +704,7 @@
     \centering
     \includegraphics[width=0.45\textwidth]{figures/7_circles.pdf}
     \caption{均匀布局：7 个半径为 1000\,m 的覆盖圆覆盖半径 1800\,m 的目标圆域}
-    \label{fig:your_label}
+    \\label{fig:t3-circles}
 \end{figure}
 
 \begin{table}[H]
@@ -975,7 +976,7 @@ dp[S][i] = \min_{j \in S, j \neq i} \bigl( dp[S \setminus \{i\}][j] + d(j,i) \bi
   \label{fig:three-c}
 \end{figure}
 
-\begin{table}[h]
+\\begin{table}[H]
     \centering
     \caption{问题3正式测试结果}
     \begin{tabular}{cccc}
@@ -1027,7 +1028,7 @@ dp[S][i] = \min_{j \in S, j \neq i} \bigl( dp[S \setminus \{i\}][j] + d(j,i) \bi
 	\subsubsection*{7.4.1算法结果}
 基于本地模拟器（与官方引擎同判据）在 seed 0-19 的 20 局演练中（共 256 个干扰源），算法表现如下：
 
-\begin{table}[h]
+\\begin{table}[H]
 \centering
 \caption{20局演练汇总（seed 0-19，20点定案布局）}
 \begin{tabular}{lcc}
@@ -1072,7 +1073,7 @@ dp[S][i] = \min_{j \in S, j \neq i} \bigl( dp[S \setminus \{i\}][j] + d(j,i) \bi
   \label{fig:four-c}
 \end{figure}
 
-\begin{table}[h]
+\\begin{table}[H]
     \centering
     \caption{问题4正式测试结果}
     \begin{tabular}{cccc}
@@ -1085,6 +1086,10 @@ dp[S][i] = \min_{j \in S, j \neq i} \bigl( dp[S \setminus \{i\}][j] + d(j,i) \bi
         \bottomrule
     \end{tabular}
 \end{table}
+
+% ---------- AI 工具使用声明（人工智能工具使用规定第 3 条：置于参考文献之前） ----------
+% 论文里只出声明那一段；同一份 ai-declaration.tex 独立编译时出支撑材料要的《AI 工具使用详情》
+\input{ai-declaration.tex}
 
 % ---------- 参考文献 ----------
 \newpage

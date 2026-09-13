@@ -10,7 +10,8 @@ mathematical-modelling problems 1-4).
   top-level packages (no enclosing `cumcm` package, no `T*.py` shim scripts). Each problem
   package ships a `__main__.py`, so `python -m t3 --practice 3` replaces the old
   `python T3.py --practice 3`; `python -m t2.region`, `python -m t4.sweep`, etc.
-  run the self-checks.
+  run the self-checks. The local simulator submodule `jammers-py/` also sits at the root
+  (it used to live under `resources/`, which is gitignored and never submitted).
 - Layering is a hard convention: deps only point down `common <- t1/t2/t3/t4`
   (`t2` may import `t1` — same wedge-intersection duct, vectorized; `t4` may import `t1` and
   `t3.probing`).
@@ -53,15 +54,20 @@ mathematical-modelling problems 1-4).
 - `uv run python -m t4.sweep` — problem 4 scan self-check (batched hearing predicate vs the
   single-case reference, then the 4.2 M-case statistics without touching any simulator).
 
-## Local simulator (`resources/jammers-py/`)
+## Local simulator (`jammers-py/`)
 
-- `resources/jammers-py/` is the local replica simulator used by `--practice` (`common/paths.py`
-  resolves it via the `JAMMERS_REL_DIR` constant; `--jammers-dir` overrides it).
+- `jammers-py/` at the repo root is the local replica simulator used by `--practice`
+  (`common/paths.py` resolves it via the `JAMMERS_REL_DIR` constant; `--jammers-dir` overrides it).
+  It lives at the root, not under `resources/`, because it ships inside the submission package
+  together with the code while `resources/` (problem statement, references) never does.
 - It is a **git submodule** (private remote `LittleFishStars/jammers-py-simulator`): a fresh clone
-  carries only its commit pointer, so run `git submodule update --init resources/jammers-py` once.
+  carries only its commit pointer, so run `git submodule update --init jammers-py` once.
   While it is absent, only the offline commands above run; once present, `--practice` and
   ground-truth checks work.
-- `uv run python -m simulator --help` or `cd resources/jammers-py; uv run python run.py`.
+- It needs **no third-party packages** (standard library only); its own `data/` (practice statistics
+  DB + behaviour logs, which contain the team id) and `figures/` are generated at run time and are
+  excluded from the submission package.
+- `uv run python -m simulator --help` or `cd jammers-py; uv run python run.py`.
 
 ## Running against the official simulator
 

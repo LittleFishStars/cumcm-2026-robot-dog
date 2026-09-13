@@ -12,10 +12,11 @@ desktop.ini
 # 本机材料：一律不入库（确实要入库时用 git add -f）
 #   Problem/      赛题材料
 #   References/   参考文献 PDF（53 M，撰写论文时本地查阅用）
-# 例外：jammers-py/ 是独立子仓库（git submodule，私有远端），只登记其提交指针；
-#       它内部的 data/、figures/ 由子仓库自己的 .gitignore 排除
+#   latex/        论文源文件
 resources/*
-!resources/jammers-py/
+
+# 本地演练场 jammers-py/ 是独立子仓库（git submodule，私有远端），已移到仓库根，
+# 只登记其提交指针；它内部的 data/、figures/ 由子仓库自己的 .gitignore 排除
 
 # 求解产物：不入库（随跑随新；同 seed 逐字节可复现，唯一例外是 api_calls.jsonl 的现实时间戳）
 results/

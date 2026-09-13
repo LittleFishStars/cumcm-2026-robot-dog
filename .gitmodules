@@ -1,3 +1,3 @@
-[submodule "resources/jammers-py"]
-	path = resources/jammers-py
+[submodule "jammers-py"]
+	path = jammers-py
 	url = https://github.com/LittleFishStars/jammers-py-simulator.git

@@ -17,7 +17,6 @@ desktop.ini
 # git 不会进入被忽略的目录，那条规则永远匹配不上
 resources/*
 !resources/latex/
-resources/latex/*
 
 # 本地演练场 jammers-py/ 是独立子仓库（git submodule，私有远端），已移到仓库根，
 # 只登记其提交指针；它内部的 data/、figures/ 由子仓库自己的 .gitignore 排除

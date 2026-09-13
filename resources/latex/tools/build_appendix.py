@@ -25,7 +25,9 @@ FONT_TEMPLATE = """{begin}
 % 圈数字 ① 到 ⑦ 交给中文字体，DejaVu 等宽里没有这几个字形
 \\xeCJKDeclareCharClass{{CJK}}{{"2460 -> "2473}}
 \\lstset{{
-    basicstyle=\\small\\codefamily,
+    % 代码段落的中文行距会被 ctex 拉到 1.56 倍，附录三千多行按那个行距要多出二十几页，
+    % 这里压到 0.85，一行 9.2 pt，汉字行高 1.27 倍，不挤也不散
+    basicstyle=\\linespread{{0.85}}\\selectfont\\small\\codefamily,
     language=Python,
     keywordstyle=\\color{{blue!70!black}},
     commentstyle=\\color{{green!45!black}},
@@ -34,7 +36,8 @@ FONT_TEMPLATE = """{begin}
 {end}
 """
 
-# 附录收录清单：每个问题只留与模型直接相关的算法函数，命令行、绘图、报告与控制流不再列出
+# 附录收录清单：收录从读入测量到给出答案的完整求解逻辑，命令行、绘图、报告、自检脚本
+# 与模拟器接口封装（common/sim_client.py）不进附录
 SECTIONS = [
     {
         "title": "附录 A \\quad 问题一：交会定位区域的求交与几何量",
@@ -49,8 +52,10 @@ SECTIONS = [
     {
         "title": "附录 B \\quad 问题二：第二检测点的最坏定位直径寻优",
         "intro": "问题二在源不确定集 $\\mathcal{C}$ 与第二次测向误差上取最坏情形，"
-                 "把最坏定位直径 $J(S_2)$ 作为目标函数。源采样、楔形交会的候选顶点、"
-                 "全域粗搜与局部细化是这段代码的四步。",
+                 "把最坏定位直径 $J(S_2)$ 作为目标函数：先采样源不确定集，"
+                 "在全域粗网格上算出每个候选点的 $J$，再在粗解附近细化，"
+                 "与文献判据（GDOP、CRLB、极小极大半径）的推荐落点对照，"
+                 "最后按 $J\\le(1+\\eta)J^*$ 给出候选区域弧带。",
         "blocks": [
             {"file": "t2/region.py",
              "symbols": ["_candidate_points_batch", "_max_pair_distance", "quad_diameters_batch",
@@ -63,36 +68,65 @@ SECTIONS = [
             {"file": "t2/theory.py",
              "symbols": ["fim_two_station", "gdop", "crlb_major"],
              "caption": "B.3 \\quad 文献判据：Fisher 信息阵、GDOP 与 CRLB（t2/theory.py）"},
+            {"file": "t2/score.py",
+             "symbols": ["closed_form_table", "theory_analysis", "criteria_points"],
+             "caption": "B.4 \\quad 闭式对照表与三条准则的落点互评（t2/score.py）"},
+            {"file": "t2/score.py",
+             "symbols": ["Band", "lens_ray_interval", "candidate_band", "_lobe", "_polar_to_xy",
+                         "SolveResult", "solve", "_rel_angle", "_single_measurement_diameter",
+                         "scenario_quad"],
+             "caption": "B.5 \\quad 候选区域弧带与完整求解流程（t2/score.py）"},
         ],
     },
     {
-        "title": "附录 C \\quad 问题三：覆盖圆布局与补测定位",
-        "intro": "问题三先用 7 个半径 1000 m 的圆盘盖住整个目标圆域，环半径取解析最优值 "
-                 "$\\sqrt{3}R/2$；巡视结束仍未清除的频段按 Fisher 信息准则选补测点，"
-                 "逐轮把定位区域压到半径 20 m 以内。",
+        "title": "附录 C \\quad 问题三：覆盖布局、补测定位与巡视清除策略",
+        "intro": "问题三分两段：先求 7 个半径 1000 m 的覆盖圆，环半径取解析最优值 "
+                 "$\\sqrt{3}R/2$，并给出巡视顺序；再让机器狗按该顺序扫描，"
+                 "把每一次测量（含听不到）都变成可能源集合上的硬约束，"
+                 "按「就近试清、多点覆盖试清、Fisher 信息补测、末端逼近」四级递进定位并清除。",
         "blocks": [
+            {"file": "common/disc_region.py", "symbols": ["DiscConstraintMixin"],
+             "caption": "C.1 \\quad 圆盘内外的硬约束叠加（common/disc_region.py）"},
+            {"file": "t3/regions.py", "symbols": ["Obs", "Meas", "ProbRegion"],
+             "caption": "C.2 \\quad 问题三的可能源集合（t3/regions.py）"},
             {"file": "t3/covering.py",
-             "symbols": ["hex_layout", "optimal_ring_radius", "feasible_ring_interval",
-                         "analytic_worst", "dense_sector_rotation", "nearest_distances",
-                         "cover_counts", "worst_candidates_general"],
-             "caption": "C.1 \\quad 六边形覆盖布局与覆盖校验（t3/covering.py）"},
-            {"file": "common/routing.py", "symbols": ["exact_open_order"],
-             "caption": "C.2 \\quad 巡视顺序的精确最短开放路径（common/routing.py）"},
+             "symbols": ["CoverPlan", "hex_layout", "optimal_ring_radius", "feasible_ring_interval",
+                         "analytic_worst", "min_circle_count", "_sector_score",
+                         "dense_sector_rotation", "region_samples", "nearest_distances",
+                         "worst_candidates", "worst_candidates_general", "cover_counts",
+                         "nearest_order", "path_length", "CoverSolveResult", "_six_circle_best",
+                         "layout_metrics", "tradeoff_table", "solve_covering_circles"],
+             "caption": "C.3 \\quad 覆盖布局的解析解、求值与校验（t3/covering.py）"},
+            {"file": "common/routing.py",
+             "symbols": ["dist_matrix", "path_len", "path_len_vec", "nearest_order_from_D",
+                         "nearest_order", "open_path_length", "two_opt_first", "two_opt_greedy",
+                         "_held_karp", "_hk_path", "exact_open_order", "exact_open_by_end"],
+             "caption": "C.4 \\quad 巡视路径：最近邻、2-opt 与 Held-Karp 精确解（common/routing.py）"},
             {"file": "t3/probing.py",
-             "symbols": ["fisher_sigma", "hypothesis_points", "probe_candidates"],
-             "caption": "C.3 \\quad 补测点的 Fisher 信息选点（t3/probing.py）"},
+             "symbols": ["fisher_sigma", "hypothesis_points", "Probe", "probe_candidates"],
+             "caption": "C.5 \\quad 补测点的 Fisher 信息选点（t3/probing.py）"},
+            {"file": "common/actions.py", "symbols": ["ActionRecorder"],
+             "caption": "C.6 \\quad 机器狗的基础动作与状态（common/actions.py）"},
+            {"file": "t3/strategy.py", "symbols": ["RobotDog"],
+             "caption": "C.7 \\quad 巡视扫描与清除策略（t3/strategy.py）"},
         ],
     },
     {
-        "title": "附录 D \\quad 问题四：二十点测量布局与听到率校验",
+        "title": "附录 D \\quad 问题四：二十点测量布局与定向源清除策略",
         "intro": "问题四的测量位置由原点、问题三的 7 个覆盖基点与 12 个外圈点组成，"
-                 "外圈点压在定向源迎光区内沿以内，保证任何方位、任何波束朝向的贴边源都有人听到。"
-                 "布局确定后按半圆盘命中判据做全口径蒙特卡洛与贴边对抗校验。",
+                 "外圈点压在定向源迎光区内沿以内，保证任何方位、任何波束朝向的贴边源都有人听到；"
+                 "定向源的 \\texttt{no\\_signal} 不再作硬约束，只保留 direction 与 near 两类，"
+                 "清除沿用问题三的四级递进，并增加清除时刻的顺路补测换取新视角。",
         "blocks": [
             {"file": "t4/sweep.py",
-             "symbols": ["measure_layout", "build_sweep_plan", "_hit_report", "_hit_cases",
-                         "adversarial_cases", "verify_hearing_stats"],
+             "symbols": ["measure_layout", "SweepPlan", "build_sweep_plan", "plan_from_points",
+                         "_hit_report", "_hit_cases", "_scan_cases", "adversarial_cases",
+                         "verify_hearing_stats"],
              "caption": "D.1 \\quad 测量布局、命中判据与听到率校验（t4/sweep.py）"},
+            {"file": "t4/regions.py", "symbols": ["Obs", "Meas", "DirProbRegion"],
+             "caption": "D.2 \\quad 问题四的可能源集合（t4/regions.py）"},
+            {"file": "t4/strategy.py", "symbols": ["RobotDog"],
+             "caption": "D.3 \\quad 扫描与清除策略（t4/strategy.py）"},
         ],
     },
 ]
@@ -176,17 +210,18 @@ def main() -> None:
         for sec, caption, code in blocks:
             if sec is not section:
                 continue
-            body.append(f"\t\\subsubsection*{{{caption}}}")
+            body.append(f"\t\\subsubsection*{{{caption.replace('_', r'\_')}}}")
             body.append("\t\\begin{lstlisting}")
             body.append(code)
             body.append("\t\\end{lstlisting}")
             body.append("")
 
     head = ["\\section*{附录}", "",
-            "\t\\noindent 附录给出四个问题求解程序的主要部分，完整的工程代码见支撑材料。"
-            "为控制篇幅，这里只保留与模型直接对应的算法函数：命令行解析、绘图、报告输出、"
-            "控制台日志一类的工程代码不再列出。代码中出现的圆域半径、覆盖半径、采样格数等"
-            "常数集中定义在各问题的 config 模块里。", ""]
+            "\t\\noindent 附录收录四个问题从读入测量到给出答案的求解逻辑：问题一的定位区域求交，"
+            "问题二的源不确定集采样、最坏定位直径与候选区域，问题三、四的覆盖布局、"
+            "可能源集合的硬约束叠加、补测选点与巡视清除策略。命令行解析、绘图、报告输出、"
+            "模块自检与模拟器接口封装（common/sim\\_client.py）不在附录内，完整工程代码见支撑材料。"
+            "代码中出现的圆域半径、覆盖半径、采样格数等常数集中定义在各问题的 config 模块里。", ""]
     appendix = "\n".join(head + body).rstrip() + "\n"
 
     if args.dry_run:

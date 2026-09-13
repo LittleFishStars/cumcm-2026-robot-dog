@@ -8,7 +8,7 @@
 
     from common.sim_client import Simulator
 
-    sim = Simulator()                        # 默认队号 202614023005，地址 http://127.0.0.1:2026
+    sim = Simulator(robot_id="<参赛队号>")   # 队号一律运行时传入，代码里不留任何队号
     sim.enter()
     r = sim.measure(300, 400, 1)             # r["measure_result"]: no_signal / near / direction
     if r["measure_result"] == "direction":
@@ -33,10 +33,9 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Callable, Iterator, TextIO
 
-__all__ = ["ROBOT_ID", "BASE_URL", "API_LOG_NAME", "Simulator", "ApiLog", "RecordedSim",
+__all__ = ["BASE_URL", "API_LOG_NAME", "Simulator", "ApiLog", "RecordedSim",
            "api_brief", "ms_since", "api_log"]
 
-ROBOT_ID = "202614023005"                   # 参赛队号，必须与模拟器登录的队号一致
 BASE_URL = "http://127.0.0.1:2026"          # 官方默认地址，模拟器只监听本机回环
 API_LOG_NAME = "api_calls.jsonl"            # 接口调用日志文件名（落在 --save-dir 下）
 
@@ -44,12 +43,13 @@ API_LOG_NAME = "api_calls.jsonl"            # 接口调用日志文件名（落�
 class Simulator:
     """模拟器接口的薄封装：4 个方法直接返回 JSON 响应（dict）。"""
 
-    def __init__(self, robot_id: str = ROBOT_ID, base_url: str = BASE_URL,
+    def __init__(self, robot_id: str, base_url: str = BASE_URL,
                  timeout: float = 5.0) -> None:
         """初始化模拟器接口封装
 
         Args:
-            robot_id: 参赛队号，必须与模拟器登录的队号一致
+            robot_id: 参赛队号（**运行时传入，无缺省值**：代码里不写队号，避免身份信息随
+                源码/提交包扩散；官方模式必须与模拟器登录的队号一致）
             base_url: 模拟器地址（只监听本机回环）
             timeout: 单次 HTTP 请求超时 / s
         """

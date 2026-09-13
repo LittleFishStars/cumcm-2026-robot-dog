@@ -38,6 +38,10 @@ mathematical-modelling problems 1-4).
   CLI: default prints a line or two of conclusions per step, `--verbose` prints the full process
   report, `--quiet` prints artifact paths only. New printing must respect that split — process detail
   goes behind `is_verbose()`, conclusions stay on plain `print`.
+- **The team id is never stored in the code**: `--robot-id` must be passed at run time for practice and
+  official modes (t3/t4 exit with code 2 when it is missing), and `Simulator(robot_id=...)` has no
+  default. `t1`, `t2`, `--plan-only` and the module self-checks never contact a simulator and need no
+  id. Keep it that way: no team number, school or personal data in any tracked file.
 
 ## Commands that work offline
 
@@ -52,9 +56,9 @@ mathematical-modelling problems 1-4).
 - `uv run python -m t3.covering` — cover-layout self-check (rotation/selection/min-circle).
 - `uv run python -m t4 --plan-only` — solve the 20 measurement positions + hearing-rate statistics
   (~2 s; writes `results/t4/t4_sweep_plan.json` + `t4_sweep_points.csv`).
-- `uv run python -m t4 --practice 20 --seed 0 --layout-file <layout.npy> --save-dir <dir>` — benchmark
-  an alternative measurement layout with the same harness (benchmark any candidate layout on the same
-  seed set).
+- `uv run python -m t4 --practice 20 --seed 0 --robot-id <team id> --layout-file <layout.npy>
+  --save-dir <dir>` — benchmark an alternative measurement layout with the same harness
+  (benchmark any candidate layout on the same seed set).
 - `uv run python -m t4.sweep` — problem 4 scan self-check (batched hearing predicate vs the
   single-case reference, then the 4.2 M-case statistics without touching any simulator).
 

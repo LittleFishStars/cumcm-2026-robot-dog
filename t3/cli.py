@@ -19,7 +19,7 @@ from common.console import (LEVEL_NORMAL, LEVEL_QUIET, LEVEL_VERBOSE, is_quiet, 
                             relax_console_encoding, set_level)
 from common.paths import default_jammers_dir
 from common.practice_arena import PracticeArena
-from common.sim_client import API_LOG_NAME, BASE_URL, ROBOT_ID, Simulator
+from common.sim_client import API_LOG_NAME, BASE_URL, Simulator
 from common.sim_client import api_log as _api_log_raw
 from t3.config import (BEARING_ERROR_DEG, CHOSEN_RING_RADIUS, CLEAR_RADIUS, COVER_RADIUS,
                              INLINE_MAX_MEC_R, INLINE_NEAR_R, INLINE_R_MAX, INLINE_R_MIN,
@@ -285,7 +285,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--api-log", default=None,
                    help=f"接口调用日志路径（缺省 <save-dir>/{API_LOG_NAME}；传空串关闭）。"
                         f"官方模式下这是唯一的证据链，建议保留")
-    p.add_argument("--robot-id", default=ROBOT_ID, help="参赛队号（须与模拟器一致）")
+    p.add_argument("--robot-id", default=None,
+                   help="参赛队号（跑演练/官方模式时**必须显式给出**，代码里不存队号；"
+                        "官方模式须与模拟器登录的队号一致，演练模式会把它传给模拟器的 --team）")
     p.add_argument("--timeout", type=float, default=5.0, help="HTTP 超时 / s")
     p.add_argument("--ring-radius", type=float, default=None,
                    help=f"（仅六边形族）覆盖圆环半径 d / m（缺省 {CHOSEN_RING_RADIUS:.0f}；"
@@ -353,6 +355,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     set_level(LEVEL_VERBOSE if args.verbose else LEVEL_QUIET if args.quiet else LEVEL_NORMAL)
     official = not args.practice and not args.plan_only
+    # 队号一律运行时传入（代码里不留任何队号）；只有纯离线的 --plan-only 不需要
+    if args.robot_id is None and (args.practice or official):
+        print("错误：跑演练/官方模式必须用 --robot-id 传入参赛队号（如 --robot-id <12 位队号>）。",
+              file=sys.stderr)
+        return 2
     # 官方模式与演练写同一目录：一个结果目录 = 最新一次运行，不按模式分家。
     # 代价是官方跑一局就会覆盖该目录里的演练批产物，故"先跑演练批 → 验证/出图"是一个
     # 固定次序（演练批可由 --practice N --seed M 逐字节复现，重跑一次即可）。

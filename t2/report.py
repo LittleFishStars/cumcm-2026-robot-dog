@@ -22,8 +22,6 @@ import json
 from pathlib import Path
 from typing import Any, Sequence
 
-import numpy as np
-
 from t2 import config as cfg
 from t2.score import SolveResult, suitability
 

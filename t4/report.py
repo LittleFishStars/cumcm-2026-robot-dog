@@ -18,8 +18,7 @@ from typing import Any, Sequence
 import numpy as np
 
 from common.geometry import dist
-from t4.config import (CLEAR_RADIUS, RECEIVE_MAX, OBS_CSV, PLAN_CSV, PLAN_JSON,
-                             RESULTS_DIR, SURVEY_JSON)
+from t4.config import OBS_CSV, PLAN_CSV, PLAN_JSON, SURVEY_JSON
 from t4.regions import Meas, Obs
 from t4.sweep import SweepPlan
 

@@ -24,10 +24,10 @@ from common.practice_arena import PracticeArena
 from common.scanfigure import STEP_DIR_NAME, reset_dir
 from common.sim_client import API_LOG_NAME, BASE_URL, Simulator
 from common.sim_client import api_log as _api_log_raw
-from t4.config import (BEARING_ERROR_DEG, CLEAR_RADIUS, INLINE_MAX_MEC_R, INLINE_NEAR_R,
-                             INLINE_R_MAX, INLINE_R_MAX_IN, INLINE_R_MIN, INLINE_R_MIN_IN,
-                             INLINE_R_MIN_OUT, K_CLEAR_MAX, PROBLEM_NO,
-                             RESULTS_DIR, SEED, TRAJ_DIR)
+from t4.config import (BEARING_ERROR_DEG, INLINE_MAX_MEC_R, INLINE_NEAR_R,
+                        INLINE_R_MAX, INLINE_R_MAX_IN, INLINE_R_MIN, INLINE_R_MIN_IN,
+                        INLINE_R_MIN_OUT, K_CLEAR_MAX, PROBLEM_NO, RESULTS_DIR, SEED,
+                        TRAJ_DIR)
 from t4.plotting import save_scan_figures, save_trajectory, truth_points
 from t4.report import (episode_row, observation_rows, save_plan, save_survey,
                              truth_check)

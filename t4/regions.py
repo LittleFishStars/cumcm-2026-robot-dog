@@ -64,7 +64,7 @@ class DirProbRegion(DiscConstraintMixin, TriangulationRegion):
     没有 add_outside：`WITH_OUTSIDE = False`，误调会直接报错而不会悄悄改掉区域语义，因为定向源
     让 no_signal 转不成"源在圆盘外"的可证明约束。
 
-    所有运算都是凸集求交，区域保持 convex，所以 `vertices`、`diameter`、`enclosing_circle` 按
+    所有运算都是凸集求交，区域保持凸，所以 `vertices`、`diameter`、`enclosing_circle` 按
     凸多边形口径算就是对的，`vertices` 里那个多块分支在这里永远不走。
     """
 

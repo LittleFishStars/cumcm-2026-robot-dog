@@ -210,8 +210,7 @@ class RobotDog(ActionRecorder):
         self.scan_steps.append(step)
 
     def region(self, channel: int) -> DirProbRegion:
-        """取频道 channel 的定位区域，头一次访问时按已有测量惰性重建
-        """
+        """取频道 channel 的定位区域，头一次访问时按已有测量惰性重建"""
         if channel not in self.regions:
             reg = DirProbRegion(err=BEARING_ERROR_DEG, radius=REGION_RADIUS, sides=CLIP_SIDES)
             # 首次建区域：把该频道此前的测量按顺序重放成硬约束
@@ -222,7 +221,10 @@ class RobotDog(ActionRecorder):
 
     @staticmethod
     def _apply_meas(reg: DirProbRegion, m: Meas) -> None:
-        """把一次测量转成硬约束。问题四里 no_signal 不当约束，它可能只是方向不对"""
+        """把一次测量转成硬约束
+
+        问题四里 no_signal 不当约束，它可能只是方向不对。
+        """
         if m.outcome == "direction":
             reg.add_node(m.x, m.y, float(m.theta))
             reg.add_inside(m.x, m.y, RECEIVE_MAX)      # 收得到，所以源在接收半径上限之内
@@ -230,8 +232,7 @@ class RobotDog(ActionRecorder):
             reg.add_inside(m.x, m.y, NEAR_RADIUS)      # 落在 5 m 内，位置几乎确定
 
     def diameter(self, channel: int) -> float:
-        """取频道 channel 定位区域的直径，单位米，越小说明定位越准
-        """
+        """取频道 channel 定位区域的直径，单位米，越小说明定位越准"""
         return float(self.region(channel).diameter)
 
     def _precise(self, channel: int) -> bool:
@@ -244,8 +245,7 @@ class RobotDog(ActionRecorder):
 
     # ---- 阶段一：扫描 ----
     def _est(self, channel: int) -> tuple[float, float] | None:
-        """取频道 channel 的位置估计，就是区域最小覆盖圆的圆心，区域为空或退化时给 None
-        """
+        """取频道 channel 的位置估计，就是区域最小覆盖圆的圆心，区域为空或退化时给 None"""
         mec = self.region(channel).enclosing_circle
         return (mec[0], mec[1]) if mec is not None else None
 
@@ -292,7 +292,7 @@ class RobotDog(ActionRecorder):
         return counts
 
     def sweep(self, plan: SweepPlan) -> None:
-        """阶段一主体：先在原点全频道扫描，其余 19 个测量位置依次测向"""
+        """阶段一的主体：先在原点全频道扫描，其余 19 个测量位置依次测向"""
         self.plan = plan
         pts = plan.points
         self.log(f"── 阶段一：扫描（{plan.n_points} 个测量位置，里程 "
@@ -321,7 +321,7 @@ class RobotDog(ActionRecorder):
                 nxt = plan.route[k + 1]
                 self._inline_clear(at, (float(pts[nxt][0]), float(pts[nxt][1])))
 
-    # ---- 阶段 2a：诊断 ----
+    # ---- 阶段二 a：诊断 ----
     def diagnose(self) -> dict[str, int]:
         """阶段二开头先诊断：数一数已听到多少频道、其中几个估计已经够准，顺带初始化 tracks
 
@@ -346,7 +346,7 @@ class RobotDog(ActionRecorder):
                  f"其中估计已够准 {precise} 个）──")
         return {"n_channels": len(self.obs), "n_precise": precise, "n_skip": self.n_skip}
 
-    # ---- 阶段 2b：访问顺序 ----
+    # ---- 阶段二 b：访问顺序 ----
     def _nearest_order(self, channels: Sequence[int]) -> list[int]:
         """精确最短开放路径定序，用 Held-Karp，算法本身见 t3.strategy 同名函数的注释
 
@@ -358,10 +358,9 @@ class RobotDog(ActionRecorder):
         idx = exact_open_order(len(channels), dist_matrix(pts, self.pos))
         return [channels[int(i)] for i in idx]
 
-    # ---- 阶段 2c：补测 ----
+    # ---- 阶段二 c：补测 ----
     def refine(self, channel: int) -> int:
-        """按文献准则补测缩小频道 channel 的定位区域，直到够准或没有候选，返回实际补测次数
-        """
+        """按文献准则补测缩小频道 channel 的定位区域，直到够准或没有候选，返回实际补测次数"""
         n_probe = 0
         for _ in range(REFINE_MAX):
             if self._precise(channel) or self._out_of_time():
@@ -399,7 +398,7 @@ class RobotDog(ActionRecorder):
                 break
         return n_probe
 
-    # ---- 阶段 2d：清除 ----
+    # ---- 阶段二 d：清除 ----
     def _homing(self, channel: int) -> bool:
         """兜底：沿最新实测示向度按 HOMING_STEP 的步长逼近，直到清掉，过程是确定性的
 
@@ -520,7 +519,9 @@ class RobotDog(ActionRecorder):
         return (a1 / d, r_est, a1)
 
     def _cover_clear(self, channel: int, why: str) -> int:
-        """在覆盖该频道定位区域的那个半径 20 m 圆的圆心处清除，这是顺路清除的新清法
+        """在覆盖该频道定位区域的那个半径 20 m 圆的圆心处清除
+
+        这是顺路清除的新清法。
 
         2026-09-12 用户指定、问题三同步：清点取区域的覆盖圆圆心，拿半径 `CLEAR_RADIUS` 的圆去盖定位区域，一
         个圆盖不住、最小覆盖圆半径超过 20 m 的话，就按贪心补选几个半径 20 m 的圆，走 _k_cover_points，它的第
@@ -770,8 +771,7 @@ class RobotDog(ActionRecorder):
         return None
 
     def process(self, channel: int) -> None:
-        """对频道 channel 走四级清除：就近试清、多清几次、补测、兜底逼近，最后落进 tracks
-        """
+        """对频道 channel 走四级清除：就近试清、多清几次、补测、兜底逼近，最后落进 tracks"""
         rec = self.tracks.setdefault(channel, {})
         if channel in self.cleared:
             rec.update({"method": "survey-near", "cleared": True})

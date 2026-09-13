@@ -6,6 +6,8 @@ import numpy as np
 import shapely
 from shapely import Point, Polygon
 
+from common.console import print_table
+
 
 class TriangulationRegion:
     """交会定位区域：累积检测点后求定位区域凸多边形及其几何量"""
@@ -138,9 +140,14 @@ def _demo() -> None:
     region = TriangulationRegion.from_nodes(
         [(x, y, TriangulationRegion.bearing((x, y), g)) for x, y in sites])
 
-    print(f"定位区域直径：{region.diameter:.4f} m")
     cx, cy, r = region.enclosing_circle
-    print(f"最小覆盖圆：圆心 ({cx:.4f}, {cy:.4f})，半径 {r:.4f} m")
+    print("问题一：4 个检测点的交会定位")
+    print_table(["量", "数值", "单位"],
+                [["定位区域直径", f"{region.diameter:.4f}", "m"],
+                 ["最小覆盖圆圆心 x", f"{cx:.4f}", "m"],
+                 ["最小覆盖圆圆心 y", f"{cy:.4f}", "m"],
+                 ["最小覆盖圆半径", f"{r:.4f}", "m"]],
+                align="lrr")
 
 
 if __name__ == '__main__':

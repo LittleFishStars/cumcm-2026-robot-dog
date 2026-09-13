@@ -42,9 +42,20 @@ not call a bare system `python`. The `.venv` interpreter shipped with the submis
 Chinese output has to render.
 
 Console output has three levels, defined once in `common/console.py` and wired through each package's
-CLI. Default prints a line or two of conclusions per step, `--verbose` prints the full process report,
-`--quiet` prints artifact paths only. Keep new printing on the right side of that line: process detail
-goes behind `is_verbose()`, conclusions stay on a plain `print`.
+CLI. Default prints the conclusions per step, `--verbose` prints the full process report, `--quiet`
+prints artifact paths only. Keep new printing on the right side of that line: process detail goes
+behind `is_verbose()`, conclusions stay on a plain `print` or a table.
+
+Anything with two or more columns goes through `print_table()` from the same module: it pads by
+display width, so a column of Chinese and a column of numbers line up, headers carry the unit
+(`里程 / m`), numbers are right-aligned with `align="r"`, and a missing value is `—`. Long sentences
+that squeeze several measurements into one line are what the tables replaced; do not reintroduce them.
+Step-by-step logs (one line per station, per API call) stay as plain lines. Artifact paths go through
+`print_paths()`, one path per line, because four absolute paths on one line run past 130 columns.
+
+A whole block should fit 120 display columns, and the default level should stay under 100 so it reads
+without wrapping in a narrow terminal. A CJK character counts as two columns there; widening a cell is
+usually a sign that a row wants splitting rather than a column wants shortening.
 
 The team id is never stored in the code. Practice and official modes take `--robot-id` at run time,
 and t3/t4 exit with code 2 when it is missing; `Simulator(robot_id=...)` has no default. `t1`, `t2`,

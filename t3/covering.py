@@ -10,6 +10,7 @@ from typing import Any, Sequence
 
 import numpy as np
 
+from common.console import print_table
 from common.routing import dist_matrix, exact_open_order, nearest_order
 from common.routing import open_path_length as path_length
 from t3.config import (BOUNDARY_SAMPLES, CHOSEN_RING_RADIUS, COARSE_BOUNDARY,
@@ -456,6 +457,8 @@ def print_cover_report(res: CoverSolveResult) -> None:
     plan = res.plan
     d = plan.ring_radius
     is_hex = plan.layout is None
+    mc = res.min_circles
+    lat = res.lattice
     print("=" * 78)
     print("一、1000 m 覆盖圆的位置")
     print("=" * 78)
@@ -467,66 +470,91 @@ def print_cover_report(res: CoverSolveResult) -> None:
         print(f"环半径 d = {d:.2f} m（正六边形边长 = d）"
               + ("（选定设计半径：时间优先）" if is_chosen else "（由 --ring-radius 指定）"))
     else:
-        print(f"布局：一般 7 点（非六边形；7 个点全部落在距原点约 1000 m 处，"
-              f"原点本身落在它们的覆盖内，无需专门的中心点）")
-    print()
-    print(f"{'序号':<6}{'类型':<12}{'x / m':>12}{'y / m':>12}{'距原点 / m':>12}")
+        print("布局：一般 7 点，非六边形；7 个点全部落在距原点约 1000 m 处，")
+        print("      原点本身落在它们的覆盖内，无需专门的中心点")
+    rows = []
     for i, (x, y) in enumerate(plan.centers):
         kind = "中心圆" if (is_hex and i == 0) else ("环上圆" if is_hex else f"站 {i + 1}")
-        rho = math.hypot(x, y)
-        print(f"{i:<6}{kind:<12}{x:>12.2f}{y:>12.2f}{rho:>12.2f}")
+        rows.append([i, kind, f"{x:.2f}", f"{y:.2f}", f"{math.hypot(x, y):.2f}"])
+    print_table(["序号", "类型", "x / m", "y / m", "距原点 / m"], rows, align="llrrr")
     print()
     print("=" * 78)
     print(f"二、覆盖校验（细网格 {GRID_STEP:.0f} m + 圆边界 {BOUNDARY_SAMPLES} 点 + 解析最坏点候选）")
     print("=" * 78)
     if is_hex:
-        print(f"解析最坏最近距离 D(d) = max(d/√3, g₂) = {res.analytic_worst:.3f} m"
-              + ("（d = d* 时内圈项与边界项相等，也就是余量最大的最优性条件）"
-                 if abs(d - optimal_ring_radius()) < 1e-6 else ""))
+        ana_label = "解析最坏最近距离"
+        ana_note = "D(d) = max(d/√3, g₂)"
+        if abs(d - optimal_ring_radius()) < 1e-6:
+            ana_note += "；d = d* 时两项相等"
     else:
-        print(f"参考最坏最近距离 = {res.analytic_worst:.3f} m（一般布局无 d 的闭式，"
-              f"由 config.{('SURVEY_WORST_UNIFORM' if res.use_uniform else 'SURVEY_WORST_M')} "
-              f"记录，来源见该常量注释）")
-    print(f"实算最坏最近距离 = {res.worst_distance:.3f} m @ "
-          f"({res.worst_point[0]:.1f}, {res.worst_point[1]:.1f})"
-          + (f"；另一族最坏点在 ρ = d/√3 = {d / math.sqrt(3):.1f} m 的角平分线方向上"
-             if is_hex else "（一般布局；候选集为三角形外心 + 中垂线∩边界 + 圆心对径点）"))
-    print(f"对覆盖半径 1000 m 的余量 = {res.margin:.3f} m，"
-          f"采样点被覆盖比例 = {res.coverage_ratio * 100:.2f}%")
-    print(f"覆盖重数分布：" + "、".join(f"{k} 重 {v} 点" for k, v in sorted(res.multiplicity.items())))
-    print(f"→ 平均覆盖重数 {res.mean_multiplicity:.3f}（重复率 "
-          f"{(res.mean_multiplicity - 1) * 100:.1f}%）；单重覆盖（只有 1 条射线，无法直接交会）占 "
-          f"{res.single_ratio * 100:.1f}%，二重及以上占 {res.multi_ratio * 100:.1f}%"
-          f"（第二阶段需对单射线频道补测第二视角）")
+        ana_label = "参考最坏最近距离"
+        ana_note = "一般布局无 d 的闭式，见 config 常量注释"
+        print(f"参考值由 config.{'SURVEY_WORST_UNIFORM' if res.use_uniform else 'SURVEY_WORST_M'}"
+          f" 记录，来源见该常量注释")
+    worst_note = ("另一族最坏点在 ρ = d/√3 的角平分线方向上" if is_hex
+                  else "候选集为三角形外心 + 中垂线∩边界 + 圆心对径点")
+    print_table(["检查项", "结果", "数值", "备注"], [
+        [ana_label, "参考", f"{res.analytic_worst:.3f} m", ana_note],
+        ["实算最坏最近距离", "≤ 1000 m ✓" if res.worst_distance <= COVER_RADIUS
+         else "超过 1000 m ✗", f"{res.worst_distance:.3f} m", worst_note],
+        ["对覆盖半径 1000 m 的余量", "—", f"{res.margin:.3f} m", "—"],
+        ["采样点被覆盖比例", "—", f"{res.coverage_ratio * 100:.2f}%", "—"],
+    ], align="llrl")
+    print(f"实算最坏点在 ({res.worst_point[0]:.1f}, {res.worst_point[1]:.1f})")
+    print()
+    # 重数分布按重数从低到高累计：累计占比才是判断"单射线点占多少"的依据
+    counts = sorted(res.multiplicity.items())
+    total = sum(v for _, v in counts)
+    dist_rows, cum = [], 0
+    for k, v in counts:
+        cum += v
+        dist_rows.append([k, v, cum, f"{cum / total * 100:.1f}"])
+    print(f"覆盖重数分布（{len(counts)} 档，逐档点数与累计占比）")
+    print_table(["重数", "点数", "累计点数", "累计占比 / %"], dist_rows, align="rrrr")
+    print(f"平均覆盖重数 {res.mean_multiplicity:.3f}，重复率 "
+          f"{(res.mean_multiplicity - 1) * 100:.1f}%")
+    print(f"单重覆盖占 {res.single_ratio * 100:.1f}%，只有 1 条射线，无法直接交会；"
+          f"二重及以上占 {res.multi_ratio * 100:.1f}%")
+    print(f"第二阶段需对单射线频道补测第二视角")
     print()
     print("=" * 78)
     print("三、为什么是 7 个（最少数）")
     print("=" * 78)
-    mc = res.min_circles
     print(f"归类为经典 disk covering problem：用 k 个半径 r 的圆盘覆盖半径 R 的圆，最少要几个？")
     print(f"归一化后本题只有 r/R = 1000/1800 = {mc['ratio_r_over_R']:.10f} 一个参数。k 个圆盘所需")
-    print(f"的最小半径比 ρ_k 已有证明：ρ_5 = {DISK_RATIO_5:.10f}（Bezdek 1983）、")
-    print(f"                          ρ_6 = {DISK_RATIO_6:.10f}（Bezdek 1979）、ρ_7 = 0.5（构造）")
-    print(f"ρ_7 = 0.5 < {mc['ratio_r_over_R']:.10f} < ρ_6 ⇒ 7 个够、6 个不够 ⇒ 最少 7 个 ✓")
-    print(f"  6 个差多少：就算六圆摆到最优，也需覆盖半径 ≥ {mc['six_required_cover_radius_m']:.3f} m，")
-    print(f"             比可用的 1000 m 多 {mc['six_shortfall_m']:.3f} m"
-          f"（{mc['six_shortfall_ratio'] * 100:.3f}%），只差千分之零点六，但仍是不够")
-    print(f"             等价地：6 个半径 1000 m 的圆盘最多覆盖半径 "
-          f"{mc['six_max_region_radius_m']:.3f} m 的圆域，而作业圆域是 1800 m")
-    print(f"  弱下界（不足以排除 6）：面积/密度 → n ≥ {mc['area_density_lower']}；"
-          f"边界弧 → n ≥ {mc['boundary_arc_lower']}；所以必须用上面已证明的最优值")
-    print(f"  族内对照（仅「1 中心 + 6 环上圆」这一族，非全局最优）：最优环半径 "
-          f"{res.six_circle_radius:.0f} m 时最坏 {res.six_circle_worst:.1f} m，离 1000 m 更远")
-    print(f"  7 个的余量：本方案最坏距离 {res.worst_distance:.1f} m ≤ 1000 m ✓"
-          f"（余量 {res.margin:.1f} m）")
+    print(f"的最小半径比 ρ_k 已有证明，逐项核对见下表")
+    print_table(["判断依据", "结果", "数值", "备注"], [
+        ["已证明的半径比", "ρ_7 = 0.5 < r/R < ρ_6", f"ρ_6 = {DISK_RATIO_6:.10f}",
+         f"ρ_5 = {DISK_RATIO_5:.10f}"],
+        ["7 个是否够", "够 ✓", f"ρ_7·R = {mc['seven_required_cover_radius_m']:.3f} m",
+         "≤ 1000 m"],
+        ["6 个是否够", "不够 ✗", f"ρ_6·R = {mc['six_required_cover_radius_m']:.3f} m",
+         f"比 1000 m 多 {mc['six_shortfall_m']:.3f} m"],
+        ["等价说法", "—", f"最多覆盖半径 {mc['six_max_region_radius_m']:.3f} m",
+         "作业圆域半径 1800 m"],
+        ["弱下界，不足以排除 6", "参考",
+         f"面积 n ≥ {mc['area_density_lower']}、弧长 n ≥ {mc['boundary_arc_lower']}",
+         "两式都排不掉 6"],
+        ["族内对照（仅六边形族）", "不够 ✗", f"最坏 {res.six_circle_worst:.1f} m",
+         "这一族最好也只有这个"],
+    ], align="llrl")
+    print(f"注：ρ_5 见 Bezdek 1983，ρ_6 见 Bezdek 1979，ρ_7 = 0.5 是构造；"
+          f"6 个还差 {mc['six_shortfall_ratio'] * 100:.3f}%，只差千分之零点六")
+    print(f"    6 个半径 1000 m 的圆盘能盖住的圆域最大半径 "
+          f"{mc['six_max_region_radius_m']:.3f} m，而作业圆域是 1800 m")
+    print("    族内对照只放开「1 中心 + 6 环上圆」这一族，非全局最优；")
+    print(f"    这一族最优环半径 {res.six_circle_radius:.0f} m 时最坏 "
+          f"{res.six_circle_worst:.1f} m，离 1000 m 更远")
+    print(f"    本方案最坏距离 {res.worst_distance:.1f} m，余量 {res.margin:.1f} m")
+    print(f"ρ_7 = 0.5 < {mc['ratio_r_over_R']:.10f} < ρ_6 ⇒ 7 个够、6 个不够 ⇒ 最少 {mc['min_count']} 个 ✓")
     print()
     print("=" * 78)
     print("四、可行区间与权衡（余量 vs 巡视里程）")
     print("=" * 78)
     lo, hi = res.feasible_interval
     if not is_hex:
-        print("（下表是「1 中心 + 6 环上圆」族的权衡，用于说明为什么不用六边形、"
-              "以及环半径取多小会破坏保证；默认的一般 7 点布局不在这一族内。）")
+        print("注：下表是「1 中心 + 6 环上圆」族的权衡，用来说明为什么不用六边形、")
+        print("    以及环半径取多小会破坏保证；默认的一般 7 点布局不在这一族内")
     print(f"覆盖保证等价于 D(d) ≤ 1000 m，可行区间 d ∈ [{lo:.2f}, {hi:.2f}] m"
           f"（两端点余量为 0）")
     print(f"六边形族内余量最大的是 d* = {optimal_ring_radius():.2f} m（余量 100.00 m，"
@@ -535,29 +563,35 @@ def print_cover_report(res: CoverSolveResult) -> None:
     print(f"但它的下界是 6·d_min = {6 * lo:.1f} m（d_min = {lo:.2f} m 时余量为 0），"
           f"仍比默认的一般布局长 {6 * lo - res.survey_length:.1f} m")
     print()
-    print(f"{'环半径 d / m':>13}{'最坏距离 / m':>13}{'余量 / m':>11}"
-          f"{'平均重数':>10}{'里程 / m':>11}{'移动时间 / s':>13}")
+    trade_rows = []
     for row in res.tradeoff:
         mark = ""
         if abs(row["ring_radius_m"] - d) < 1e-6:
-            mark = "  ← 六边形族内时间优先（已被默认布局取代）"
+            mark = "时间优先"
         elif abs(row["ring_radius_m"] - optimal_ring_radius()) < 1e-6:
-            mark = "  ← d*（余量最大）"
-        print(f"{row['ring_radius_m']:>13.2f}{row['computed_worst_m']:>13.2f}"
-              f"{row['margin_m']:>11.2f}{row.get('mean_multiplicity', float('nan')):>10.3f}"
-              f"{row['survey_length_m']:>11.1f}{row['survey_time_s']:>13.1f}{mark}")
+            mark = "d*，余量最大"
+        mean_mul = row.get("mean_multiplicity")
+        trade_rows.append([f"{row['ring_radius_m']:.2f}", f"{row['computed_worst_m']:.2f}",
+                           f"{row['margin_m']:.2f}",
+                           "—" if mean_mul is None else f"{mean_mul:.3f}",
+                           f"{row['survey_length_m']:.1f}", f"{row['survey_time_s']:.1f}",
+                           mark or "—"])
+    print_table(["环半径 d / m", "最坏距离 / m", "余量 / m", "平均重数", "里程 / m",
+                 "移动时间 / s", "备注"], trade_rows, align="rrrrrrl")
+    print(f"注：标着时间优先的那一行就是 d = {d:.2f} m 的六边形族方案，已被默认布局取代")
+    print(f"    d* = {optimal_ring_radius():.2f} m 是这一族余量最大的取值")
     print()
-    lat = res.lattice
-    print(f"参考文献紧贴栅格对照（相邻圆心间距 √3·r，也就是环半径 {lat['ring_radius_m']:.2f} m）："
-          f"最坏距离 {lat['computed_worst_m']:.2f} m（余量 {lat['margin_m']:.2f} m）、"
-          f"里程 {lat['survey_length_m']:.1f} m")
-    print(f"默认布局：最坏距离 {res.worst_distance:.2f} m（余量 {res.margin:.2f} m）、"
-          f"里程 {res.survey_length:.1f} m → 覆盖余量优于紧贴栅格、里程省 "
-          f"{lat['survey_length_m'] - res.survey_length:.1f} m")
-    print(f"六边形族最优（d = d_min = {lo:.2f} m，余量 0.00 m）：里程 {6 * lo:.1f} m，"
-          f"仍比默认布局长 {6 * lo - res.survey_length:.1f} m"
-          f"（六边形把 1 个点压在原点，而原点是覆盖效率最低的位置）")
-    print()
+    lat_note = "；本方案最坏距离与栅格齐平" if res.worst_distance >= lat["computed_worst_m"] else ""
+    print_table(["布局", "最坏距离 / m", "余量 / m", "里程 / m", "备注"], [
+        ["参考文献紧贴栅格", f"{lat['computed_worst_m']:.2f}", f"{lat['margin_m']:.2f}",
+         f"{lat['survey_length_m']:.1f}",
+         f"相邻圆心间距 √3·r，也就是环半径 {lat['ring_radius_m']:.2f} m"],
+        ["默认布局", f"{res.worst_distance:.2f}", f"{res.margin:.2f}", f"{res.survey_length:.1f}",
+         f"里程省 {lat['survey_length_m'] - res.survey_length:.1f} m{lat_note}"],
+        ["六边形族最优", f"{analytic_worst(lo):.2f}", "0.00", f"{6 * lo:.1f}",
+         f"d = d_min = {lo:.2f} m，比默认长 {6 * lo - res.survey_length:.1f} m"],
+    ], align="lrrrl")
+    print("注：六边形把 1 个点压在原点，而原点是覆盖效率最低的位置，所以这一族里程下不去")
     print("=" * 78)
     print("五、巡视顺序（从原点出发的精确最短开放路径，Held-Karp 枚举）")
     print("=" * 78)
@@ -565,9 +599,8 @@ def print_cover_report(res: CoverSolveResult) -> None:
     print(f"顺序：{seq}（编号见第一节；{'圆心 0 在原点' if is_hex else '所有站都在距原点约 1 km 处'}）")
     print("说明：以上是设计基准（站点方位固定）。把整个布局绕原点旋转一个角时，覆盖条件只依赖"
           "点间距离与\n      点到原点的距离、巡视路径长度只依赖点间距离，所以最坏最近距离与里程都"
-          "不变（见 python -m t3.covering 的实算自检）。实际作业在起始全频道扫描\n      "
-          "之后把布局转到最密集的 60° 扇区方向，使巡视终点落在源密集方向；逐局旋转角记录在 "
-          "t3_survey.json。")
+          "不变（见自检）。\n      实际作业在起始全频道扫描之后把布局转到最密集的 60° 扇区方向，"
+          "使巡视终点落在源密集方向；\n      逐局旋转角记录在 t3_survey.json。")
     print(f"总里程 = {res.survey_length:.1f} m，纯移动时间 = {res.survey_length / 5.0:.1f} s"
           f"（速度 5 m/s）")
     print("=" * 78)
@@ -583,6 +616,12 @@ def _selftest() -> int:
     rng = np.random.default_rng(2026)
     rots = np.concatenate([np.arange(0.0, 60.0, 1.0), rng.uniform(0.0, 360.0, 40)])
     ok1 = True
+    # 每项检查一行，最后统一成表：检查项 | 结果 | 数值 | 备注
+    rows: list[list[Any]] = []
+
+    def note(flag: bool) -> str:
+        """把判定结果写成表里那一列的对勾或叉"""
+        return "✓" if flag else "✗"
 
     # (a) 经典六边形族：解析值 D(d) 应被 100 个旋转角一致复现
     d = CHOSEN_RING_RADIUS
@@ -596,9 +635,8 @@ def _selftest() -> int:
             worst_seen, worst_at = w, rot
     ok1a = abs(worst_seen - ana) < 1e-6 and worst_seen <= COVER_RADIUS + 1e-9
     ok1 &= ok1a
-    print(f"[1] 六边形族在 {len(rots)} 个旋转角下：最坏最近距离最大 {worst_seen:.6f} m"
-          f"（出现在 {worst_at:.1f}°），解析值 {ana:.6f} m → "
-          f"{'✓ 与解析一致且未破坏保证' if ok1a else '✗ 不一致'}")
+    rows.append([f"{len(rots)} 个旋转角下解析值复现", note(ok1a), f"{worst_seen:.6f} m",
+                 f"解析值 {ana:.6f} m，最大出现在 {worst_at:.1f}°"])
 
     # (b) 默认的一般 7 点布局：旋转不变 + 覆盖成立 + 里程等于记录值
     layout = tuple((float(x), float(y)) for x, y in SURVEY_CENTERS)
@@ -615,10 +653,10 @@ def _selftest() -> int:
     ok1b = (abs(gworst - SURVEY_WORST_M) < 1e-3 and gworst <= COVER_RADIUS + 1e-9
             and abs(glen - SURVEY_ROUTE_M) < 1e-3)
     ok1 &= ok1b
-    print(f"[1] 一般 7 点布局（默认）在 {len(rots)} 个旋转角下：最坏 {gworst:.6f} m"
-          f"（记录 {SURVEY_WORST_M:.4f}，余量 {COVER_RADIUS - gworst:.4f} m），"
-          f"精确里程 {glen:.4f} m（记录 {SURVEY_ROUTE_M:.4f}）→ "
-          f"{'✓ 覆盖成立且旋转不变' if ok1b else '✗ 不一致'}")
+    rows.append([f"{len(rots)} 个旋转角下覆盖成立且旋转不变", note(ok1b), f"最坏 {gworst:.6f} m",
+                 f"记录 {SURVEY_WORST_M:.4f} m，余量 {COVER_RADIUS - gworst:.4f} m"])
+    rows.append(["精确里程与记录一致", note(abs(glen - SURVEY_ROUTE_M) < 1e-3),
+                 f"{glen:.4f} m", f"记录 {SURVEY_ROUTE_M:.4f} m"])
 
     cases = [([95.0, 100.0, 105.0, 200.0, 300.0], 100.0),
              ([130.0, 131.0, 10.0], 130.5),
@@ -629,22 +667,26 @@ def _selftest() -> int:
         got = math.degrees(dense_sector_rotation(bearings))
         good = min(abs(got - want), abs(got - want - 360.0), abs(got - want + 360.0)) < 1.5
         ok2 &= good
-        print(f"[2] 密集扇区选向 {str(bearings)[:34]:36s} → {got:7.2f}°（期望 ≈{want}°）"
-              f"{'✓' if good else '✗'}")
-    ok2 &= dense_sector_rotation([]) is None
-    print(f"    空输入（未听到任何源）→ {dense_sector_rotation([])}（应为 None）"
-          f"{'✓' if dense_sector_rotation([]) is None else '✗'}")
+        rows.append(["密集扇区选向", note(good), f"{got:.2f}°", f"期望 ≈{want}°"])
+    empty_none = dense_sector_rotation([]) is None
+    ok2 &= empty_none
+    rows.append(["密集扇区选向，空输入", note(empty_none), "None", "未听到任何源时应为 None"])
     # [3] 最少圆数：7，6 个被已证明的 ρ_6 排除
     mc = min_circle_count()
     ok3 = (mc["min_count"] == 7
            and mc["six_required_cover_radius_m"] > COVER_RADIUS
            and DISK_RATIO_7 * REGION_RADIUS <= COVER_RADIUS
            and mc["boundary_arc_lower"] <= 6)
-    print(f"[3] 最少圆数：ρ_6·R = {mc['six_required_cover_radius_m']:.3f} m > 1000 m ⇒ 6 个不够；"
-          f"ρ_7·R = {mc['seven_required_cover_radius_m']:.0f} m ≤ 1000 m ⇒ 7 个够")
-    print(f"    → 最少 {mc['min_count']} 个（6 个只差 {mc['six_shortfall_ratio'] * 100:.3f}%）；"
-          f"弱下界 面积≥{mc['area_density_lower']}、弧长≥{mc['boundary_arc_lower']}"
-          f" → {'✓' if ok3 else '✗'}")
+    ok3a = mc["six_required_cover_radius_m"] > COVER_RADIUS
+    ok3b = DISK_RATIO_7 * REGION_RADIUS <= COVER_RADIUS
+    rows.append(["最少圆数，ρ_6 排除 6", note(ok3a),
+                 f"{mc['six_required_cover_radius_m']:.3f} m > 1000 m",
+                 f"ρ_6·R，只差 {mc['six_shortfall_ratio'] * 100:.3f}%，6 个不够"])
+    rows.append(["最少圆数，ρ_7 容下 7", note(ok3b),
+                 f"{mc['seven_required_cover_radius_m']:.0f} m ≤ 1000 m", "ρ_7·R，7 个够"])
+    rows.append(["最少圆数，弱下界不排除 6", note(mc["boundary_arc_lower"] <= 6),
+                 f"面积≥{mc['area_density_lower']}、弧长≥{mc['boundary_arc_lower']}",
+                 f"弱下界排不掉 6，最少 {mc['min_count']} 个按 ρ_k 下结论"])
 
     # [4] 均匀 7 点布局，用户指定的排布：圆心都在半径 1000 m 的圆上且均匀分布，覆盖必须成立
     U = np.asarray([(float(x), float(y)) for x, y in SURVEY_CENTERS_UNIFORM], dtype=float)
@@ -658,7 +700,8 @@ def _selftest() -> int:
                       worst_candidates_general(U)])
     wU = float(nearest_distances(ptsU, U).max())
     ok4 &= wU <= COVER_RADIUS + 1e-9                              # 覆盖成立（等号，零余量）
-    for th in (0.0, 0.3, 1.1):                                    # 旋转不变
+    th_list = (0.0, 0.3, 1.1)                                     # 旋转不变抽查的角
+    for th in th_list:
         c, s = math.cos(th), math.sin(th)
         Ur = U @ np.array([[c, s], [-s, c]])
         ptsUr = np.vstack([region_samples(GRID_STEP, BOUNDARY_SAMPLES),
@@ -668,15 +711,25 @@ def _selftest() -> int:
     orderU = exact_open_order(7, dist_matrix(U, (0.0, 0.0)))
     LU = path_length(U, orderU)
     ok4 &= abs(LU - SURVEY_ROUTE_UNIFORM) <= 1e-3                 # 里程与记录一致
-    print(f"[4] 均匀 7 点布局：圆心都在 r=1000 圆上且均匀（正七边形）"
-          f" {'✓' if np.allclose(rho, 1000.0, atol=1e-6) else '✗'}；"
-          f"最坏最近距离 {wU:.4f} m（零余量，最坏点恰在原点）"
-          f" {'✓' if wU <= COVER_RADIUS + 1e-9 else '✗'}；"
-          f"任意旋转不变 {'✓' if ok4 else '✗'}；里程 {LU:.1f} m"
-          f"（记录 {SURVEY_ROUTE_UNIFORM}）{'✓' if abs(LU - SURVEY_ROUTE_UNIFORM) <= 1e-3 else '✗'}")
+    ok4a = bool(np.allclose(rho, 1000.0, atol=1e-6))
+    ok4b = wU <= COVER_RADIUS + 1e-9
+    ok4c = abs(LU - SURVEY_ROUTE_UNIFORM) <= 1e-3
+    rows.append(["均匀 7 点布局，圆心均匀", note(ok4a),
+                 f"半径 {rho.min():.4f} ~ {rho.max():.4f} m", "都落在 r = 1000 m 圆上，正七边形"])
+    rows.append(["均匀 7 点布局，覆盖成立", note(ok4b), f"最坏 {wU:.4f} m",
+                 "零余量，最坏点恰在原点"])
+    rows.append(["均匀 7 点布局，旋转不变", note(ok4), f"抽查 {len(th_list)} 个旋转角",
+                 f"{th_list[0]:.1f}、{th_list[1]:.1f}、{th_list[2]:.1f}"])
+    rows.append(["均匀 7 点布局，里程一致", note(ok4c), f"{LU:.1f} m",
+                 f"记录 {SURVEY_ROUTE_UNIFORM} m"])
 
+    print("覆盖布局自检（实算校验，不靠解析值自证）")
+    print_table(["检查项", "结果", "数值", "备注"], rows, align="llrl")
+    print("注：密集扇区选向的四组输入与期望角")
+    for bearings, want in cases:
+        print(f"    {str(bearings)[:34]:36s} → 期望 ≈{want}°")
     ok = ok1 and ok2 and ok3 and ok4
-    print("\n自检结果：" + ("全部通过 ✓" if ok else "存在失败 ✗"))
+    print(f"共 {len(rows)} 项检查，" + ("全部通过 ✓" if ok else "存在失败 ✗"))
     return 0 if ok else 1
 
 

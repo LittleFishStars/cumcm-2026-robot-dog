@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Sequence
 
 from common.console import (LEVEL_NORMAL, LEVEL_QUIET, LEVEL_VERBOSE, is_quiet, is_verbose,
-                            relax_console_encoding, set_level)
+                            print_paths, print_table, relax_console_encoding, set_level)
 from t2 import config as cfg
 from t2.report import print_report, save_summary_json, write_outputs
 from t2.score import solve
@@ -74,8 +74,8 @@ def main(argv: Sequence[str] | None = None) -> int:
                       args.save_dir / cfg.CRITERIA_PNG, args.save_dir / cfg.CRITERIA_PDF]
         print_report(result, figure=figure, files=shown)
     elif is_quiet():
-        # --quiet：只留一行产物路径，批处理直接取用。六个产物一次给全
-        print("结果已保存：" + "，".join(str(p) for p in _artifact_paths(args.save_dir, files, figure)))
+        # --quiet：只留产物路径，一行一个，批处理直接取用。六个产物一次给全
+        print_paths(_artifact_paths(args.save_dir, files, figure))
     else:
         _print_conclusion(result, _artifact_paths(args.save_dir, files, figure))
     return 0
@@ -83,7 +83,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 def _artifact_paths(save_dir: Path, files: dict[str, Path],
                     figure: Path | None) -> list[Path]:
-    """本次运行写出的全部产物路径，缺省档与 --quiet 共用那一行"""
+    """本次运行写出的全部产物路径，缺省档与 --quiet 共用"""
     paths = [files[k] for k in ("csv", "json") if k in files]
     if figure is not None:
         paths += [figure, save_dir / cfg.FIGURE_PDF,
@@ -96,28 +96,31 @@ def _artifact_paths(save_dir: Path, files: dict[str, Path],
 
 
 def _print_conclusion(result: "SolveResult", paths: Sequence[Path]) -> None:
-    """缺省档结论：最优第二检测点、判据认证与产物路径，每步一两行"""
+    """缺省档结论：一张关键结论表，末尾跟上逐条产物路径"""
     x, y = result.best
     ce = result.theory["certify"]
     cr = result.theory["criteria"]
-    # 候选区域关于示向度方向镜像对称，通常两瓣，所以只取正方位那一瓣报"方位差范围"
-    lobe = result.band.lobes[0] if result.band.lobes else None
-    print("问题二：第二检测点的选择与候选区域")
-    print(f"最优第二检测点 S2* = ({x:.0f}, {y:.0f}) m：距 S1 {result.best_r:.0f} m、"
-          f"相对示向度 {result.best_phi:+.1f}°")
-    print(f"最坏定位直径 J* = {result.j_star:.1f} m（最坏交会角 "
-          f"{result.scenario['gamma_deg']:.1f}°），比只做一次测向（{result.single_m:.0f} m）"
-          f"缩小 {result.improvement:.1f} 倍")
-    print(f"候选区域（J ≤ {result.band.level_m:.0f} m）："
-          + (f"r ∈ [{result.band.r_lo:.0f}, {result.band.r_hi:.0f}] m、方位差 ∈ "
-             f"[{lobe['phi_lo']:+.0f}°, {lobe['phi_hi']:+.0f}°]、"
-             if lobe else "")
-          + f"合计面积 {result.band.area_m2 / 1e6:.3f} km²")
-    print(f"认证与判据：{ce['step_m']:.0f} m 细网格 {ce['n_grid']} 点快筛 + "
-          f"{ce['n_exact']} 点精确复核 → 认证 J = {ce['worst_diam_m']:.4f} m"
-          f"（与粗搜细化解相距 {ce['vs_coarse_m']:.1f} m）；文献 GDOP 判据与精确直径的 "
-          f"Spearman 秩相关 {cr['gdop_vs_exact_spearman']:.3f}")
-    print("结果已保存：" + "，".join(str(p) for p in paths))
+    rows = [
+        ["最优第二检测点 S2* / m", f"({x:.0f}, {y:.0f})"],
+        ["S2* 距 S1 / m", f"{result.best_r:.0f}"],
+        ["S2* 相对示向度 / °", f"{result.best_phi:+.1f}"],
+        ["最坏定位直径 J* / m", f"{result.j_star:.1f}"],
+        ["最坏交会角 γ / °", f"{result.scenario['gamma_deg']:.1f}"],
+        ["单次测向时的直径 / m", f"{result.single_m:.0f}"],
+        ["最坏直径缩小倍数", f"{result.improvement:.1f}"],
+        ["候选区域判据 J / m", f"≤ {result.band.level_m:.0f}"],
+        ["候选区域径向范围 / m", f"[{result.band.r_lo:.0f}, {result.band.r_hi:.0f}]"],
+        ["候选区域方位差范围 / °",
+         "；".join(f"[{l['phi_lo']:+.0f}, {l['phi_hi']:+.0f}]" for l in result.band.lobes) or "—"],
+        ["候选区域面积 / km²", f"{result.band.area_m2 / 1e6:.3f}"],
+        ["认证网格点数", str(ce["n_grid"])],
+        ["精确复核点数", str(ce["n_exact"])],
+        ["认证最坏直径 / m", f"{ce['worst_diam_m']:.4f}"],
+        ["GDOP 与精确直径秩相关", f"{cr['gdop_vs_exact_spearman']:.3f}"],
+    ]
+    print_table(["关键结论", "数值"], rows, align="lr")
+    print("结果已保存：")
+    print_paths(paths)
 
 
 if __name__ == '__main__':

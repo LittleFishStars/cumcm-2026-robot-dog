@@ -9,6 +9,7 @@ from typing import Any, Sequence
 
 import numpy as np
 
+from common.console import EMPTY_CELL, print_table
 from common.geometry import dist
 from t4.config import OBS_CSV, PLAN_CSV, PLAN_JSON, SURVEY_JSON
 from t4.regions import Meas, Obs
@@ -147,6 +148,65 @@ def observation_rows(ep: int, plan: SweepPlan, meas: dict[int, list[Meas]]) -> l
                          "theta_deg": None if m.theta is None else round(m.theta, 3),
                          "stage": m.stage})
     return rows
+
+
+def episode_table_head(clear: bool) -> list[str]:
+    """逐局结果表的列名，仅扫描时不带定位误差与首次听到步两列"""
+    head = ["局号", "seed", "清除 / 个" if clear else "听到 / 个", "里程 / m",
+            "虚拟时间 / s", "测向 / 次"]
+    return head + (["定位误差 / m", "首次听到步"] if clear else [])
+
+
+def episode_table_rows(rows: Sequence[dict], clear: bool) -> list[list[Any]]:
+    """逐局结果表的行：局号 / seed / 清除 / 里程 / 虚拟时间 / 测向 / 定位误差 / 首次听到步"""
+    out: list[list[Any]] = []
+    for r in rows:
+        seed: Any = EMPTY_CELL if r["seed"] is None else r["seed"]
+        # 官方模式没有真值，定位误差与首次听到步两列都留空
+        err: Any = EMPTY_CELL if r["localize_err_mean_m"] is None else f"{r['localize_err_mean_m']:.2f}"
+        step: Any = EMPTY_CELL if r["worst_first_heard_step"] is None else r["worst_first_heard_step"]
+        if clear:
+            out.append([r["episode"], seed, f"{r['cleared']}/{r['n_sources']}",
+                        f"{r['travel_m']:.0f}", f"{r['virtual_time_s']:.0f}", r["n_measure"],
+                        err, step])
+        else:
+            out.append([r["episode"], seed, f"{r['heard']}/{r['n_sources']}",
+                        f"{r['travel_m']:.0f}", f"{r['virtual_time_s']:.0f}", r["n_measure"]])
+    return out
+
+
+def summary_table_rows(rows: Sequence[dict], clear: bool) -> list[list[Any]]:
+    """整批汇总表的行：指标 / 均值或合计 / 最差，单位都写在指标名里"""
+    n_src = sum(r["n_sources"] for r in rows)
+    travel = [r["travel_m"] for r in rows]
+    vtime = [r["virtual_time_s"] for r in rows]
+    n_measure = [r["n_measure"] for r in rows]
+    common = [["里程 / m", f"{np.mean(travel):.0f}", f"{max(travel):.0f}"],
+              ["虚拟时间 / s", f"{np.mean(vtime):.0f}", f"{max(vtime):.0f}"],
+              ["测向 / 次", f"{np.mean(n_measure):.0f}", f"{max(n_measure):.0f}"]]
+    if not clear:
+        return [["听到 / 个", f"{sum(r['heard'] for r in rows)}/{n_src}", EMPTY_CELL]] + common
+    errs = [r["localize_err_mean_m"] for r in rows if r["localize_err_mean_m"] is not None]
+    worst_err = [r["localize_err_max_m"] for r in rows if r["localize_err_max_m"] is not None]
+    heard = [r["worst_first_heard_step"] for r in rows
+             if r["worst_first_heard_step"] is not None]
+    return [
+        ["清除比例", f"{np.mean([r['clear_ratio'] for r in rows]):.4f}", EMPTY_CELL],
+        ["清除 / 个", f"{sum(r['cleared'] for r in rows)}/{n_src}", EMPTY_CELL],
+    ] + common + [
+        ["定位误差均值 / m", f"{np.mean(errs):.2f}" if errs else EMPTY_CELL,
+         f"{max(worst_err):.2f}" if worst_err else EMPTY_CELL],
+        ["首次听到步", EMPTY_CELL, max(heard) if heard else EMPTY_CELL],
+    ]
+
+
+def print_episode_tables(rows: Sequence[dict], clear: bool = True) -> None:
+    """打印整批演练的逐局结果表与汇总表，命令行收尾处用"""
+    print(f"逐局结果（{len(rows)} 局）")
+    print_table(episode_table_head(clear), episode_table_rows(rows, clear),
+                align="rrrrrrrr" if clear else "rrrrrr")
+    print("汇总")
+    print_table(["指标", "均值 / 合计", "最差"], summary_table_rows(rows, clear), align="lrr")
 
 
 def save_plan(plan: SweepPlan, save_dir: Path, verify: dict | None = None) -> list[Path]:

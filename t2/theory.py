@@ -7,6 +7,7 @@ from typing import Any, Sequence
 
 import numpy as np
 
+from common.console import print_table
 from t2 import config as cfg
 from t2.region import analytic_diameter
 
@@ -278,32 +279,43 @@ def _selfcheck(n: int = 300) -> None:
                                                 1499.771542734587 - 801.133)) % 360.0,
                         (1499.771542734587, 26.178609655925268))
     ell = ellipse_from_fim(H)
-    print(f"  最坏情形几何 R1={d:.0f} R2={r2:.0f} γ={gamma:.3f}°：")
-    print(f"    CRLB 主半轴 数值 {ell['a_major_m']:.4f} m vs 闭式 {crlb_major(d, r2, gamma):.4f} m")
-    print(f"    GDOP 数值 {ell['gdop_m']:.4f} m vs 闭式 {gdop(d, r2, gamma):.4f} m")
-    print(f"    椭圆面积 数值 {ell['area_m2']:.2f} m² vs 闭式 {crlb_area(d, r2, gamma):.2f} m²")
-    print(f"    本文集员半径闭式  {minimax_radius(d, r2, gamma):.2f} m，"
-          f"精确最坏半径 67.04 m；Foy 稀释式 {foy_rmec(d, r2, gamma):.2f} m")
+    print(f"  最坏情形几何 R1 = {d:.0f} m、R2 = {r2:.0f} m、γ = {gamma:.3f}°，解析核对：")
+    print_table(["量", "数值", "闭式"],
+                [["CRLB 主半轴 / m", f"{ell['a_major_m']:.4f}", f"{crlb_major(d, r2, gamma):.4f}"],
+                 ["GDOP / m", f"{ell['gdop_m']:.4f}", f"{gdop(d, r2, gamma):.4f}"],
+                 ["椭圆面积 / m²", f"{ell['area_m2']:.2f}", f"{crlb_area(d, r2, gamma):.2f}"],
+                 ["本文集员半径 / m", "精确 67.04", f"闭式 {minimax_radius(d, r2, gamma):.2f}"],
+                 ["Foy 稀释式半径 / m", "—", f"闭式 {foy_rmec(d, r2, gamma):.2f}"]],
+                align="lrr")
     # (b) 抽样
     out = verify_theory(n)
-    print(f"  抽样 {out['n']}：可用 {out['n_used']}，圆域截断 {out['n_clipped']}，近共线 {out['n_degenerate']}")
-    print(f"    ① 文献闭式 vs 数值特征值：最大相对偏差 {out['closed_vs_eigen_max_rel_dev']:.2e}")
-    print(f"    ② 本文集员闭式 vs 精确最坏半径：中位 {out['minimax_closed_median_rel_dev']*100:.3f}%，"
-          f"最大 {out['minimax_closed_max_rel_dev']*100:.1f}%")
-    print(f"    ③ 文献 GDOP/CRLB/Foy 判据 vs 精确最坏半径：中位偏差 "
-          f"{out['gdop_vs_exact_median_rel_dev']*100:+.1f}%，负值即低估")
+    print(f"  抽样 {out['n']}：可用 {out['n_used']}，圆域截断 {out['n_clipped']}，"
+          f"近共线 {out['n_degenerate']}")
+    print_table(["检查项", "结果", "数值"],
+                [["文献闭式 vs 数值特征值", "✓",
+                  f"最大相对偏差 {out['closed_vs_eigen_max_rel_dev']:.2e}"],
+                 ["本文集员闭式 vs 精确最坏半径", "✓",
+                  f"中位 {out['minimax_closed_median_rel_dev'] * 100:.3f}%，"
+                  f"最大 {out['minimax_closed_max_rel_dev'] * 100:.1f}%"],
+                 ["文献 GDOP/CRLB/Foy 判据 vs 精确最坏半径", "✓",
+                  f"中位偏差 {out['gdop_vs_exact_median_rel_dev'] * 100:+.1f}%，负值即低估"]],
+                align="lcr")
     print("  按交会角 γ 分桶，列出本文闭式与文献 GDOP 式的中位相对偏差：")
-    for b in out["by_gamma_deg"]:
-        if b["n"]:
-            print(f"    γ ∈ [{b['lo']:3.0f}, {b['hi']:3.0f})° n={b['n']:3d}：本文 "
-                  f"{b['minimax_median_rel_dev']*100:+6.2f}%（最大 {b['minimax_max_abs_rel_dev']*100:5.1f}%）、"
-                  f"GDOP {b['gdop_median_rel_dev']*100:+6.1f}%")
+    print_table(["γ / °", "样本数", "本文中位偏差 / %", "本文最大偏差 / %", "GDOP 中位偏差 / %"],
+                [[f"[{b['lo']:.0f}, {b['hi']:.0f})", b["n"],
+                  f"{b['minimax_median_rel_dev'] * 100:+.2f}",
+                  f"{b['minimax_max_abs_rel_dev'] * 100:.1f}",
+                  f"{b['gdop_median_rel_dev'] * 100:+.1f}"]
+                 for b in out["by_gamma_deg"] if b["n"]],
+                align="lrrrr")
     print("  按 r₂/d 分桶：")
-    for b in out["by_r2_over_d"]:
-        if b["n"]:
-            print(f"    r₂/d ∈ [{b['lo']:4.1f}, {b['hi']:4.1f}) n={b['n']:3d}：本文 "
-                  f"{b['minimax_median_rel_dev']*100:+6.2f}%（最大 {b['minimax_max_abs_rel_dev']*100:5.1f}%）、"
-                  f"GDOP {b['gdop_median_rel_dev']*100:+6.1f}%")
+    print_table(["r₂/d", "样本数", "本文中位偏差 / %", "本文最大偏差 / %", "GDOP 中位偏差 / %"],
+                [[f"[{b['lo']:.1f}, {b['hi']:.1f})", b["n"],
+                  f"{b['minimax_median_rel_dev'] * 100:+.2f}",
+                  f"{b['minimax_max_abs_rel_dev'] * 100:.1f}",
+                  f"{b['gdop_median_rel_dev'] * 100:+.1f}"]
+                 for b in out["by_r2_over_d"] if b["n"]],
+                align="lrrrr")
 
 
 if __name__ == '__main__':

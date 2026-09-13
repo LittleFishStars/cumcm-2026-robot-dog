@@ -9,6 +9,7 @@ from typing import Any, Sequence
 
 import numpy as np
 
+from common.console import EMPTY_CELL, print_table
 from common.routing import dist_matrix, nearest_order, two_opt_first, two_opt_greedy
 from t3.config import SURVEY_CENTERS
 from t4.config import (MID_RING_N, MID_RING_RAD, MID_RING_ROT_DEG,
@@ -264,23 +265,80 @@ def verify_hearing_stats(points: Sequence[Sequence[float]],
     }
 
 
-def print_sweep_report(plan: SweepPlan, verify: dict[str, Any] | None) -> None:
-    """打印扫描方案与听到率统计报告，命令行 --plan-only 与每局开头都用它"""
-    print(f"扫描方案：7 覆盖基点"
-          + (f" + {plan.interior_n} 内部补点" if plan.interior_n > 0 else "")
-          + f" + {plan.outer_n} 均匀外圈点"
-          f"（r={plan.outer_radius:.0f} m），测量位置 {plan.n_points} 个（含原点起点扫描），"
-          f"访问里程 {plan.route_m:.0f} m")
-    if verify is None:
-        print("  （未做听到率统计）")
-        return
-    if verify["n_fail"] == 0:
-        print(f"  听到率统计：{verify['n_cases']} 个算例全部命中（本布局恰好 0 漏）")
+def point_rows(plan: SweepPlan) -> list[list[Any]]:
+    """测量点清单的行：序号 / x / y / 是否在圆域内，序号按访问顺序，与落盘 CSV 对齐"""
+    rows: list[list[Any]] = []
+    for k, i in enumerate(plan.route):
+        x, y = plan.points[i]
+        rows.append([k, f"{x:.2f}", f"{y:.2f}",
+                     "是" if float(np.hypot(x, y)) <= 1800.0 else "否"])
+    return rows
+
+
+def plan_summary_rows(plan: SweepPlan) -> list[list[Any]]:
+    """扫描方案概况的行：测量位置分区计数与访问里程"""
+    rows: list[list[Any]] = [["测量位置合计", plan.n_points], ["覆盖基点 + 原点", 8]]
+    # 内部补点那档现在是 0，方案里没有这一项就不占表里一行
+    if plan.interior_n > 0:
+        rows.append(["内部补点", plan.interior_n])
+    rows.append([f"均匀外圈点 r={plan.outer_radius:.0f} m", plan.outer_n])
+    rows.append(["访问里程 / km", f"{plan.route_m / 1000:.2f}"])
+    return rows
+
+
+def verify_rows(verify: dict[str, Any], verbose: bool = False) -> list[list[Any]]:
+    """听到率统计的行：算例数 / 漏数 / 听到率 / 贴边漏 / 蒙特卡洛漏，verbose 时补首例漏"""
+    rows: list[list[Any]] = [
+        ["算例数", verify["n_cases"], EMPTY_CELL],
+        ["漏数", verify["n_fail"], f"听到率 {verify['hear_rate'] * 100:.4f}%"],
+        ["贴边对抗漏", verify["edge_miss"], EMPTY_CELL],
+        ["蒙特卡洛漏", verify["mc_miss"], f"共 {verify['mc_n']}"],
+    ]
+    if verbose:
+        w = verify["worst_fail"] or {}
+        g = w.get("g") or [None, None]
+        rows.append(["首例漏", f"g=({g[0]}, {g[1]})",
+                     f"θ={w.get('theta_deg')}°，R={w.get('R_m')} m"])
     else:
-        print(f"  听到率统计：{verify['n_cases']} 个算例中漏 {verify['n_fail']} 个"
-              f"（{verify['hear_rate'] * 100:.4f}% 听到）；贴边对抗漏 "
-              f"{verify['edge_miss']}、蒙特卡洛漏 {verify['mc_miss']}/{verify['mc_n']}；"
-              f"首例漏 {verify['worst_fail']}，非严格保证，按实测报告")
+        rows.append(["首例漏", EMPTY_CELL, "非严格保证，按实测报告"])
+    return rows
+
+
+def print_point_table(plan: SweepPlan, title: str = "测量点清单") -> None:
+    """打印 20 个测量位置的清单表，逐点一行"""
+    print(title)
+    print_table(["序号", "x / m", "y / m", "在圆域内"], point_rows(plan), align="rrrl")
+
+
+def print_sweep_summary(plan: SweepPlan, verify: dict[str, Any] | None,
+                        src: str | None = None) -> None:
+    """打印扫描方案概况与听到率统计两张精简表，缺省档用，src 是布局文件来源"""
+    print(f"扫描方案（布局来自 {src}）" if src else "扫描方案")
+    print_table(["项目", "数值"], plan_summary_rows(plan), align="lr")
+    if verify is None:
+        print("听到率统计：未做统计")
+        return
+    print("听到率统计")
+    print_table(["指标", "数值", "备注"], verify_rows(verify), align="lrl")
+
+
+def print_sweep_report(plan: SweepPlan, verify: dict[str, Any] | None) -> None:
+    """打印扫描方案与听到率统计报告，详细档用，逐点清单与逐项校验都成表"""
+    print("扫描方案（含原点起点扫描）")
+    print_table(["项目", "数值"], plan_summary_rows(plan), align="lr")
+    print_point_table(plan)
+    if verify is None:
+        print("听到率统计：未做统计")
+        return
+    print("听到率统计")
+    print_table(["指标", "数值", "备注"], verify_rows(verify, verbose=True), align="lrl")
+    # 严格不漏与否只认统计口径这一句，guaranteed 标记留着是给以后换成严格布局用的
+    print(f"  统计口径：{verify['note']}")
+
+
+def print_check_table(rows: Sequence[Sequence[Any]]) -> None:
+    """打印自检的检查项表：检查项 | 结果 | 数值，见 `python -m t4.sweep`"""
+    print_table(["检查项", "结果", "数值"], [list(r) for r in rows], align="lll")
 
 
 if __name__ == '__main__':
@@ -296,7 +354,11 @@ if __name__ == '__main__':
     ref = np.array([_hit_report(p.points, np.array([x, y]), t, r)[0]
                     for x, y, t, r in zip(gx, gy, th, RR)])
     same_trig = np.array_equal(np.cos(th), np.array([math.cos(float(t)) for t in th]))
-    print(f"  批量判据 vs 单例参考：逐例一致 {bool(np.array_equal(batch_hit, ref))}（200 个随机算例）；"
-          f"np.cos 与 math.cos 在这批角度上逐位一致 {bool(same_trig)}")
+    print_check_table([
+        ["批量判据 vs 单例参考", "逐例一致" if bool(np.array_equal(batch_hit, ref)) else "不一致",
+         "200 个随机算例"],
+        ["np.cos vs math.cos", "逐位一致" if bool(same_trig) else "有位差",
+         f"{th.size} 个随机角度"],
+    ])
     v = verify_hearing_stats(p.points)
     print_sweep_report(p, v)

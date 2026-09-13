@@ -349,10 +349,11 @@ class RobotDog(ActionRecorder):
                        else "未旋转（--no-rotate），")
         self.log(f"    [朝向] 起始扫描听到 {len(bearings)} 个源，最密集方向 "
                  f"{math.degrees(dense % (2.0 * math.pi)):.1f}°，其顺时针 90° 处 = "
-                 f"{math.degrees((dense - math.pi / 2.0) % (2.0 * math.pi)):.1f}°；"
-                 f"{rotate_note}"
-                 f"第一个巡视点站点{first} 正对该方位。巡视终点为站点{end}"
-                 f"（终点路径长 {length:.0f} m，比最短路径多 {length - L_min:.0f} m）")
+                 f"{math.degrees((dense - math.pi / 2.0) % (2.0 * math.pi)):.1f}°"
+                 f"\n    {rotate_note}"
+                 f"第一个巡视点站点{first} 正对该方位"
+                 f"\n    巡视终点为站点{end}（终点路径长 {length:.0f} m，"
+                 f"比最短路径多 {length - L_min:.0f} m）")
         order[:] = list(path)
         self.survey_order_planned = list(path)
         self._survey_path_len = length
@@ -486,10 +487,10 @@ class RobotDog(ActionRecorder):
         r_hi = self.inline_radius_max if self.inline_radius_max is not None else self.inline_r_max
         self.log(f"    [顺路清除] 本站 ({at[0]:.0f}, {at[1]:.0f}) → 下一站"
                  f" ({next_wp[0]:.0f}, {next_wp[1]:.0f})：与圆心的连线方向在 {th_a:.0f}° ~ "
-                 f"{th_b:.0f}° 之间（方位扇区 {ang_diff(th_a, th_b):.0f}°）、半径 "
-                 f"{self.inline_r_min:.0f}~{r_hi:.0f} m、区域覆盖圆半径 ≤ {self.inline_max_mec_r:.0f} m，"
-                 f"有 {len(picked)} 个估计点" + (f"（跳过 {n_too_big} 个区域过大的频道）"
-                                                if n_too_big else ""))
+                 f"{th_b:.0f}° 之间（方位扇区 {ang_diff(th_a, th_b):.0f}°）"
+                 f"\n    半径 {self.inline_r_min:.0f}~{r_hi:.0f} m、"
+                 f"区域覆盖圆半径 ≤ {self.inline_max_mec_r:.0f} m，有 {len(picked)} 个估计点"
+                 + (f"（跳过 {n_too_big} 个区域过大的频道）" if n_too_big else ""))
         n = 0
         for _key, ch, _est in picked:
             if self._out_of_time():
@@ -520,8 +521,8 @@ class RobotDog(ActionRecorder):
             })
             precise += self._precise(ch)
         self.log(f"阶段2 定位与清除：{len(self.obs)} 个频道，其中巡视后估计已够准"
-                 f"（最小覆盖圆半径 < {CLEAR_RADIUS:.0f} m，诊断值）{precise} 个；"
-                 f"全部频道都走同一流程：就近试清 → 未命中则补测缩小再清")
+                 f"（最小覆盖圆半径 < {CLEAR_RADIUS:.0f} m，诊断值）{precise} 个"
+                 f"\n    全部频道都走同一流程：就近试清 → 未命中则补测缩小再清")
         return {"n_channels": len(self.obs), "n_precise": precise,
                 "n_skip": self.n_skip}
 

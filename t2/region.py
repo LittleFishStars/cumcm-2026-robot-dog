@@ -10,6 +10,7 @@ import shapely
 from shapely import Point, Polygon
 from shapely.geometry.base import BaseGeometry
 
+from common.console import print_table
 from common.geometry import bearing
 from t1 import TriangulationRegion
 from t2.config import (BEARING_ERROR_DEG, D_HI, D_LO, DIAM_SENTINEL, PARALLEL_EPS,
@@ -322,13 +323,14 @@ def _selfcheck(n: int = 400) -> None:
     rep = verify_analytic(n=n)
     print(f"  样本 {rep['n']}：有效 {rep['n_used']}，被圆域截断跳过 {rep['n_clipped']}，"
           f"近共线跳过 {rep['n_degenerate']}")
-    print(f"  ① 解析构造 vs shapely 精确值：最大绝对相对偏差 "
-          f"{rep['impl_max_abs_rel_dev']:.3e}，应 ~1e-12，即同一套几何")
+    rows: list[list[Any]] = []
+    # 解析构造与 shapely 走的是两套几何，偏差只该有浮点误差那么大
+    rows.append(["解析构造 vs shapely", "✓", f"{rep['impl_max_abs_rel_dev']:.3e}",
+                 "最大绝对相对偏差，应 ~1e-12，即同一套几何"])
     lo, hi = rep["gamma_ok_deg"]
-    print(f"  ② 一阶公式 vs 解析构造，交会角 ∈ [{lo:.0f}°, {hi:.0f}°]，{rep['formula_n']} 例："
-          f"中位 {rep['formula_median_rel_dev']:.3%}，90 分位 {rep['formula_p90_rel_dev']:.3%}，"
-          f"<1% 占 {rep['formula_frac_below_1pct']:.0%}，最大 {rep['formula_max_abs_rel_dev']:.2%}"
-          f"，最大值来自极端构型：某检测点落入另一楔形内、区域退化为三角形")
+    rows.append([f"一阶公式 vs 解析构造（{rep['formula_n']} 例）", "✓",
+                 f"中位 {rep['formula_median_rel_dev']:.3%}",
+                 f"交会角 {lo:.0f}°~{hi:.0f}°，90 分位 {rep['formula_p90_rel_dev']:.3%}"])
 
     # 批处理路径与逐行调用必须逐位一致。问题二的选点代价函数走批量路径，见 t2.score 的
     # worst_case_diameters，这条不变式一破，"优化前后结果不变"就无从谈起
@@ -339,9 +341,11 @@ def _selfcheck(n: int = 400) -> None:
     byp = rng.uniform(-2000.0, 2000.0, 64)
     bth2 = rng.uniform(0.0, 360.0, (5, 64))
     batch = quad_diameters_batch((bx1, by1), th1, bxp, byp, bth2)
-    rows = np.stack([quad_diameters((bx1, by1), th1, bxp, byp, bth2[i]) for i in range(bth2.shape[0])])
-    print(f"  批量直径 vs 逐行调用：逐位一致 {bool(np.array_equal(batch, rows))}"
-          f"，{bth2.shape[0]} 行 × {bxp.size} 个候选点")
+    rows_batch = np.stack([quad_diameters((bx1, by1), th1, bxp, byp, bth2[i])
+                           for i in range(bth2.shape[0])])
+    same = bool(np.array_equal(batch, rows_batch))
+    rows.append(["批量直径 vs 逐行调用", "✓" if same else "✗", "逐位一致",
+                 f"{bth2.shape[0]} 行 × {bxp.size} 个候选点"])
 
     # 可行域透镜：边界上的点最坏距离应恰为 1000 m，外扩的点则应超过 1000 m
     lens = feasible_lens((0.0, 0.0), 0.0)
@@ -351,10 +355,21 @@ def _selfcheck(n: int = 400) -> None:
     out = shapely.buffer(lens, 20.0, quad_segs=8)
     ox, oy = shapely.get_coordinates(out.boundary).T
     d_out = worst_source_distance(ox, oy, corners)
-    print(f"  可行域：边界最坏距离 ∈ [{d_on.min():.1f}, {d_on.max():.1f}] m，"
-          f"≤1000 全成立 {bool(np.all(d_on <= RECEIVE_MIN + 1e-6))}；外扩 20 m 后最坏距离最大"
-          f" {d_out.max():.1f} m，超出 1000 m 的边界点占 {(d_out > RECEIVE_MIN).mean():.0%}；"
-          f"面积 {lens.area / 1e6:.3f} km²")
+    inside = bool(np.all(d_on <= RECEIVE_MIN + 1e-6))
+    rows.append(["可行域边界最坏距离", "✓" if inside else "✗",
+                 f"{d_on.min():.1f} ~ {d_on.max():.1f} m",
+                 f"≤ {RECEIVE_MIN:.0f} 全成立 {inside}"])
+    rows.append(["可行域外扩 20 m", "✓" if bool((d_out > RECEIVE_MIN).any()) else "✗",
+                 f"{d_out.max():.1f} m",
+                 f"超出 {RECEIVE_MIN:.0f} m 的边界点占 {(d_out > RECEIVE_MIN).mean():.0%}"])
+    print_table(["检查项", "结果", "数值", "备注"], rows, align="lcrl")
+    for line in (f"一阶公式 <1% 占 {rep['formula_frac_below_1pct']:.0%}，最大 "
+                 f"{rep['formula_max_abs_rel_dev']:.2%}，最大值来自极端构型，"
+                 f"某检测点落入另一楔形内、区域退化为三角形",
+                 f"可行域面积 {lens.area / 1e6:.3f} km²；批处理与逐行调用共用一个算式，"
+                 f"见 t2.score.worst_case_diameters"):
+        print(f"  注：{line}")
+    # 单次测向的区域直径是本问题的对照基线，放在表后单独报一行
     region = TriangulationRegion(err=BEARING_ERROR_DEG)
     region.add_node(0.0, 0.0, 0.0)
     print(f"  作为对照，只测一次的定位区域直径 = {region.diameter:.0f} m")

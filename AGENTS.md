@@ -29,8 +29,9 @@ mathematical-modelling problems 1-4).
 
 - `pyproject.toml` requires **Python >= 3.14** and uses the Tsinghua PyPI mirror; the stack is
   Python 3.14 + numpy/matplotlib/shapely.
-- Use `uv sync` then `uv run python <script>`. README's `.venv/bin/python` is POSIX-only; on Windows
-  use `uv run` or `.venv\Scripts\python.exe`. Prefer `python -X utf8 ...` so Chinese output renders.
+- **uv is mandatory**: `uv sync`, then `uv run -m <package>` (equivalently `uv run python -m <package>`).
+  Never invoke a bare system `python`; README documents this as the only supported entry. Prefer
+  `uv run python -X utf8 -m <package>` so Chinese output renders.
 
 ## Commands that work offline
 
@@ -65,7 +66,7 @@ mathematical-modelling problems 1-4).
 
 ## Running against the official simulator
 
-- `python -X utf8 -m t3` (no args) connects to `http://127.0.0.1:2026`.
+- `uv run python -X utf8 -m t3` (no args) connects to `http://127.0.0.1:2026`.
   The simulator is Windows-only and listens on localhost only, so it must run on the same machine.
 - **Gotcha:** the official `jammers-simulator.exe` is a long-running process that holds port 2026.
   While it runs, a local `--practice` launch fails with `WinError 10013`/port-busy. `python -m t3`

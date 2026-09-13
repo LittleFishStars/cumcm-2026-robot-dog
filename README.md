@@ -14,7 +14,7 @@ t1/ t2/ t3/ t4/    问题一~四，每个包都带 __main__.py
 results/           最后一次正式运行的产物：t3/、t4/ 的逐局汇总、观测、轨迹与扫描图，t2/ 的成果图
 README.md          本文件
 pyproject.toml     Python 版本与依赖声明
-.venv/             随包提供的 Python 3.14 运行环境（numpy / shapely / matplotlib）
+.venv/             本队在 Linux（Arch Linux + Python 3.14.7）下建的虚拟环境，见「运行环境」
 ```
 
 因此包内**只能跑离线命令**：`--practice` 演练模式依赖的本地复刻模拟器是开发仓库里的
@@ -23,33 +23,37 @@ pyproject.toml     Python 版本与依赖声明
 
 ## 运行环境
 
-包里已带 `.venv/`，**无需安装任何依赖**即可直接运行：
-
-```bash
-.venv/bin/python -m t2                   # Linux / macOS
-.venv\Scripts\python.exe -m t2           # Windows
-```
-
-本队的开发方式是 [uv](https://docs.astral.sh/uv/)：装了 uv 的机器上按下面这样用（推荐），uv 会
-自动使用本目录的 `.venv`，不必手动激活：
-
-```bash
-uv sync                                  # 按 pyproject.toml 建/更新 .venv（首次需联网解析依赖）
-uv run python -V                         # 应显示 3.14.x
-```
-
-没有 uv 时，把下一节命令里的 `uv run -m X` 换成 `.venv/bin/python -m X`
-（Windows 为 `.venv\Scripts\python.exe -m X`），两者等价。请勿使用系统 PATH 里的 `python`。
-
-- **Python ≥ 3.14**（`pyproject.toml` 声明；开发与验证都在 Arch Linux 上做）
+- **Python ≥ 3.14**（`pyproject.toml` 声明；本队开发与验证都在 Arch Linux + Python 3.14.7 上做）
 - 依赖：`numpy ≥ 2.5`、`shapely ≥ 2.1`（问题一/二的楔形交计算）、`matplotlib ≥ 3.11`（出图）；
   求解与自检本身不需要 matplotlib（`--no-plot` 可只算数与文件）
-- 中文输出若乱码，用 `uv run python -X utf8 -m <包名> ...`（或 `.venv/bin/python -X utf8 -m <包名> ...`）
+- 安装依赖（在包根目录执行一次，二选一）：
+
+  ```bash
+  python -m pip install "numpy>=2.5" "shapely>=2.1" "matplotlib>=3.11"   # 用本机 Python
+  uv sync                     # 用 uv（本队的开发方式，会自动建/更新 .venv，首次需联网）
+  uv run python -V            # 用 uv 时应显示 3.14.x
+  ```
+
+- 包内附带的 `.venv/` **与本队开发机同类的环境**可直接复用，无需再装依赖：
+
+  ```bash
+  .venv/bin/python -m t2
+  ```
+
+  注意它不是自包含环境：`.venv/bin/python` 是指向系统 `python3.14` 的软链接，`site-packages`
+  里也是 linux-x86_64 的扩展模块（numpy 2.5.3 / shapely 2.1.2 / matplotlib 3.11.2），
+  因此**只适用于已装 Python 3.14 的 Linux**；Windows 等其他平台请按上面自行安装依赖
+  （Windows 下也没有 `.venv\Scripts\`，不要照搬这一行）。
+
+- 本队开发时统一走 uv：`uv run -m <包名>`（uv 自动使用本目录的 `.venv`，不必手动激活）。评审机上
+  没有 uv 时，把前缀换成 `python -m <包名>`（已按上面装好依赖）或 `.venv/bin/python -m <包名>`
+  （Linux 上直接用包内环境），三者等价。中文输出若乱码，在解释器后加 `-X utf8`，例如
+  `python -X utf8 -m t3 --plan-only`。
 
 ## 使用说明
 
-下面一律用 `uv run -m <包名>`（在包根目录执行）。每个包都带 `__main__.py`，等价写法是
-`uv run python -m <包名>`。
+下面一律用 `uv run -m <包名>`（在包根目录执行）；按上一节换成 `python -m <包名>` 或
+`.venv/bin/python -m <包名>` 完全等价。每个包都带 `__main__.py`。
 
 ```bash
 # 四个问题的入口
@@ -67,8 +71,8 @@ uv run -m t3.covering                   # 覆盖圆方案：旋转/选向/最少
 uv run -m t4.sweep                      # 扫描判据：批量实现 vs 单例参考
 ```
 
-- **离线命令**（`t1`、`t2`、两个 `--plan-only` 与上面四条自检）在提交包里直接可跑，只依赖
-  `.venv` 里的 numpy / shapely / matplotlib。
+- **离线命令**（`t1`、`t2`、两个 `--plan-only` 与上面四条自检）在提交包里直接可跑，只依赖 numpy /
+  shapely / matplotlib（包内 `.venv` 里已装好，见上一节）。
 - **演练模式**（`--practice N`）自动拉起本地复刻模拟器（自带真值，可核对覆盖保证）；该模拟器是
   开发仓库里的独立子仓库 `resources/jammers-py/`，**不在提交包内**，故包里跑不了。
   本队开发时先 `git submodule update --init resources/jammers-py`，`--jammers-dir` 可指定别处；

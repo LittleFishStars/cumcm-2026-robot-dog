@@ -9,11 +9,9 @@ __all__ = ["dist", "bearing", "ang_diff", "clamp_to_region", "point_in_circle"]
 
 
 def dist(a: Sequence[float], b: Sequence[float]) -> float:
-    """两点距离 / m
-
-    用 math.hypot 而不是 np.linalg.norm：两者在极少数调用上会差出 1 µs 量级的浮点误差，
-    而虚拟时钟按 5 m/s 精确复算，走 numpy 会造出"时钟对不上"的假不一致。这里踩过。
-    """
+    """两点距离 / m"""
+    # 用 math.hypot 而不是 np.linalg.norm：后者会差出浮点末位，而虚拟时钟按 5 m/s 精确复算，
+    # 走 numpy 会造出"时钟对不上"的假不一致，这里踩过
     return math.hypot(a[0] - b[0], a[1] - b[1])
 
 
@@ -28,12 +26,8 @@ def ang_diff(a: float, b: float) -> float:
 
 
 def clamp_to_region(x: float, y: float, radius: float) -> tuple[float, float]:
-    """把坐标拉回半径为 radius 的作业圆域内，出域时沿原方向缩到边界
-
-    所有 /measure 与 /clear 的入口都过这里：定位解、补测点、末端归航步进都可能落在圆域外，
-    统一在这一处裁掉，内部逻辑就不用各自判断了。radius 由调用方给，通常是
-    `REGION_RADIUS - REGION_MARGIN`，留出数值余量。
-    """
+    """把坐标拉回半径为 radius 的作业圆域内，出域时沿原方向缩到边界"""
+    # 所有 /measure 与 /clear 的入口都过这里，radius 通常给 REGION_RADIUS - REGION_MARGIN
     r = math.hypot(x, y)
     if r <= radius or r == 0.0:
         return x, y

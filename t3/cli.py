@@ -27,38 +27,14 @@ from t3.strategy import RobotDog
 
 
 def _api_log(args: argparse.Namespace, echo: bool) -> "AbstractContextManager[ApiLog | None]":
-    """接口日志上下文，把 CLI 参数拆成公共层 api_log 需要的参数
-
-    路径优先取 --api-log，没指定就用 <save-dir>/api_calls.jsonl，显式传空串则关闭日志。
-
-    Args:
-        args: 已解析的命令行参数
-        echo: 是否把每次接口调用回显到终端
-
-    Returns:
-        AbstractContextManager[ApiLog | None]: 上下文管理器；进入时得到日志对象，
-            日志被关闭时为 None，--api-log 传空串就是关闭
-    """
+    """接口日志上下文，把 CLI 参数拆成公共层 api_log 需要的参数，传空串的 --api-log 就是关闭"""
     return _api_log_raw(args.save_dir, args.api_log, echo)
 
 
 def _episode_printer(clear: bool) -> "Callable[[dict, dict, int | None], None]":
-    """按模式打印本局小结，只在需要时输出清除相关字段；过程明细仅 `--verbose` 时输出
-
-    Args:
-        clear: 是否做了阶段二定位与清除；False 时只报巡视扫描相关字段
-
-    Returns:
-        Callable[[dict, dict, int | None], None]: 打印函数 show(stats, check, n_sources)
-    """
+    """按模式打印本局小结，只在需要时输出清除相关字段，过程明细仅 --verbose 时输出"""
     def show(stats: dict, check: dict, n_sources: int | None) -> None:
-        """打印一局的巡视小结与覆盖核对结果。详细档走这里，缺省档只在外面打一行结论
-
-        Args:
-            stats: 本局统计，含圆心数、里程、虚拟时间、测向次数、清除个数等
-            check: 真值核对结果，含定位误差、最坏最近距离等；官方模式无真值时为 None
-            n_sources: 本局干扰源个数，官方模式无真值时为 None
-        """
+        """打印一局的巡视小结与覆盖核对结果，详细档走这里，缺省档只在外面打一行结论"""
         if not is_verbose():
             return
         print(f"本局：巡视 {stats['waypoints_visited']} 个圆心，里程 {stats['travel_m']:.0f} m，"
@@ -199,15 +175,7 @@ def run_practice(args: argparse.Namespace, res: CoverSolveResult, save_dir: Path
 
 
 def run_official(args: argparse.Namespace, res: CoverSolveResult, save_dir: Path) -> int:
-    """官方评测接口模式：连 127.0.0.1 上已开放接口的模拟器，跑完整一局
-
-    与演练有两处差别。一是拿不到干扰源真值，定位误差这些需要真值的指标只能留空，覆盖核对
-    也无从做起。二是结果与演练写同一目录 <RESULTS_DIR>，不按模式分家。策略代码和参数完全
-    一致，所以演练里验证过的行为在正式模式同样成立。
-
-    接口调用全程落盘到 <save-dir>/api_calls.jsonl，用 --api-log 改路径、传空串关闭。官方模式
-    没有真值，这份逐次请求与响应的记录就是唯一的证据链，事后可据此复核每次测量与清除。
-    """
+    """官方评测接口模式：连 127.0.0.1 上已开放接口的模拟器跑完整一局，接口调用日志即证据链"""
     sim = Simulator(robot_id=args.robot_id, base_url=args.base_url, timeout=args.timeout)
     if is_verbose():
         print(f"连接模拟器 {args.base_url}（robot_id={args.robot_id}）")
@@ -334,13 +302,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    """按模式分派：--practice 走本地演练，--plan-only 只求覆盖圆，其余走官方模拟器
-
-    也就是说，`python -m t3` 不带任何参数时会直接连官方模拟器跑完一局，缺省地址就是
-    http://127.0.0.1:2026。三种模式共用同一次覆盖圆求解和同一份策略代码，差别只在"场景从
-    哪来"和"结果写哪去"。输出缺省只报关键结论，每步 1~2 行；`--verbose` 还原完整过程，
-    `--quiet` 只留最终产物路径。
-    """
+    """按模式分派：--practice 走本地演练，--plan-only 只求覆盖圆，其余连官方模拟器"""
     relax_console_encoding()
     args = build_parser().parse_args(argv)
     set_level(LEVEL_VERBOSE if args.verbose else LEVEL_QUIET if args.quiet else LEVEL_NORMAL)

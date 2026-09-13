@@ -41,11 +41,8 @@ def source_samples(site: Sequence[float], theta1: float, d_lo: float = cfg.D_LO,
                    n_delta: int = cfg.DELTA_SAMPLES,
                    err_deg: float = cfg.BEARING_ERROR_DEG,
                    radius: float = cfg.REGION_RADIUS) -> np.ndarray:
-    """源不确定集 C 的采样点，形状 (M, 2)，落在目标圆域之外的样本已经剔除
-
-    d 取 [d_lo, d_hi] 的等距网格，δ 取 [−1°, 1°] 的等距网格，两端都包含。最坏情况常出现在
-    端点，也就是最远的源配上楔形边缘。两端都取上，取最坏时拿到的才是真实的极值候选
-    """
+    """源不确定集 C 的采样点，形状 (M, 2)，圆域之外的样本已剔除"""
+    # 两端都取上：最坏情况出现在端点上，取最坏时拿到的才是真实极值候选
     ds = np.linspace(float(d_lo), float(d_hi), int(n_d))
     deltas = np.linspace(-err_deg, err_deg, int(n_delta))
     pts = []
@@ -68,22 +65,8 @@ def worst_case_diameters(site: Sequence[float], sx: np.ndarray, sy: np.ndarray, 
                          sources: np.ndarray, deltas2: np.ndarray,
                          err_deg: float = cfg.BEARING_ERROR_DEG,
                          reduce: str = "max") -> np.ndarray:
-    """J(S2)：对源采样点与第二次测向误差取最坏或期望的定位直径 / m，逐候选点向量化
-
-    对每个候选点 S2 和每个源采样点 G，第二次示向度的名义值是 θ₂ = ∠(S2→G)，实际读数还要叠加误差
-    δ₂，所以把 θ₂ + δ₂ 代进四边形构造取最大。源采样点本身已含 δ₁ ∈ [−1°, 1°]，那正是源在楔形内
-    的角向不确定性，于是这一层覆盖了"源在楔形内何处"与"第二次测向偏多少"的全部组合。
-
-    reduce="max" 是本文的 minimax 口径，保证最坏情况；reduce="mean" 是文献常用的期望口径，
-    Chen 等 2009 用期望滤波 RMS 位置误差，两者给出的最优第二检测点可能不同，这正是
-    `theory_analysis` 要量化对照的东西。
-
-    实现上把"源采样点 × δ₂"的整套组合按批送进 `quad_diameters_batch`，约 2 万行。逐组合调
-    `quad_diameters` 时单次只有几百微秒的有效计算，却要 2 ms 以上的调用开销，摊掉这一层之后
-    同一份算式的耗时降到原来的几分之一。批内每行与逐组合调用逐元素同值，见
-    `t2.region._candidate_points_batch`。reduce="mean" 时仍逐行累加，求和顺序与原先完全一致，
-    结果逐位不变。
-    """
+    """对源采样点与第二次测向误差取最坏或期望的定位直径 J(S2) / m，逐候选点向量化"""
+    # reduce="max" 是本文的 minimax 口径，"mean" 是文献常用的期望口径
     sx = np.asarray(sx, dtype=float).ravel()
     sy = np.asarray(sy, dtype=float).ravel()
     if reduce not in ("max", "mean"):
@@ -111,7 +94,7 @@ def worst_case_diameters(site: Sequence[float], sx: np.ndarray, sy: np.ndarray, 
 
 
 def suitability(j: np.ndarray, j_star: float) -> np.ndarray:
-    """适合度 F = J*/J，取值在 (0,1] 内；J 取到哨兵值时按 0 处理，那时构型退化，等于无法定位"""
+    """适合度 F = J*/J，取值 (0, 1]，哨兵值按 0 处理"""
     j = np.asarray(j, dtype=float)
     safe = np.where(j > 0.0, j, np.inf)
     f = float(j_star) / safe
@@ -127,11 +110,8 @@ def coarse_fields(site: Sequence[float], theta1: float, sources: np.ndarray,
                   err_deg: float = cfg.BEARING_ERROR_DEG,
                   radius: float = cfg.REGION_RADIUS,
                   receive_min: float = cfg.RECEIVE_MIN) -> dict[str, np.ndarray]:
-    """全域粗网格上的四个场：坐标网格、到源集的最坏距离、可测性掩码、最坏定位直径
-
-    J 只在可行点上算。不可行点本来就不会成为第二检测点，算了也是浪费，而可行域只是圆域里很小
-    的一块透镜，跳过它们能省下 90% 以上的计算量。不可行点的 J 记成哨兵值。
-    """
+    """全域粗网格上的坐标网格、最坏源距、可测性掩码与最坏定位直径四个场"""
+    # 只在可行点上算 J，其余记哨兵值：可行域只是圆域里很小的一块透镜，能省九成计算
     axis = np.arange(-radius, radius + 0.5 * step, step)
     xx, yy = np.meshgrid(axis, axis)
     in_region = np.hypot(xx, yy) <= radius + 1e-9
@@ -150,7 +130,7 @@ def coarse_fields(site: Sequence[float], theta1: float, sources: np.ndarray,
 
 def closed_form_table(d: float, r2: float, gamma_deg: float, exact_radius: float,
                       err_deg: float = cfg.BEARING_ERROR_DEG) -> dict[str, Any]:
-    """在最坏情形几何上对照：本文闭式、文献 GDOP、文献 CRLB 主半轴、Foy 稀释式与精确最坏半径"""
+    """在最坏情形几何上对照本文闭式、三条文献判据与精确最坏半径"""
     closed = {
         "minimax_radius_m": theory.minimax_radius(d, r2, gamma_deg, err_deg),
         "gdop_m": theory.gdop(d, r2, gamma_deg, err_deg),
@@ -178,21 +158,7 @@ def theory_analysis(site: Sequence[float], theta1: float, sources: np.ndarray,
                     expect_step: float = cfg.EXPECT_STEP,
                     certify_max: int = cfg.CERTIFY_MAX,
                     expect_max: int = cfg.EXPECT_MAX) -> dict[str, Any]:
-    """把文献判据 GDOP/CRLB/几何稀释接到本文算法上，做三件事
-
-    第一件是全域认证。在可行域包围盒内按 `step` 建细网格，缺省 5 m，用解析 GDOP 场
-    `theory.radius_field` 快筛出最优先的 `top` 个候选，那个场比精确构造快约两个数量级，再用精确
-    判据复核。这样"最优点"就不再看 25 m 粗网格是否恰好框住盆地，而是"细网格全局快筛 + 精确复核"
-    的结果，报告中给出两者的差。
-
-    第二件是判据对照。在可行域内等距抽 `probe_n` 个点，比较文献 GDOP 判据与本文精确判据的秩相关，
-    看文献判据能不能替代精确判据做搜索；同时给出三条文献判据在本文最坏情形上相对精确最坏界的
-    偏差，也就是低估多少。
-
-    第三件是准则对照。分别求"文献 GDOP 判据最优"、"期望（平均）直径最优"和本文 minimax 最优
-    三点，前者是 Chen 等 2009 的期望 RMS 口径；然后在同一张表上用精确最坏直径、期望直径、GDOP
-    三个指标互评。这样才说得清 minimax 与期望准则的取舍，而不是只丢一句"我们用最坏情况"。
-    """
+    """把文献判据接到本文算法上，做全域认证、判据一致性与准则对照三件事"""
     lens = feasible_lens(site, theta1, d_lo, d_hi, err_deg, receive_min, radius)
     x0, y0, x1, y1 = lens.bounds
     # 可行域大时，比如换了第一检测点，5 m 网格会涨到几十万点，那就按点数上限自动放宽步长。
@@ -263,12 +229,7 @@ def criteria_points(site: Sequence[float], theta1: float, sources: np.ndarray,
                     deltas2: np.ndarray, points_xy: dict[str, tuple[float, float]],
                     j_star: float, mirror: bool = True,
                     err_deg: float = cfg.BEARING_ERROR_DEG) -> dict[str, Any]:
-    """三个口径的最优点在同一张表上互评，指标是最坏直径、期望直径与 GDOP
-
-    `mirror=True` 时把 φ < 0 的点镜像到 +φ，解关于示向度方向严格对称，指标不变，这样与主结论
-    的报告方式一致，便于并排比较。`j_star` 是最终认定最优的最坏直径，表里的
-    `worst_diam_loss_pct` 就是各点相对它的损失。
-    """
+    """三个口径的最优点在同一张表上互评，指标是最坏直径、期望直径与 GDOP"""
     ang = math.radians(float(theta1))
     table: dict[str, Any] = {}
     for name, (bx, by) in points_xy.items():
@@ -302,11 +263,7 @@ def refine_best(site: Sequence[float], theta1: float, sources: np.ndarray, delta
                 step: float = cfg.REFINE_STEP, err_deg: float = cfg.BEARING_ERROR_DEG,
                 receive_min: float = cfg.RECEIVE_MIN,
                 reduce: str = "max") -> tuple[float, float, float]:
-    """在粗解附近做局部细化，返回 (x, y, J)
-
-    J 在最优点附近光滑，"太大/近共线"的区域又被哨兵值挡住，25 m 粗网格必然把最优点圈进 ±80 m
-    的窗口里。窗口内 2 m 步长足够把最优值定到米级，再细的差异远小于 ±1° 测向误差对应的几十米量级。
-    """
+    """在粗解附近做局部细化，返回 (x, y, J)"""
     xs = np.arange(x0 - half, x0 + half + 0.5 * step, step)
     ys = np.arange(y0 - half, y0 + half + 0.5 * step, step)
     xx, yy = np.meshgrid(xs, ys)
@@ -326,11 +283,7 @@ def refine_best(site: Sequence[float], theta1: float, sources: np.ndarray, delta
 
 @dataclass
 class Band:
-    """候选区域的解析描述：若干条径向弧带，每瓣一条，外加多边形边界，绘图与面积都用它
-
-    `radial_gaps` 记的是"某个方位角上出现两段径向区间"的次数。弧带组装取包络，这个值非 0 就说明
-    描述略偏乐观，会打印出来，实测恒为 0。
-    """
+    """候选区域的解析描述：每瓣一条径向弧带，外加多边形边界与面积"""
 
     level_m: float                                  # 阈值 J ≤ level_m
     lobes: list[dict[str, Any]] = field(default_factory=list)
@@ -362,17 +315,7 @@ class Band:
 def lens_ray_interval(site: Sequence[float], theta1: float, phi_deg: np.ndarray, d_lo: float,
                       d_hi: float, err_deg: float, receive_min: float,
                       radius: float) -> tuple[np.ndarray, np.ndarray]:
-    """可行域透镜沿某个方位绕 S1 的精确径向区间 (r_in, r_out) / m
-
-    透镜是圆域与 4 个半径 1000 m 圆盘的交，圆盘心为源不确定集的 4 个极点。从 S1 出发沿方向 u
-    的射线，与以 C 为心、半径 r 的圆盘相交的极径区间是 [proj − √D, proj + √D]，其中 proj = u·w、
-    D = proj² + r² − |w|²，w = C − S1，D < 0 表示该方位与这个圆盘无交。5 个约束取交就是透镜
-    沿该方位的精确区间，它同时给出弧带的外缘和内缘：外缘常被可测性限制住，内缘可能被两个远端
-    圆盘的"阴影"顶出来。细网格的径向范围也靠它定，否则放大图会漏掉透镜内侧的一半。
-
-    与 `phi_deg` 同形地返回径向区间下界 `r_in` 与上界 `r_out` / m。该方位与透镜无交时 `r_out`
-    为 -inf。
-    """
+    """可行域透镜沿某个方位绕 S1 的精确径向区间 (r_in, r_out) / m，无交时 r_out 为 -inf"""
     phi = np.asarray(phi_deg, dtype=float)
     ux, uy = np.cos(np.radians(theta1 + phi)), np.sin(np.radians(theta1 + phi))
     r_in = np.zeros_like(phi)
@@ -393,18 +336,8 @@ def candidate_band(site: Sequence[float], theta1: float, sources: np.ndarray, de
                    err_deg: float = cfg.BEARING_ERROR_DEG,
                    receive_min: float = cfg.RECEIVE_MIN,
                    radius: float = cfg.REGION_RADIUS) -> Band:
-    """在绕 S1 的极坐标网格上提取 { 可行 ∩ J ≤ level } 的弧带。
-
-    网格是极坐标下的矩形，r 乘 φ。J 的次水平集在每个方位角上都恰好是一段连续径向区间，实测
-    无例外，见 Band.radial_gaps，所以把每列的首末极径连起来就得到弧带边界：外弧按 φ 升序，内弧
-    按 φ 降序，闭合成一条简单多边形。分瓣按 φ 的符号来分，解关于示向度方向对称时恰好两瓣。
-
-    边界口径关系到报告里的面积与范围，得说清楚。外弧取"网格外缘与透镜精确外边界
-    `lens_ray_limit` 的较小者"，因为弧带外缘通常正是被可测性限制住的那一条，这时用精确值，
-    最优点恰在外缘上也能如实落进带内。内弧取"网格内缘再向外半格"，也就是把最后被选中的单元
-    中心外扩半个径向步长，5 m 步长对应 2.5 m。于是报告的范围与面积跟真实次水平集最多差半个
-    网格单元，径向 ≤ 2.5 m、方位 ≤ 0.25°。
-    """
+    """在绕 S1 的极坐标网格上提取可行且 J ≤ level 的弧带，按 φ 的正负分瓣"""
+    # 外弧取网格外缘与透镜精确边界的较小者，内弧外扩半格，最优点恰在外缘上也能落进带内
     phis = np.arange(-cfg.BAND_PHI_SPAN, cfg.BAND_PHI_SPAN + 0.5 * cfg.BAND_PHI_STEP,
                      cfg.BAND_PHI_STEP)
     # 径向网格按透镜的精确径向范围设定，留半步余量：放大图必须覆盖整个可行域，
@@ -456,12 +389,7 @@ def candidate_band(site: Sequence[float], theta1: float, sources: np.ndarray, de
 def _lobe(r: np.ndarray, phis: np.ndarray, cols: list[int], sel: np.ndarray,
           feasible: np.ndarray, theta1: float, site: Sequence[float], lim_in: np.ndarray,
           lim_out: np.ndarray, half_r: float) -> dict[str, Any]:
-    """把一串连续方位角上的径向区间组装成一瓣弧带，外弧正序、内弧逆序
-
-    边界口径看紧邻的下一个网格点是否可行，它决定该侧是被可测性限制还是被 J 限制。被可测性限制，
-    也就是下一点不可行时，直接用透镜的精确边界 `lim_out`/`lim_in`，那是精确值，最优点恰在外缘
-    上也能落进带内；否则用网格单元中心外扩或内缩半格。
-    """
+    """把一串连续方位角上的径向区间组装成一瓣弧带，外弧正序内弧逆序"""
     outer, inner = [], []
     for k in cols:
         idx = np.flatnonzero(sel[:, k])
@@ -521,7 +449,7 @@ class SolveResult:
         return self.single_m / self.j_star if self.j_star else float("inf")
 
     def summary(self) -> str:
-        """控制台/报告用的一段话小结。"""
+        """控制台与报告共用的一段话小结"""
         x, y = self.best
         return (f"最优第二检测点 ({x:.0f}, {y:.0f}) m：距 S1 {self.best_r:.0f} m、"
                 f"相对示向度 {self.best_phi:+.1f}°，最坏定位直径 J* = {self.j_star:.1f} m"
@@ -631,13 +559,13 @@ def solve(site: Sequence[float] = cfg.DEFAULT_SITE, theta1: float = cfg.DEFAULT_
 
 
 def _rel_angle(angle: float, ref: float) -> float:
-    """angle 相对 ref 的方位差，取值 (−180, 180]。"""
+    """angle 相对 ref 的方位差，取值 (−180, 180]"""
     return ((angle - ref + 180.0) % 360.0) - 180.0
 
 
 def _single_measurement_diameter(site: Sequence[float], theta1: float, err_deg: float,
                                  radius: float) -> float:
-    """对照量：只做这一次测向时的定位区域直径，也就是补测前的最坏起点"""
+    """对照量：只做这一次测向时的定位区域直径 / m"""
     region = TriangulationRegion(err=err_deg, radius=radius)
     region.add_node(float(site[0]), float(site[1]), float(theta1))
     return float(region.diameter)

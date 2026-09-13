@@ -29,16 +29,7 @@ def draw_trajectory(out_path: Path, actions: Sequence[dict[str, Any]],
                     title: str | None = None,
                     figsize: tuple[float, float] = (9.0, 7.6)) -> Path:
     """把一局的轨迹画成图并存盘，格式由后缀决定，.png 或 .pdf
-
-    `actions` 是逐次动作记录，也就是 RobotDog.actions，含测向与清除的落点、结果类型、虚拟
-    时刻。`plan` 是覆盖圆方案，用来画 7 个半径 1000 m 的覆盖圆与圆心，那些圆心就是巡视航路点。
-    `order` 是巡视访问顺序，给圆心标序号，一眼能看出"依次到圆心"的路线。`sources` 是干扰源
-    真值，只有演练模式有，画成红叉再按 20 m 清除半径画圈。`title` 是图内小标题，论文用图传
-    None，大标题交给 caption。
-
-    matplotlib 只在本函数内导入，没装的话只会抛 ImportError，由调用方忽略，官方测试机上
-    没有 matplotlib 也能正常跑完整局。出图去掉了时间戳类元数据，同一输入两次出图逐字节一致。
-    """
+    plan 用来画 7 个覆盖圆与圆心，order 给圆心标访问序号，sources 只有演练模式才有。"""
     # 配置目录与中文字体的统一处理都在 common.plotting，这里只管调用
     setup_mpl_env()
     import matplotlib
@@ -122,10 +113,7 @@ def save_trajectory(save_dir: Path, name: str, actions: Sequence[dict[str, Any]]
                     title: str | None = None,
                     traj_dir: str = TRAJ_DIR) -> list[Path]:
     """落盘一局的轨迹：同名的 PNG 图和 CSV 轨迹表，返回已写出的文件列表
-
-    轨迹表让"图上每个点"都能与过程日志逐点对账，序号、动作类型、阶段、坐标、结果、频道、
-    虚拟时刻、累计里程都在里面。matplotlib 缺失只提示一次并跳过出图，轨迹表照常写出。
-    """
+    轨迹表让图上每个点都能与过程日志逐点对账，matplotlib 缺失只提示一次并跳过出图。"""
     return _save_trajectory(
         save_dir, name, actions,
         lambda png: draw_trajectory(png, actions, plan, order, sources, title),
@@ -137,11 +125,7 @@ def save_scan_figures(save_dir: Path, name: str, steps: Sequence[dict[str, Any]]
                       sources: Sequence[dict[str, Any]] = (),
                       step_dir: str = STEP_DIR_NAME) -> list[Path]:
     """把一局内每一步扫描各画一张结果图，落在 <save-dir>/<step_dir>/ 下
-
-    文件名形如 `ep01_s00_起点全频道扫描.png`、`ep01_s03_巡视站3.png`：局号 + 步序，排序后
-    与执行顺序一致，便于按时间顺次翻阅"信息是怎么一步步积累起来的"。
-    与轨迹图一样在 /exit 之后调用，不占现实时间预算；缺 matplotlib 只提示一次并跳过。
-    """
+    文件名形如 `ep01_s00_起点全频道扫描.png`，缺 matplotlib 只提示一次并跳过。"""
     out_dir = save_dir / step_dir
     out_dir.mkdir(parents=True, exist_ok=True)
     wp = [tuple(map(float, c)) for c in plan.waypoints]

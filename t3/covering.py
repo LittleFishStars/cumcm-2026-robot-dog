@@ -21,14 +21,7 @@ from t3.config import (BOUNDARY_SAMPLES, CHOSEN_RING_RADIUS, COARSE_BOUNDARY,
 
 @dataclass(frozen=True, eq=False)
 class CoverPlan:
-    """覆盖圆方案：所有覆盖圆的圆心位置，这些圆心就是机器狗的巡视路点
-
-    圆心来源有两条路。centers 给定时按给定坐标摆放，这也是默认走法，见 config.SURVEY_CENTERS
-    里那 7 点一般布局；centers 为 None 时按"1 个中心加 6 个正六边形环心"生成，ring_radius
-    就是环半径，对照和参数扫描都用这条。
-
-    两条路都保证圆域内任一点到最近圆心的距离 ≤ cover_radius，走遍圆心就必不漏源。
-    """
+    """覆盖圆方案：各覆盖圆的圆心位置，这些圆心就是机器狗的巡视路点，layout 为空时按 ring_radius 走六边形族"""
 
     region_radius: float            # 目标圆域半径 / m
     cover_radius: float             # 覆盖圆半径，等于有效接收半径下界 / m
@@ -50,11 +43,7 @@ class CoverPlan:
         object.__setattr__(self, "waypoints", wp)
 
     def rotated(self, rotation: float) -> "CoverPlan":
-        """返回把整个布局绕原点旋转到给定角度的新方案
-
-        覆盖条件只看点间距离和点到原点的距离，巡视路径长度只看点间距离，旋转两样都不碰。
-        所以旋转是个零成本的自由度，专门用来把站点的朝向对准源密集的那一侧。
-        """
+        """返回把整个布局绕原点旋转到给定角度的新方案，覆盖与里程都不变"""
         return replace(self, rotation=float(rotation))
 
     @property
@@ -65,12 +54,7 @@ class CoverPlan:
 
 def hex_layout(ring_radius: float, rotation: float = 0.0,
                n_ring: int = 6) -> np.ndarray:
-    """正六边形布局的圆心：第 0 个在原点，其余 n_ring 个在半径 ring_radius 的环上
-
-    `rotation` 把整个环绕原点转一个角度。正六边形有 6 重旋转对称，只有模 2π/n_ring 才有区别。
-    中心圆恒在原点，所以旋转既不动覆盖保证，也不动巡视里程 6d，它管的是"环心朝哪边"，进而
-    决定巡视路线扫过哪一片区域、最后停在哪个方向，见 strategy._align_face。
-    """
+    """正六边形布局的圆心：第 0 个在原点，其余 n_ring 个均匀铺在半径 ring_radius 的环上，rotation 只管环心朝哪边"""
     ang = rotation + np.arange(n_ring) * (2.0 * math.pi / n_ring)
     ring = np.stack((ring_radius * np.cos(ang), ring_radius * np.sin(ang)), axis=1)
     return np.vstack([[0.0, 0.0], ring])
@@ -83,16 +67,7 @@ def optimal_ring_radius(region_radius: float = REGION_RADIUS) -> float:
 
 def feasible_ring_interval(region_radius: float = REGION_RADIUS,
                            cover_radius: float = COVER_RADIUS) -> tuple[float, float]:
-    """满足覆盖保证 D(d) ≤ r 的环半径区间 [d_min, d_max]，解析给出
-
-    两个约束各划一段区间，取交集：
-
-      内圈约束 d/√3 ≤ r 给出 d ≤ √3·r；
-      边界约束 g₂(d) ≤ r 是个二次式 d² - √3R·d + R² - r² = 0，解出
-      d ∈ [(√3R - √(4r²-R²))/2, (√3R + √(4r²-R²))/2]。
-
-    区间两个端点都是零余量，最坏距离恰好等于 r，余量随 d 单调变化。
-    """
+    """满足覆盖保证 D(d) ≤ r 的环半径区间 [d_min, d_max]，解析给出，两端点余量为零"""
     root = math.sqrt(max(4.0 * cover_radius ** 2 - region_radius ** 2, 0.0))
     lo = (math.sqrt(3.0) * region_radius - root) / 2.0
     hi = min(math.sqrt(3.0) * cover_radius,
@@ -101,14 +76,9 @@ def feasible_ring_interval(region_radius: float = REGION_RADIUS,
 
 
 def analytic_worst(ring_radius: float, region_radius: float = REGION_RADIUS) -> float:
-    """最坏最近距离的解析值 D(d) = max(d/√3, g₂)，推导见模块文档
-
-    两项各有来头。d/√3 是内圈的最坏距离，内圈里只有中心圆够得着；g₂ 是圆域边界上那个与
-    某环心夹角 30° 的点到最近环心的距离。两项在 d* = √3·R/2 处同时等于 R/2，这就是最优点
-    的最坏距离。
-    """
+    """最坏最近距离的解析值 D(d) = max(d/√3, g₂)，两项在 d* = √3·R/2 处同时等于 R/2"""
     def g(rho: float) -> float:
-        """半径 rho 的圆域边界点、与最近环心夹角 30° 时到该环心的距离，也就是边界项 g₂"""
+        """半径 rho 的圆域边界点与最近环心夹角 30° 时到这个环心的距离，也就是边界项 g₂"""
         return math.sqrt(max(rho * rho + ring_radius * ring_radius
                              - math.sqrt(3.0) * rho * ring_radius, 0.0))
     return max(ring_radius / math.sqrt(3.0), g(region_radius))
@@ -116,38 +86,13 @@ def analytic_worst(ring_radius: float, region_radius: float = REGION_RADIUS) -> 
 
 def min_circle_count(region_radius: float = REGION_RADIUS,
                      cover_radius: float = COVER_RADIUS) -> dict[str, Any]:
-    """覆盖半径 R 的圆域最少需要几个半径 r 的圆盘，本题 r/R = 5/9 = 0.5555556
-
-    这是经典的 disk covering problem：拿若干个等半径圆盘去盖一个圆。k = 5、6 的最优值都已经
-    被证明，k 个圆盘能盖住一个圆所需的最小半径比 ρ_k = r/R 是
-
-        ρ_5 = 0.6093828641（Bezdek 1983）  ρ_6 = 0.5559052114（Bezdek 1979）  ρ_7 = 0.5
-
-    判定于是只剩一件事，看 5/9 落在哪两个 ρ_k 中间：
-
-        ρ_7 = 0.5000 < 5/9 = 0.5555556 < 0.5559052 = ρ_6
-
-    7 个够用，6 个不够用，所以最少 7 个。6 个其实只差一点点：就算六个圆盘摆到最优，也要求
-    覆盖半径 ≥ ρ_6·R = 1000.629 m，比手里这 1000 m 只多 0.629 m，合 0.0629%。凭直觉说
-    "再少几个圆也该行"几乎是对的，可惜差了千分之零点六，不够就是不够。
-
-    只靠面积或者弧长，拿到的下界都弱得多：面积加密度给到 n ≥ 4，边界弧长给到 n ≥ 6，两者
-    都排不掉 6 个。要排除它，只能用上面那些已证明的最优值。
-
-    上面是引用文献的判定。光有引用没有自查也不踏实，所以另做了一次独立的数值搜索复核。
-    搜索把问题归一化到 R=1，而且圆心不设圆域约束，这比本题的情形更宽松，宽松情形下的最优值
-    必然 ≤ 受约束时的最优值，正好构成下界。以罗盘模式搜索，从大量随机起点与结构族出发最小化
-    最坏距离，得到 k=3 → 0.8660254，也就是 √3/2 ✓；k=4 → 0.7071425，约等于 1/√2；
-    k=5 → 0.6102517；k=6 → 0.5575510；k=7 → 0.5000000，也就是 1/2 ✓。与文献值依次相差
-    2e-16、3.6e-5、8.7e-4、1.7e-3、2e-16。搜索在 k=3、k=7 上精确复现了解析最优，说明求值器
-    与搜索本身可信；k=5、k=6 的搜索值略高于证明值，那是局部最优没跑干净留下的正常残差。方向
-    是一致的，而且已经够用：就算按这个比证明值更大的数值结果，6 个圆盘也只能做到
-    0.5575510 > 5/9 = 0.5555556，6 个依然不够。
-
-    判定依据的两个比值挨得很近，这里对精度要格外当心：5/9 = 0.5555555556 与
-    ρ_6 = 0.5559052114 只差 3.5e-4。要是用 4 位小数的近似值，0.5556 对 0.5559，结论倒是不变，
-    余量却被吃掉大半。所以这几个常量一律写足位数，并且注明来源。
-    """
+    """覆盖半径 R 的圆域最少需要几个半径 r 的圆盘，本题 r/R = 5/9，结论是 7 个够、6 个不够"""
+    # ρ_7 = 0.5 < 5/9 = 0.5555556 < 0.5559052 = ρ_6；6 个就算摆到最优也要覆盖半径 ≥ 1000.629 m，
+    # 比手里的 1000 m 多 0.629 m（0.0629%）。面积加密度只给到 n ≥ 4、边界弧长只给到 n ≥ 6，
+    # 都排不掉 6 个，能作数的只有已证明的 ρ_k。数值搜索（R=1、圆心不设圆域约束）复核：
+    # k=3 → 0.8660254、k=4 → 0.7071425、k=5 → 0.6102517、k=6 → 0.5575510、k=7 → 0.5，
+    # 与文献值依次差 2e-16、3.6e-5、8.7e-4、1.7e-3、2e-16，即使按偏大的搜索值 6 个也不够。
+    # 5/9 与 ρ_6 只差 3.5e-4，这几个常量一律写足位数，别用 4 位小数的近似。
     ratio = cover_radius / region_radius
     arc_deg = 2.0 * math.degrees(math.asin(min(ratio, 1.0)))
     six_need = DISK_RATIO_6 * region_radius
@@ -168,11 +113,7 @@ def min_circle_count(region_radius: float = REGION_RADIUS,
 
 SECTOR_HALF_DEG = 30.0          # 扇区半宽 / 度，正六边形相邻环心隔 60°，正好各管一半
 def _sector_score(bearings_rad: np.ndarray, phi: float) -> tuple[int, float]:
-    """以 phi 为扇区中心的评分，返回装入的源个数与这些源的 ΣcosΔθ
-
-    个数是主指标，它回答"哪一片源最多"。ΣcosΔθ 只在个数打平时才出场，用来看片内的源是不是
-    更居中。
-    """
+    """以 phi 为扇区中心的评分，返回装入的源个数与这些源的 ΣcosΔθ，后者只在个数打平时用"""
     d = (bearings_rad - phi + math.pi) % (2.0 * math.pi) - math.pi
     inside = np.abs(d) <= math.radians(SECTOR_HALF_DEG)
     cnt = int(inside.sum())
@@ -181,19 +122,7 @@ def _sector_score(bearings_rad: np.ndarray, phi: float) -> tuple[int, float]:
 
 def dense_sector_rotation(bearings: Sequence[float],
                           step_deg: float = 1.0) -> float | None:
-    """选一个旋转角，让某个环心正对"听到的源最多"的那个 60° 扇区
-
-    6 个环心彼此相隔 60°，环心能对准哪些方向就只由旋转角模 60° 决定。于是把圆周切成 360/60
-    个候选 60° 扇区，1° 一格，等效于把整个圆周扫了一遍，取装入源最多的那一片的中心方向 θ*，
-    返回 θ* 本身，落在 [0, 2π)。至于具体把哪条旋转量施加到布局上，由 strategy._orient_route
-    决定，它那边同时还要挑落脚站。本函数只管回答一件事：源最密集的方向是哪个。
-
-    为什么按个数最多而不是方位角均值？均值是合向量方向，碰到两个相距几十度的等量簇就会落在
-    两簇中间，谁也没对准。本题要的是把圆心摆到源密集的那一侧，取众数才符合意图。同分时用
-    扇区内 ΣcosΔθ 破平，再拿片内源的质量中心做一次亚度精修，并且只在个数不减少时才采纳。
-
-    入参是示向度序列，单位度。一个源都没听到时返回 None，无从判断，保持 0°。
-    """
+    """选一个旋转角，让某个环心正对"听到的源最多"的那个 60° 扇区，入参示向度按度给，一个源都没听到时返回 None"""
     if not len(bearings):
         return None
     beta = np.asarray([math.radians(float(b)) for b in bearings], dtype=float)
@@ -220,7 +149,7 @@ def dense_sector_rotation(bearings: Sequence[float],
 
 @lru_cache(maxsize=8)
 def region_samples(step: float, n_boundary: int) -> np.ndarray:
-    """目标圆域的采样点：细网格加圆边界均匀采样，最坏点常躲在边界上，这里得采细"""
+    """目标圆域的采样点：细网格加圆边界均匀采样，最坏点常躲在边界上，边界得采细"""
     ax = np.arange(-REGION_RADIUS, REGION_RADIUS + TOL, step)
     gx, gy = np.meshgrid(ax, ax)
     pts = np.stack((gx.ravel(), gy.ravel()), axis=1)
@@ -233,14 +162,7 @@ def region_samples(step: float, n_boundary: int) -> np.ndarray:
 
 def nearest_distances(points: np.ndarray, waypoints: np.ndarray,
                       chunk: int = 200_000) -> np.ndarray:
-    """每个采样点到最近圆心的距离，分块算，免得撑起一个大矩阵
-
-    做法是逐圆心一列、比平方距离、最后只对 N 个最小值开方：
-
-      * 不构造 `(N, n_circles, 2)` 三维临时数组，也不在对轴长约 2 的轴上做 `np.linalg.norm`
-        的多维归约。那种归约得按行走通用累加路径，实测比逐列循环慢好几倍。
-      * 开方放到最后。开方单调，√(min d²) 与 min √(d²) 逐位相同，等于把 7N 次开方省成 N 次。
-    """
+    """每个采样点到最近圆心的距离，分块算，免得撑起一个大矩阵，开方只对最小值做一次"""
     pts = np.asarray(points, dtype=float)
     wp = np.asarray(waypoints, dtype=float)
     out = np.empty(pts.shape[0], dtype=float)
@@ -256,12 +178,7 @@ def nearest_distances(points: np.ndarray, waypoints: np.ndarray,
 
 
 def worst_candidates(ring_radius: float, region_radius: float = REGION_RADIUS) -> np.ndarray:
-    """解析给出的最坏点候选：12 个角平分线方向 × {ρ* = d/√3, ρ = R}
-
-    圆域内的最坏点必定落在某个角平分线方向上，也就是与最近环心夹角 30° 的方向。内圈最坏点在
-    ρ* = d/√3 处，到那里它到最近环心的距离恰好也是 ρ*，和中心圆打平；外圈最坏点在圆域边界
-    ρ = R 处。把这些点塞进采样集合，解析解与实算解就能一致到机器精度，网格退居旁证。
-    """
+    """解析给出的最坏点候选：12 个角平分线方向 × {ρ* = d/√3, ρ = R}，内圈点在 ρ* 处与中心圆打平"""
     ang = np.arange(12) * (math.pi / 6.0) + math.pi / 6.0
     pts = [(r * math.cos(a), r * math.sin(a))
            for r in (ring_radius / math.sqrt(3.0), region_radius) for a in ang]
@@ -270,17 +187,7 @@ def worst_candidates(ring_radius: float, region_radius: float = REGION_RADIUS) -
 
 def worst_candidates_general(centers: np.ndarray,
                             region_radius: float = REGION_RADIUS) -> np.ndarray:
-    """任意圆心布局下的精确最坏点候选集，不靠网格采样
-
-    函数 f(p) = min_i |p - c_i| 在圆域上的最大值只能出现在这三类点里：
-
-      1. 到三个圆心等距的点，也就是三角形外心，并且落在圆域内。这类点是局部极大。
-      2. 到两个圆心等距的中垂线与圆域边界的交点。
-      3. 圆域内到某个圆心最远与最近的点，也就是沿 c_i 方向的原点和它对径的边界点，原点本身
-         也算。
-
-    三类点全算进候选，实算最坏距离就能和真值一致到机器精度，网格只用来旁证。
-    """
+    """任意圆心布局下的精确最坏点候选集，取三角形外心、中垂线与边界的交点、圆心方向的边界点，不靠网格"""
     C = np.asarray(centers, dtype=float)
     n = len(C)
     R = region_radius
@@ -321,12 +228,7 @@ def worst_candidates_general(centers: np.ndarray,
 
 def cover_counts(points: np.ndarray, waypoints: np.ndarray, radius: float,
                  chunk: int = 200_000) -> np.ndarray:
-    """每个采样点被几个覆盖圆同时覆盖，也就是覆盖重数
-
-    判据写成"平方距离 ≤ (r + TOL)²"。两侧都非负，而且 TOL 的余量在 d 上是 1e-9、在 d² 上是
-    2e-6，比浮点最后一位大七个数量级，d = 1000 处那一位约 1e-13，所以它和"距离 ≤ r + TOL"
-    逐点同判。这样写的好处是不用对每个点都开方，也省掉了构造 `(N, n_circles, 2)` 三维临时数组。
-    """
+    """每个采样点被几个覆盖圆同时覆盖，也就是覆盖重数，判据写成平方距离 ≤ (r + TOL)² 免开方"""
     pts = np.asarray(points, dtype=float)
     wp = np.asarray(waypoints, dtype=float)
     lim = (float(radius) + TOL) ** 2
@@ -394,11 +296,7 @@ class CoverSolveResult:
         return COVER_RADIUS - self.worst_distance
 
     def to_json(self) -> dict[str, Any]:
-        """把方案与校验结果导出成 JSON 可序列化的字典，落盘成 t3_cover_plan.json
-
-        字典里装圆心坐标、最坏距离、覆盖重数、可行区间、权衡表与文献对照这些字段，键名与
-        CoverSolveResult 的字段名对得上。
-        """
+        """把方案与校验结果导出成 JSON 可序列化的字典，落盘成 t3_cover_plan.json"""
         plan = self.plan
         is_hex = plan.layout is None
         return {
@@ -446,17 +344,8 @@ class CoverSolveResult:
 
 def _six_circle_best(step: float = COARSE_STEP,
                      n_boundary: int = COARSE_BOUNDARY) -> tuple[float, float]:
-    """6 个覆盖圆的族内对照，不是全局最优：只放开「1 中心 + 6 环上圆」这一个受限族，
-    得到的是"这一族里最好能到多少"，证明不了 6 个不行
-
-    真正的判定在 `min_circle_count()` 那边，它引用经典 disk covering problem 的已证明最优值
-    ρ_6 = 0.5559052 > 5/9，说明任意 6 个圆盘都不够，不管限不限这一族。本函数留着，只为在
-    报告里给一个直观的对照数字。
-
-    Returns:
-        tuple[float, float]: 该族最优环半径 / m，以及该半径下的最坏最近距离 / m。粗网格只
-        用来判断可行性。
-    """
+    """6 个覆盖圆的族内对照：只放开「1 中心 + 6 环上圆」这一族，看这一族最好能到多少
+    它排除不了 6 个，真正的判定在 min_circle_count。"""
     pts = region_samples(step, n_boundary)
     best = (float("inf"), 0.0)
     for d in np.arange(200.0, COVER_RADIUS + 1.0, 10.0):
@@ -501,15 +390,7 @@ def solve_covering_circles(ring_radius: float | None = None,
                           use_hex: bool = False,
                           use_uniform: bool = False) -> CoverSolveResult:
     """求解 1000 m 覆盖圆的位置，顺带做实算校验、可行区间与权衡分析、文献方法对照
-
-    一般布局有三种走法：
-
-      * 默认用优化布局 config.SURVEY_CENTERS，里程 ~6167 m，余量 ~5 m；
-      * use_uniform=True 时换成"7 个圆心均匀分布在半径 1000 m 的圆上"的正七边形布局
-        config.SURVEY_CENTERS_UNIFORM，里程 ~6207 m，零余量，最坏点恰好落在原点；
-      * 给出 ring_radius 或者 use_hex=True 时改用"1 中心 + 6 正六边形环心"的经典族，里程 6d，
-        留给对照与参数扫描。
-    """
+    给出 ring_radius 或 use_hex=True 走六边形族，use_uniform 走正七边形。"""
     if use_hex or ring_radius is not None:
         d = CHOSEN_RING_RADIUS if ring_radius is None else float(ring_radius)
         plan = CoverPlan(REGION_RADIUS, COVER_RADIUS, d)
@@ -696,12 +577,8 @@ def print_cover_report(res: CoverSolveResult) -> None:
 # 自检：`python -m t3.covering`
 # ----------------------------------------------------------------------------
 def _selftest() -> int:
-    """三项自检：覆盖保证在旋转下成立，六边形族与一般布局各验一遍；密集扇区选向；最少圆数为 7
-
-    旋转是"整个 7 圆布局绕原点转一个角"，而覆盖条件只取决于圆心之间的距离与它们到原点的
-    距离，两者在共同旋转下都不变，所以保证在理论上恒定。可"理论上不变"和"实现上确实不变"
-    是两回事，只转了采样点没转圆心就会静默出错，所以这里实算校验。
-    """
+    """四项自检：覆盖保证在旋转下成立，六边形族与一般布局各验一遍；密集扇区选向；最少圆数为 7
+    光转采样点不转圆心会静默出错，所以这里实算校验。"""
     import numpy as np
     rng = np.random.default_rng(2026)
     rots = np.concatenate([np.arange(0.0, 60.0, 1.0), rng.uniform(0.0, 360.0, 40)])

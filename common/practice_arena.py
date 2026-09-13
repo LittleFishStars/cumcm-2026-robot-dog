@@ -37,17 +37,7 @@ class PracticeArena:
     def __init__(self, jammers_dir: Path, robot_id: str, robot_port: int = 2026,
                  console_port: int = 8090, countdown: int = 1,
                  reuse_existing: bool = True, problem_no: int = PROBLEM_NO) -> None:
-        """初始化演练场
-
-        Args:
-            jammers_dir: jammers-py 所在目录，里头有 run.py
-            robot_id: 参赛队号，传给模拟器的 --team
-            robot_port: 机器狗接口端口，由模拟器监听
-            console_port: 控制台 REST 端口；被占用时会自动往后换
-            countdown: 开局倒计时秒数
-            reuse_existing: 是否复用已在运行的 jammers-py 实例
-            problem_no: 题目编号，3 是全向源，4 是定向 + 全向混合
-        """
+        """初始化演练场，题目编号 3 是全向源，4 是定向加全向混合"""
         self.reuse_existing = reuse_existing
         self.jammers_dir = Path(jammers_dir).resolve()
         self.robot_id = robot_id
@@ -93,14 +83,7 @@ class PracticeArena:
         raise TimeoutError("等待 jammers-py 控制台就绪超时")
 
     def __exit__(self, *exc: Any) -> bool:
-        """退出演练场：收掉自己拉起的那个进程
-
-        Args:
-            *exc: with 块内的异常三元组；本演练场不改写异常传播
-
-        Returns:
-            bool: 恒为 False，异常照常往外抛
-        """
+        """退出演练场：收掉自己拉起的那个进程，异常照常往外抛"""
         self.close()
         return False
 
@@ -119,17 +102,7 @@ class PracticeArena:
     # ---- 控制台 REST ----
     def _request(self, path: str, payload: dict | None = None,
                  base: str | None = None, post: bool = False) -> dict:
-        """向控制台 REST 发一次请求并返回解析后的 JSON
-
-        Args:
-            path: 接口路径，如 "/api/state"
-            payload: 请求体；None 表示不带请求体
-            base: 基地址；None 表示用本实例的 console_url，探测其他端口时会显式传进来
-            post: 是否强制用 POST
-
-        Returns:
-            dict: 控制台返回的 JSON
-        """
+        """向控制台 REST 发一次请求并返回解析后的 JSON，base 给了就打到那个地址上"""
         data = None if payload is None else json.dumps(payload).encode("utf-8")
         # 带请求体就走 POST；post=True 时即使没有请求体也发 POST，如 /api/abort、/api/clear
         req = urllib.request.Request((base or self.console_url) + path, data=data,
@@ -156,16 +129,7 @@ class PracticeArena:
         return None
 
     def _wait_state(self, target: str, timeout: float = 30.0) -> None:
-        """轮询控制台，直到模拟器状态等于 target
-
-        Args:
-            target: 期望的状态名，如 "window_open"
-            timeout: 最长等待时间 / s
-
-        Raises:
-            RuntimeError: 演练局提前进入 finished，不可能再到达 target
-            TimeoutError: 等超时了还没到 target
-        """
+        """轮询控制台，直到模拟器状态等于 target；演练局提前 finished 或等超时都会抛错"""
         deadline = time.monotonic() + timeout
         while time.monotonic() < deadline:
             state = self._request("/api/state").get("state")
@@ -178,12 +142,9 @@ class PracticeArena:
 
     # ---- 一局演练 ----
     def start_episode(self, seed: int) -> list[dict]:
-        """按种子生成固定场景并开一局，等接口开放后返回干扰源真值
-
-        噪声种子被覆写成由 seed 派生的确定值，整局的布局与噪声都完全可复现：同一个 `--seed`
-        必然得到同一份结果，新旧策略也能严格对照。盐里带题目编号，免得不同题目、相同 seed
-        碰巧共用同一条噪声流。
-        """
+        """按种子生成固定场景并开一局，等接口开放后返回干扰源真值"""
+        # 噪声种子覆写成由 seed 派生的确定值，盐里带题目编号，免得不同题目相同 seed 共用同一条
+        # 噪声流；同一个 --seed 必然得到同一份结果，新旧策略能严格对照
         scenario = self._request("/api/scenario", {"problem_no": self.problem_no,
                                                    "seed": seed})["scenario"]
         scenario["noise_seed_hex"] = hashlib.blake2b(

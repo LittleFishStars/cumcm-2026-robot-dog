@@ -145,31 +145,21 @@ the author's own habit across `~/Projects/python/MBridge`, `~/Projects/python/GN
     reads better. 98 `故` in 10k lines is a fingerprint;
   - vary sentence length. A one-line jab ("跑一遍就知道", "这里别乱动") is welcome next to a long
     sentence that carries a whole derivation. Just don't give every paragraph the same rhythm.
-- Docstrings: every module, class, function and method has one, in Chinese, starting with a
-  one-line summary and no trailing period on that line. Everything after the summary is optional
-  and has to earn its place: a trivial helper gets one line, not an `Args:`/`Returns:` skeleton. Write
-  the sections only when a parameter, return value, exception or invariant is genuinely not obvious
-  from the call site:
+- Docstrings are one-line introductions. Every module, class, function and method has one, in
+  Chinese, saying what it does, with no trailing period on that line. Two lines is the ceiling, and
+  only when the second one is genuinely load-bearing. No `Args:`/`Returns:` skeletons: if a parameter
+  or return value really is not obvious from the call site, work it into the sentence.
 
   ```python
-  """One-line Chinese summary, no trailing period
-
-  Args:
-      student_id: student id
-      password: password for the unified verification platform
-
-  Returns:
-      tuple[bool, Any]: whether it succeeded, plus the resulting data
-  """
+  """构建命令行解析器"""
   ```
 
-  The sample shows the layout only (4-space indent inside a section, written as `name: description` /
-  `type: description`); the real text is Chinese. Whatever a function docstring already records about
-  maths, constraints and pitfalls is content, so keep it there.
-- Module docstrings are one-line introductions, not design notes: say what the file is for in a
-  sentence or two, three lines at the very most. Constraints, derivations, traps and history belong
-  in the function docstring or comment that carries them, in the commit message, or in the paper; do
-  not restate them at the top of the file.
+  Rationale, derivations, measured numbers and traps do not belong in a docstring. When one of them
+  has to stay near the code, put it in a `#` comment on the statement it explains, one line, and
+  leave the docstring alone.
+- Module docstrings follow the same rule: say what the file is for, one line. Constraints,
+  derivations, traps and history belong in the comment or docstring that carries them, in the commit
+  message, or in the paper; do not restate them at the top of the file.
 - Type annotations: annotate parameters and return values on every function and method, including
   `-> None` on `__init__` and on internal `_helper`s. Use only builtin generics and `|`:
   `list[float]`, `tuple[float, float]`, `dict[str, Any]`, `float | None` — never

@@ -25,12 +25,7 @@ Point = tuple[float, float]
 
 @dataclass
 class ScanStep:
-    """一步扫描的完整记录，也就是画图所需的最小契约
-
-    `measures` / `clears` 只描述本步发生的动作。`path` 是到本步为止的行驶路径，含起点，
-    给这一步提供空间上下文。`regions` / `estimates` 是本步结束时的估计状态快照。
-    这些字段都能与 `api_calls.jsonl` 里的逐次调用对上，所以图可以反向核对。
-    """
+    """一步扫描的完整记录，也就是画图所需的最小契约"""
 
     index: int                                  # 0 = 起始扫描；1..N = 巡视站序号
     label: str                                  # 展示名，如 "起点全频道扫描"
@@ -66,11 +61,7 @@ class ScanStep:
 
 
 def scan_step_of(raw: dict[str, Any], k: int) -> ScanStep:
-    """由机器狗登记的一步扫描记录构造 `ScanStep`
-
-    键名契约见 `common.actions.ActionRecorder._begin_scan_step` 与各题的 `_end_scan_step`；
-    两族策略的记录格式一致，所以这里只留一份转换。
-    """
+    """由机器狗登记的一步扫描记录构造 `ScanStep`"""
     return ScanStep(
         index=int(raw.get("index", k)), label=str(raw.get("label", "")),
         x=float(raw["x"]), y=float(raw["y"]),
@@ -88,20 +79,13 @@ def scan_step_of(raw: dict[str, Any], k: int) -> ScanStep:
 
 
 def scan_figure_path(out_dir: Path, name: str, k: int, raw: dict[str, Any]) -> Path:
-    """一步扫描图的路径：`<局号>_s<步序>_<标签>.png`，排序后与执行顺序一致
-
-    标签经 `slug` 压成安全的文件名片段，免得标签里的空格、括号在不同文件系统上出问题。
-    """
-    safe = slug(str(raw.get("label", f"step{k}")))
+    """一步扫描图的路径 `<局号>_s<步序>_<标签>.png`，排序后与执行顺序一致"""
+    safe = slug(str(raw.get("label", f"step{k}")))      # 标签压成安全片段，免得空格括号出问题
     return Path(out_dir) / f"{Path(name).name}_s{k:02d}_{safe}.png"
 
 
 def reset_dir(path: Path) -> None:
-    """清空一个输出目录，只保留最新一局用；目录不存在就什么都不做
-
-    逐局重画时先清空，免得上一局的图和新图混在同一目录里。文件名带局号，肉眼很难分辨哪张
-    是这一轮的。只删该目录自身，不动 <save-dir> 下的 json / csv 结果表。
-    """
+    """清空一个输出目录，目录不存在就什么都不做；<save-dir> 下的 json / csv 不动"""
     p = Path(path)
     if p.is_dir():
         shutil.rmtree(p, ignore_errors=True)
@@ -120,19 +104,9 @@ def draw_scan_step(out_path: Path, step: ScanStep, *,
                    title: str | None = None,
                    fonts: Sequence[str] | None = None,
                    figsize: tuple[float, float] = (9.2, 7.8)) -> Path:
-    """画一步扫描的结果图并存盘，格式由后缀决定，.png / .pdf
-
-    - `step`：本步记录，见 `ScanStep`；
-    - `cover_centers` / `visit_order` / `visited`：覆盖圆布局、计划巡视顺序、到本步为止已访问
-      的站序号。用来标出路线走到哪了，并把当前站突出显示；
-    - `ray_len`：示向度的射线长度。取接收半径上限，画出来就是"源必在这条射线方向上"；
-    - `sources`：干扰源真值，仅演练模式有；官方模式拿不到真值，传空即可；
-    - `fonts`：中文字体候选链。传各自使用的链以保持与既有产物一致；不传就用公共默认链。
-
-    图上元素：作业圆域、各覆盖圆、已访问与未访问的圆心，当前站加粗、到本步的行驶路径、
-    本步测向点，按结果分类，与示向度射线、本步近距清除、本步结束时的估计，区域轮廓或 σ 圆、
-    干扰源真值。各元素由下面的 `_draw_*` 依次叠加，顺序就是层次，也是图例顺序。
-    """
+    """画一步扫描的结果图并存盘，格式由后缀决定，各元素由下面的 `_draw_*` 依次叠加"""
+    # 叠加顺序就是层次，也是图例顺序。ray_len 是示向度射线长度，取接收半径上限；sources 是
+    # 干扰源真值，仅演练模式有；fonts 是各自的中文字体候选链，不传就用公共默认链
     setup_mpl_env()
     import matplotlib
     matplotlib.use("Agg")
@@ -261,8 +235,7 @@ def _draw_measures(ax: "Axes", handles: list[Any], step: ScanStep, ray_len: floa
             if m.get("outcome") == "direction" and m.get("theta") is not None]
     if not rays:
         return
-    # theta 是示向度，单位为度：从测量点沿该方向画到接收半径上限，一眼看出"这条约束把源限制在
-    # 哪条射线上"。逐条画线但不逐条进图例，否则图例会被撑爆。
+    # theta 是示向度，单位为度：逐条画线但不逐条进图例，否则图例会被撑爆
     for m in rays:
         rad = math.radians(float(m["theta"]))
         ax.plot([step.x, step.x + ray_len * math.cos(rad)],
@@ -295,11 +268,7 @@ def _draw_local_clears(ax: "Axes", handles: list[Any], step: ScanStep) -> None:
 
 
 def _draw_regions(ax: "Axes", handles: list[Any], step: ScanStep) -> None:
-    """本步结束时的可能源区域轮廓
-
-    按用户要求，2026-09-12 去掉了"定位估计 1σ 圆 / 中心十字"，橙黄小圈和射线混在一起太杂乱，
-    但保留可能源区域的多边形轮廓，区域形状的信息还是有价值的。
-    """
+    """本步结束时的可能源区域轮廓"""
     from matplotlib.lines import Line2D
 
     if not step.regions:

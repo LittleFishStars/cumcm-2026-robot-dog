@@ -25,10 +25,7 @@ def relax_console_encoding() -> None:
 
 
 def set_level(level: int) -> None:
-    """设置输出详略档位，取值 LEVEL_QUIET / LEVEL_NORMAL / LEVEL_VERBOSE
-
-    各入口脚本解析完 `--verbose` / `--quiet` 之后调一次，全局只此一处入口。
-    """
+    """设置输出详略档位，取值 LEVEL_QUIET / LEVEL_NORMAL / LEVEL_VERBOSE"""
     global _level
     _level = level
 
@@ -49,10 +46,6 @@ def is_verbose() -> bool:
 
 
 def detail(msg: str = "") -> None:
-    """打印一条过程明细，只有 `--verbose` 下看得见，缺省档位直接丢掉
-
-    Args:
-        msg: 要打印的一行；不给就是打一个空行
-    """
+    """打印一条过程明细，只有 `--verbose` 下看得见，不给 msg 就是打一个空行"""
     if is_verbose():
         print(msg)

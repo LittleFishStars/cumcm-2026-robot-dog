@@ -72,7 +72,7 @@ def two_opt_first(order: Sequence[int], D: np.ndarray) -> list[int]:
     order = [int(v) for v in order]
 
     def d(a: int, b: int) -> float:
-        """D 上从 a 到 b 的距离 / m，a < 0 表示起点"""
+        """D 上从 a 到 b 的距离 / m"""
         return float(D[0, b] if a < 0 else D[1 + a, b])       # a < 0 表示起点
 
     improved = True
@@ -94,16 +94,12 @@ def two_opt_first(order: Sequence[int], D: np.ndarray) -> list[int]:
 
 
 def two_opt_greedy(order: Sequence[int], D: np.ndarray) -> list[int]:
-    """2-opt 精修的贪心就地替换版：扫描中一发现更短就替换当前解，继续往后扫
-
-    与 `two_opt_first` 的差别只在"发现改进后是 break 重扫还是继续往后扫"这一点上，但两者
-    会停在不同局部最优，所以都留着，见模块文档。
-    """
+    """2-opt 精修的贪心就地替换版：扫描中一发现更短就替换当前解，继续往后扫"""
     order = [int(v) for v in order]
 
     def d(a: int, b: int) -> float:
-        """D 上从 a 到 b 的距离 / m，a < 0 表示起点"""
-        return float(D[0, b] if a < 0 else D[1 + a, b])
+        """D 上从 a 到 b 的距离 / m"""
+        return float(D[0, b] if a < 0 else D[1 + a, b])       # a < 0 表示起点
 
     def length(seq: Sequence[int]) -> float:
         """整条顺序的路径长度 / m：首点从起点起算，终点自由"""
@@ -127,19 +123,9 @@ def two_opt_greedy(order: Sequence[int], D: np.ndarray) -> list[int]:
 
 
 def _held_karp(n: int, D: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-    """Held-Karp 动态规划，返回 (dp, prev)
-
-    dp[mask, j] 是从起点出发、访问 mask 中的点、最后停在 j 的最短长度；
-    prev[mask, j] 是对应路径上 j 的前一个点，-1 表示起点。
-    mask 的转移按 j 的候选集向量化，所以 n=16 那一档，65536 个掩码、1.7e7 次松弛，也能秒级完成。
-
-    Args:
-        n: 待访问点个数
-        D: 距离矩阵，形状 (n+1, n)，第 0 行代表起点
-
-    Returns:
-        tuple[np.ndarray, np.ndarray]: (dp, prev) 两张 2^n 行、n 列的表
-    """
+    """Held-Karp 动态规划，返回 (dp, prev) 两张 2^n 行、n 列的最短开放路径表"""
+    # dp[mask, j] 是访问 mask 中的点、最后停在 j 的最短长度，prev[mask, j] 是 j 的前一个点，
+    # -1 表示起点；掩码转移按 j 的候选集向量化，n=16 也能秒级完成
     INF = float("inf")
     full = 1 << n
     bits = np.arange(n)
@@ -179,15 +165,9 @@ def _hk_path(prev: np.ndarray, n: int, last: int) -> list[int]:
 
 
 def exact_open_order(n: int, D: np.ndarray, limit: int = 16) -> list[int]:
-    """从起点出发访问全部 n 个点、终点任意的精确最短开放路径，用 Held-Karp 动态规划求解
-
-    返回被访问点的编号序列，与 nearest_order / path_len 的约定一致，里面不含起点占位符。
-
-    n > limit 时退化为最近邻 + 2-opt。精确解规模是 O(2^n·n²)，n=16 约 1.7e7，已实测秒级；
-    本题最大的场景是 20 个频道，所以 limit 留到 16，超出就降级。
-
-    确定性：遍历顺序固定；最优值并列时取字典序最小的路径，同一输入必得同一输出。
-    """
+    """从起点出发访问全部 n 个点的精确最短开放路径，终点任意，超 limit 个点就退化为启发式"""
+    # 返回不含起点占位符的点编号序列，与 nearest_order / path_len 的约定一致；遍历顺序固定，
+    # 最优值并列时取字典序最小的路径
     if n <= 0:
         return []
     if n == 1:
@@ -200,21 +180,8 @@ def exact_open_order(n: int, D: np.ndarray, limit: int = 16) -> list[int]:
 
 
 def exact_open_by_end(n: int, D: np.ndarray, limit: int = 16) -> list[tuple[int, float, list[int]]]:
-    """返回 (终点, 长度, 顺序) 列表：对每个可能的终点给出从起点出发的最短开放路径
-
-    用在"终点本身也是决策变量"的场合。比如巡视路线既要短，又希望终点落在一片指定区域附近，
-    因为终点决定后续行程的起点。n > limit 时退化为最近邻 + 2-opt，只给一个终点。
-
-    确定性：最优值并列时按 (长度, 终点编号) 排序，同一输入必得同一输出。
-
-    Args:
-        n: 待访问点个数
-        D: 距离矩阵，形状 (n+1, n)，第 0 行代表起点
-        limit: 精确 DP 的规模上限，超过就退化为启发式
-
-    Returns:
-        list[tuple[int, float, list[int]]]: 每项为 (终点编号, 路径长度 / m, 访问顺序)
-    """
+    """对每个可能的终点给出 (终点, 长度, 顺序)，用在终点本身也是决策变量的场合"""
+    # 超 limit 个点时退化，只给一个终点；最优值并列时按 (长度, 终点编号) 排序
     if n <= 0:
         return []
     if n == 1:

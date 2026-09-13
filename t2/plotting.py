@@ -41,7 +41,7 @@ def zoom_window(result: SolveResult, margin: float = 150.0,
 
 
 def _frame(ax: Any, result: SolveResult) -> None:
-    """圆域边界、灰色"不保证可测"底、源不确定集扇形、S1 与示向度射线。"""
+    """圆域边界、灰色"不保证可测"底、源不确定集扇形、S1 与示向度射线"""
     th = np.linspace(0.0, 2.0 * math.pi, 721)
     cos_t, sin_t = np.cos(th), np.sin(th)
     ax.fill(cfg.REGION_RADIUS * cos_t, cfg.REGION_RADIUS * sin_t, color=C_INFEASIBLE, lw=0.0,
@@ -70,11 +70,8 @@ def _cell_edges(v: np.ndarray) -> np.ndarray:
 def _suitability_panel(ax: Any, result: SolveResult, x: np.ndarray, y: np.ndarray,
                        j: np.ndarray, feasible: np.ndarray, label_contours: bool,
                        polar: bool = False) -> Any:
-    """铺适合度场、等值线与候选弧带，返回 pcolormesh 供 colorbar 使用
-
-    `polar=True` 时网格来自绕 S1 的极坐标，x、y 沿行和列都不单调，必须显式给出单元边界，
-    否则 pcolormesh 只能自己猜，会警告，也可能画错。边界由相邻单元中心的中点外推得到。
-    """
+    """铺适合度场、等值线与候选弧带，返回 pcolormesh 供 colorbar 使用"""
+    # 极坐标网格的 x、y 沿行列都不单调，必须显式给单元边界，否则 pcolormesh 会画错
     f = np.ma.masked_where(~feasible, suitability(j, result.j_star))
     if polar:
         fine = result.band.fine
@@ -134,11 +131,7 @@ def _line_through(ax: Any, p: tuple[float, float], ang_deg: float, **kw: Any) ->
 
 
 def _worst_case_inset(ax: Any, result: SolveResult) -> None:
-    """内嵌小图画最坏情形的定位区域与它的直径
-
-    按真实几何画。S1 的两条边界射线在 $\\theta_1$ ± 1°，S2 的两条在"最坏那次的实测示向度"
-    ± 1°，四线围成的就是附录图 2 的四边形。直径取最长对角线，等于 $J^*$。
-    """
+    """内嵌小图画最坏情形的定位区域与它的直径"""
     poly = scenario_quad(result)
     verts = np.asarray(poly.exterior.coords)
     gx, gy = result.scenario["source"]
@@ -285,12 +278,7 @@ def draw_suitability(out_path: Path, result: SolveResult, dpi: float = cfg.DPI,
 
 def _exact_radius_at(R1: float, R2: float, gamma_deg: float,
                      err_deg: float = cfg.BEARING_ERROR_DEG) -> float:
-    """构造一个恰好实现 (R1, R2, γ) 的两站构型，用精确构造给出最坏半径 / m
-
-    源 G 放在 (R1, 0)，S1 放在原点，于是 G→S1 方向是 180°。再取 G→S2 方向为 180°−γ、长度
-    R2，两站在源处的交会角就恰是 γ。最坏半径让 `quad_diameters` 算，它给的是 ±1° 楔形交的
-    精确直径，取一半就行。
-    """
+    """构造一个恰好实现 (R1, R2, γ) 的两站构型，用精确构造给出最坏半径 / m"""
     gx, gy = R1, 0.0
     ang = math.radians(180.0 - gamma_deg)
     s2x, s2y = gx + R2 * math.cos(ang), gy + R2 * math.sin(ang)
@@ -302,16 +290,7 @@ def _exact_radius_at(R1: float, R2: float, gamma_deg: float,
 
 def draw_criteria(out_path: Path, result: SolveResult, dpi: int = cfg.DPI,
                   pdf_path: Path | None = None) -> Path:
-    """文献判据与本文精确判据的对照图，写论文里"为什么这么选点"要用
-
-    左图看交会角的影响。固定 R1 = 1500 m、R2 = 907 m，这是本文最坏情形的距离组合，按
-    γ ∈ [15°, 90°] 逐点用精确构造算出最坏半径，和三条文献闭式、本文闭式并排画。Foy 1976 的
-    几何稀释一眼可见，γ 越小半径越大；文献 GDOP 式则系统性偏低约三成。
-
-    右图看两个判据的一致性。可行域内 1200 余个采样点上，文献 GDOP 判据与本文精确 J 做双对数
-    散点，给出 Spearman 秩相关。秩几乎一致，说明它适合做快筛；点云整体压在对角线下方，
-    GDOP 低估了最坏直径，所以不能当硬界用。
-    """
+    """文献判据与本文精确判据的对照图，写论文里"为什么这么选点"要用"""
     setup_mpl_env()          # 得赶在 import matplotlib 之前，配置目录只在首次导入时读一次
     try:
         import matplotlib

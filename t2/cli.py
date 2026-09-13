@@ -16,11 +16,7 @@ __all__ = ["build_parser", "main"]
 
 
 def build_parser() -> argparse.ArgumentParser:
-    """构造命令行解析器，问题二的选项都在这儿，缺省值取自 `t2.config`
-
-    位置参数一个都没有，全部靠开关控制。--site、--bearing、--eta、--d-lo、--d-hi、--verify、
-    --save-dir、--no-plot、--no-csv、--quiet、--verbose 都在这里注册，别处不再加
-    """
+    """构造命令行解析器，问题二的选项全在这儿，缺省值取自 `t2.config`"""
     p = argparse.ArgumentParser(
         prog="python -m t2",
         description="CUMCM 2026 B 问题二：第二个检测点的选择与候选区域（最坏情况最小化）")
@@ -50,17 +46,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    """问题二的命令行主流程：解析参数 → 求解最优第二检测点 → 写结果文件与图
-
-    缺省输出只报关键结论，标题、S2*、J* 与改善倍数、判据/认证、产物路径，一共 4~6 行。
-    `--verbose` 把 `print_report` 的逐行明细全放出来，`--quiet` 只留产物路径那一行。
-
-    Args:
-        argv: 命令行参数列表；缺省取 sys.argv[1:]
-
-    Returns:
-        int: 进程退出码，正常结束恒为 0
-    """
+    """命令行主流程：解析参数、求解、写结果与图，返回进程退出码"""
     relax_console_encoding()
     args = build_parser().parse_args(argv)
     set_level(LEVEL_VERBOSE if args.verbose else LEVEL_QUIET if args.quiet else LEVEL_NORMAL)
@@ -97,16 +83,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 def _artifact_paths(save_dir: Path, files: dict[str, Path],
                     figure: Path | None) -> list[Path]:
-    """本次运行写出的全部产物路径，缺省档与 --quiet 共用那一行
-
-    Args:
-        save_dir: 结果目录
-        files: `write_outputs` / `save_summary_json` 返回的路径表；--no-csv 时只有 json
-        figure: 适合度图路径。--no-plot 时为 None，这时不再列四张图
-
-    Returns:
-        list[Path]: 按 CSV → JSON → 两张图的 png/pdf 排好并去重后的路径
-    """
+    """本次运行写出的全部产物路径，缺省档与 --quiet 共用那一行"""
     paths = [files[k] for k in ("csv", "json") if k in files]
     if figure is not None:
         paths += [figure, save_dir / cfg.FIGURE_PDF,
@@ -119,15 +96,7 @@ def _artifact_paths(save_dir: Path, files: dict[str, Path],
 
 
 def _print_conclusion(result: "SolveResult", paths: Sequence[Path]) -> None:
-    """缺省档结论：最优第二检测点、判据/认证与产物路径
-
-    每步 1~2 行，全文 4~6 行。只拿已经算好的值拼字符串，不为这几行重算任何量。过程明细，
-    也就是逐瓣候选区域、判据对照表、全部校验，交给 `--verbose` 的 `print_report`。
-
-    Args:
-        result: 问题二的求解结果
-        paths: 本次运行写出的产物路径，取 `_artifact_paths` 去重后的结果
-    """
+    """缺省档结论：最优第二检测点、判据认证与产物路径，每步一两行"""
     x, y = result.best
     ce = result.theory["certify"]
     cr = result.theory["criteria"]

@@ -18,12 +18,7 @@ from t4.sweep import SweepPlan
 def truth_check(truth: Sequence[dict] | None, plan: SweepPlan,
                 obs: dict[int, list[Obs]], cleared: set, tracks: dict,
                 first_heard: dict[int, int] | None = None) -> dict[str, Any]:
-    """逐源核对，只有演练模式拿得到真值
-
-    * 检测：该源频道是否被听到，拖网保证每个源 ≥ 1 次示向度，同时记下首次听到的拖网步骤；
-      定向源额外记下它的定向方向，用来交代"方向不对"的场景也被拖网兜住了，听到就证明命中；
-    * 清除：清除点与真值的距离（定位误差）、判定是否在 20 m 清除半径内。
-    """
+    """逐源核对是否被听到、是否被清除，只有演练模式拿得到真值"""
     tracks = tracks or {}
     first_heard = first_heard or {}
     rows: list[dict[str, Any]] = []
@@ -68,12 +63,8 @@ def truth_check(truth: Sequence[dict] | None, plan: SweepPlan,
 
 
 def summarize(rows: Sequence[dict]) -> dict[str, Any]:
-    """整批演练汇总：清除率、时间、里程、测向次数、定位误差与清除方式分布
-
-    键名与问题三的 summarize 对齐，两份 survey 可以并排读；问题四另外给出拖网特有的两项：
-    首次听到的最晚步骤，以及顺路补测次数。清除方式由逐局的 methods 累加。
-    官方模式拿不到真值，定位误差与首次听到步会留空，其余字段照常。
-    """
+    """整批演练汇总：清除率、时间、里程、测向次数、定位误差与清除方式分布"""
+    # 官方模式拿不到真值，定位误差与首次听到步这两项留 None，其余字段照常
     n_src = sum(r["n_sources"] for r in rows if r.get("n_sources"))
     n_cleared = sum(r.get("cleared", 0) for r in rows)
     avg_times = [r["avg_time_s"] for r in rows if r.get("avg_time_s")]
@@ -112,19 +103,8 @@ def summarize(rows: Sequence[dict]) -> dict[str, Any]:
 
 def episode_row(ep: int, seed: int | None, truth: Sequence[dict] | None,
                 dog: "RobotDog", stats: dict, check: dict) -> dict:
-    """一局的汇总行，整批汇总表与落盘 JSON 都用它
-
-    Args:
-        ep: 局号，从 1 开始
-        seed: 该局的种子；官方模式的场景不由 --seed 控制，记 None 以免误读
-        truth: 干扰源真值列表，官方模式没有，为 None
-        dog: 该局的机器人策略实例；本行字段取自 stats 与 check，这个参数只为统一调用口径留着
-        stats: dog.run() 返回的本局统计
-        check: truth_check() 给出的真值核对结果
-
-    Returns:
-        dict: 汇总字段，清除比例、里程、虚拟时间、测向次数、定位误差等
-    """
+    """一局的汇总行，整批汇总表与落盘 JSON 都用它"""
+    # 官方模式的场景不由 --seed 控制，seed 与 truth 都记 None，免得把没有的东西误读出来
     return {
         "episode": int(ep),
         "seed": seed,

@@ -26,13 +26,8 @@ _DIR_RAY_M = 260.0
 
 
 def _draw_beams(ax: "Axes", sources: Sequence[dict[str, Any]], th: np.ndarray) -> None:
-    """定向源画 ±90° 波束扇形，沿波束方向拉两条半径再加弧近似
-
-    Args:
-        ax: matplotlib 轴对象
-        sources: 真值源列表，定向源须带 kind="directional" 与 direction_deg
-        th: 圆周角度采样数组；为统一绘图辅助函数的签名保留，本函数没用上
-    """
+    """定向源画 ±90° 波束扇形，沿波束方向拉两条半径再加弧近似"""
+    # th 只为统一绘图辅助函数的签名留着，本函数没用上
     for s in sources:
         if s.get("kind") != "directional" or s.get("direction_deg") is None:
             continue
@@ -138,12 +133,9 @@ def save_scan_figures(save_dir: Path, name: str, steps: Sequence[dict[str, Any]]
                       plan: SweepPlan, order: Sequence[int] = (),
                       sources: Sequence[dict[str, Any]] = (),
                       step_dir: str = STEP_DIR_NAME) -> list[Path]:
-    """把一局内每一步扫描测量各画一张结果图，落在 <save-dir>/<step_dir>/ 下
-
-    文件名形如 `ep01_s00_起点全频道扫描.png`、`ep01_s04_测量位置4.png`，排序后与执行顺序一致。
-    问题四没有覆盖圆，覆盖圆参数一律传空，画面上保留该步测向点、示向度射线、行驶路径、
-    当时估计区域与真值，真值里含定向源波束扇形。
-    """
+    """把一局内每一步扫描测量各画一张结果图，落在 <save-dir>/<step_dir>/ 下"""
+    # 文件名形如 ep01_s00_起点全频道扫描.png、ep01_s04_测量位置4.png，排序后与执行顺序一致；
+    # 问题四没有覆盖圆，覆盖圆参数一律传空
     out_dir = save_dir / step_dir
     out_dir.mkdir(parents=True, exist_ok=True)
     paths: list[Path] = []

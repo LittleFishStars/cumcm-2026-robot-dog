@@ -22,34 +22,19 @@ class Simulator:
 
     def __init__(self, robot_id: str, base_url: str = BASE_URL,
                  timeout: float = 5.0) -> None:
-        """初始化模拟器接口封装
-
-        Args:
-            robot_id: 参赛队号。运行时传入，没有缺省值：代码里不写队号，免得上身份信息随
-                源码和提交包扩散。官方模式必须与模拟器登录的队号一致
-            base_url: 模拟器地址，只监听本机回环
-            timeout: 单次 HTTP 请求超时 / s
-        """
+        """初始化模拟器接口封装，队号必须与模拟器登录的那个一致"""
         self.robot_id = robot_id
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout
         self._seq = 0
 
     def _post(self, path: str, request_id: str | None = None, **fields: Any) -> dict:
-        """POST 一个接口并解析返回的 JSON
-
-        Args:
-            path: 接口路径，如 "/measure"
-            request_id: 断线重试时传入原 request_id 以复用原请求；None 表示按序号新生成一个
-            **fields: 该接口的业务字段，直接并进请求体
-
-        Returns:
-            dict: 模拟器返回的 JSON 响应
-        """
+        """POST 一个接口并解析返回的 JSON，断线重试时复用原 request_id"""
         self._seq += 1
         payload = {
             "arena_id": "default",
             "robot_id": self.robot_id,
+            # request_id 没给就按接口名加序号新生成一个
             "request_id": request_id or f"{path.strip('/')}-{self._seq}",
             **fields,
         }
@@ -106,31 +91,10 @@ def api_brief(call: str, resp: dict, elapsed_ms: int) -> str:
 
 
 class ApiLog:
-    """把每一次接口调用的请求参数与原始响应写成 JSONL，需要时再回显一行摘要
-
-    模拟器自己也有行为日志，那份不归我们掌握，这里就留一份自己的痕迹：逐条带 request_id，
-    可以和模拟器日志逐行对照。每次调用后立即 flush，中途断连或者崩溃，已经发生的调用也不会丢。
-
-    落盘策略，为的是别让一次失败运行把上一次成功的证据链抹掉。本轮第一次要落盘时才决定
-    打开方式：
-
-    * 本轮已经成功调用过，正常情形就是 `/enter` 这条且成功：清空重写，一个结果目录对应
-      最新一次运行，与直觉一致；
-    * 本轮至今全是失败，比如模拟器没启动、地址敲错当场连不上：追加写，并在记录里标
-      `"appended": true`。上一次成功运行的完整日志得以保全，本次失败也留了痕。
-
-    官方测试只有 3 次机会。真把上一次成功的记录交给一次敲错地址的运行清空，损失无法挽回。
-
-    路径取 --api-log 指定的文件，没给就是 <save-dir>/api_calls.jsonl。
-    """
+    """把每一次接口调用的请求与原始响应写成 JSONL，需要时再回显一行摘要"""
 
     def __init__(self, path: Path, echo: Callable[[str], None] | None = None) -> None:
-        """初始化接口日志
-
-        Args:
-            path: 日志文件路径，JSONL，一行一次调用
-            echo: 每条记录的单行摘要回调；None 表示不回显
-        """
+        """初始化接口日志，echo 为 None 时不回显"""
         self.path = Path(path)
         self._fh: TextIO | None = None
         self._echo = echo
@@ -138,13 +102,15 @@ class ApiLog:
         self.counts: dict[str, int] = defaultdict(int)
 
     def elapsed(self) -> float:
-        """自日志建立起的秒数，走单调时钟，用来记各次调用的相对时刻"""
+        """自日志建立起的秒数，走单调时钟"""
         return time.monotonic() - self._t0
 
     def _ensure_open(self, ok: bool, rec: dict[str, Any]) -> TextIO:
-        """本轮第一次落盘时决定打开方式；成功过就重写，纯失败则追加，详见类文档"""
+        """本轮第一次落盘时决定打开方式：成功过就清空重写，纯失败则追加，详见类文档"""
         if self._fh is None:
             self.path.parent.mkdir(parents=True, exist_ok=True)
+            # 一次敲错地址的运行不该把上一次成功的证据链抹掉，官方测试只有 3 次机会，所以
+            # 本轮至今全是失败时改为追加写，并给这条记录标上 appended
             if not ok and self.path.exists() and self.path.stat().st_size > 0:
                 self._fh = self.path.open("a", encoding="utf-8")
                 rec["appended"] = True          # 标记"这一条不与上一次运行同批"
@@ -153,7 +119,7 @@ class ApiLog:
         return self._fh
 
     def write(self, rec: dict[str, Any], line: str) -> None:
-        """落盘一条调用记录，并把单行摘要交给终端"""
+        """落盘一条调用记录并把单行摘要交给终端，写完立即 flush"""
         fh = self._ensure_open(bool(rec.get("ok")), rec)
         self.counts[rec["call"]] += 1
         fh.write(json.dumps(rec, ensure_ascii=False) + "\n")
@@ -162,7 +128,7 @@ class ApiLog:
             self._echo(line)
 
     def report(self) -> None:
-        """打印一行统计，便于和模拟器自己的计数交叉核对"""
+        """打印一行调用次数统计，便于和模拟器自己的计数交叉核对"""
         if self.counts:
             detail = "、".join(f"{call} {n}" for call, n in sorted(self.counts.items()))
             print(f"接口调用日志：共 {sum(self.counts.values())} 次（{detail}）→ {self.path}")
@@ -176,11 +142,7 @@ class ApiLog:
 
 @contextmanager
 def api_log(save_dir: str, raw: str | None, echo: bool) -> Iterator[ApiLog | None]:
-    """接口日志的上下文：进入时建文件，退出时关闭
-
-    路径优先用 raw，也就是 --api-log；没指定就用 <save-dir>/api_calls.jsonl；
-    显式传空串则不记日志。
-    """
+    """接口日志的上下文：进入时建文件，退出时关闭，路径与落盘策略见 `ApiLog`"""
     path = raw if raw is not None else str(Path(save_dir) / API_LOG_NAME)
     log = ApiLog(Path(path), echo=print if echo else None) if path else None
     try:
@@ -191,20 +153,10 @@ def api_log(save_dir: str, raw: str | None, echo: bool) -> Iterator[ApiLog | Non
 
 
 class RecordedSim:
-    """Simulator 的记录代理：4 个接口原样转发，每次调用顺手交给 ApiLog 落盘
-
-    request_id 在这一层生成，形如 `<接口>-<局号>-<序号>`。跨局不会重复，也让我们的日志
-    能和模拟器行为日志里的同一条请求对上号。
-    """
+    """Simulator 的记录代理：4 个接口原样转发，每次调用顺手交给 ApiLog 落盘"""
 
     def __init__(self, sim: Simulator, log: ApiLog, episode: int = 0) -> None:
-        """初始化记录代理
-
-        Args:
-            sim: 被代理的 Simulator 实例
-            log: 调用落盘用的 ApiLog
-            episode: 局号，参与生成 request_id，跨局不重复
-        """
+        """初始化记录代理，局号参与生成 request_id"""
         self._sim = sim
         self._log = log
         self.episode = episode
@@ -231,6 +183,7 @@ class RecordedSim:
     def _call(self, call: str, params: dict[str, Any], send: Callable[[str], dict]) -> dict:
         """执行一次调用并记录：先把请求与时刻落下去，再按成功或异常分别补全结果"""
         self.seq += 1
+        # request_id 形如 <接口>-<局号>-<序号>，跨局不重复，能和模拟器行为日志里的同一条请求对上
         rid = f"{call.strip('/')}-{self.episode}-{self.seq}"
         rec: dict[str, Any] = {"episode": self.episode, "seq": self.seq, "call": call,
                                "request_id": rid, "at_s": round(self._log.elapsed(), 3),

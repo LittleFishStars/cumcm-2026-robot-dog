@@ -29,36 +29,14 @@ from t4.sweep import (SweepPlan, build_sweep_plan, plan_from_points,
 
 
 def _api_log(args: argparse.Namespace, echo: bool) -> "AbstractContextManager[ApiLog | None]":
-    """接口日志上下文，便于用同一方式审计
-
-    Args:
-        args: 已解析的命令行参数
-        echo: 是否把每次接口调用回显到终端
-
-    Returns:
-        AbstractContextManager[ApiLog | None]: 上下文管理器。进入时拿到日志对象，
-            日志被关掉时也就是 --api-log 传了空串，则是 None
-    """
+    """接口日志上下文，便于用同一方式审计"""
     return _api_log_raw(args.save_dir, args.api_log, echo)
 
 
 def _episode_printer(clear: bool) -> "Callable[[dict, dict, int | None], None]":
-    """按模式打印本局小结，过程明细只有 --verbose 才输出
-
-    Args:
-        clear: 是否做了阶段二，也就是定位与清除；False 时只报扫描相关字段
-
-    Returns:
-        Callable[[dict, dict, int | None], None]: 打印函数 show(stats, check, n_sources)
-    """
+    """按模式打印本局小结，过程明细只有 --verbose 才输出"""
     def show(stats: dict, check: dict, n_sources: int | None) -> None:
-        """打印一局的扫描小结与命中核对结果，走详细档；缺省档只在外面打一行结论
-
-        Args:
-            stats: 本局统计，里程、虚拟时间、测向次数、清除个数、首次听到步数都在里面
-            check: 真值核对结果，定位误差、命中情况等；官方模式没有真值，为 None
-            n_sources: 本局干扰源个数；官方模式没有真值，为 None
-        """
+        """打印一局的扫描小结与命中核对结果，走详细档；缺省档只在外面打一行结论"""
         if not is_verbose():
             return
         fh = [v for v in stats["first_heard"].values()]
@@ -213,12 +191,7 @@ def run_practice(args: argparse.Namespace, plan: SweepPlan, verify: dict, save_d
 
 
 def run_official(args: argparse.Namespace, plan: SweepPlan, verify: dict, save_dir: Path) -> int:
-    """官方评测接口模式：连 127.0.0.1 上已开放接口的模拟器，跑完整一局
-
-    拿不到真值，真值相关字段一律留空。扫描布局在 t4.sweep 里实测听到率 99.9891%，加上演练里
-    验证过的行为，在正式模式下同样成立。接口调用全程落盘 api_calls.jsonl，这是官方模式唯一
-    的证据链。
-    """
+    """官方评测接口模式：连 127.0.0.1 上已开放接口的模拟器，跑完整一局"""
     sim = Simulator(robot_id=args.robot_id, base_url=args.base_url, timeout=args.timeout)
     if is_verbose():
         print(f"连接模拟器 {args.base_url}，robot_id={args.robot_id}，问题四")
@@ -241,6 +214,8 @@ def run_official(args: argparse.Namespace, plan: SweepPlan, verify: dict, save_d
                   f"含补测 {stats['n_probe']} 次；扫描结束听到 {stats['channels_heard']} 个频道，"
                   f"{stats['n_bearings']} 条示向度")
         row = episode_row(1, None, None, dog, stats,
+                          # 官方模式拿不到真值，真值相关字段一律留空；接口调用全程落盘
+                          # api_calls.jsonl，那是这个模式唯一的证据链
                           truth_check(None, plan, dog.obs, dog.cleared, dog.tracks,
                                       dog.first_heard))
         if not args.no_plot:
@@ -274,11 +249,7 @@ def run_official(args: argparse.Namespace, plan: SweepPlan, verify: dict, save_d
 
 
 def build_parser() -> argparse.ArgumentParser:
-    """构建命令行解析器
-
-    Returns:
-        argparse.ArgumentParser: 演练 / 官方 / 仅规划三种模式的选项都配齐了的解析器
-    """
+    """构建命令行解析器"""
     p = argparse.ArgumentParser(
         description="2026 CUMCM B 题问题四：定向 + 全向混合干扰源的搜索与清除，扫描加定位清除")
     p.add_argument("--practice", type=int, nargs="?", const=1, default=0,
@@ -345,11 +316,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    """按模式分派：`--practice` 走本地演练，`--plan-only` 只求扫描方案，其余连官方
-
-    缺省输出只报关键结论：标题、扫描方案一行、每局一行、汇总几行、产物路径。`--verbose` 还原
-    完整过程，含 `=` 分隔线、扫描方案明细、每局阶段统计、图路径。`--quiet` 只留最终产物路径。
-    """
+    """按模式分派：`--practice` 走本地演练，`--plan-only` 只求扫描方案，其余连官方"""
     relax_console_encoding()
     args = build_parser().parse_args(argv)
     set_level(LEVEL_VERBOSE if args.verbose else LEVEL_QUIET if args.quiet else LEVEL_NORMAL)

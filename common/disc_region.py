@@ -17,25 +17,13 @@ OUT_OF_REACH_MARGIN = 1.0
 
 
 class DiscConstraintMixin:
-    """把"源在圆盘内 / 圆盘外"的硬约束增量叠加到宿主类的 `region` 上
-
-    子类只要声明本题有哪几类约束，也就是 `WITH_OUTSIDE`，再绑定各自的圆盘近似精度，
-    几何机制全在这里。宿主类须把它排在 MRO 中 `TriangulationRegion` 之前，否则 `region`
-    取不到基类的多边形。
-    """
+    """把"源在圆盘内 / 圆盘外"的硬约束增量叠加到宿主类的 `region` 上"""
 
     WITH_OUTSIDE = False        # 子类按题意打开：可证明"收不到 ⇒ 源在圆盘外"时才开
 
     def __init__(self, err: float = 1.0, radius: float | None = None,
                  sides: int | None = None, quad: int = 16) -> None:
-        """初始化圆盘约束叠层，把 err / radius / sides 原样转发给宿主类
-
-        Args:
-            err: 示向度误差半宽 / 度，透传给宿主类的定位区域
-            radius: 目标圆域半径 / m；None 表示沿用宿主类的缺省值
-            sides: 目标圆域内接正多边形边数；None 表示沿用宿主类的缺省值
-            quad: 圆盘近似的正多边形精度，边数 = 4 × quad，见模块文档
-        """
+        """初始化圆盘约束叠层，err / radius / sides 透传给宿主类的定位区域"""
         super().__init__(err, radius, sides)
         self.quad = int(quad)                            # 圆盘近似的正多边形精度，见模块文档
         self._inside: list[tuple[float, float, float]] = []      # 源在此圆盘内
@@ -67,7 +55,7 @@ class DiscConstraintMixin:
     # ---- 几何：在父类的增量楔形交之上再叠加圆盘约束，同样增量、同样惰性 ----
     @property
     def region(self) -> shapely.geometry.base.BaseGeometry:
-        """楔形交与圆盘约束叠加后的可能源集合，增量维护并缓存，见模块文档"""
+        """楔形交与圆盘约束叠加后的可能源集合，增量维护并缓存"""
         geom = super().region
         n_in, n_out = len(self._inside), len(self._outside)
         if self._applied_in < n_in or self._applied_out < n_out:
@@ -84,10 +72,7 @@ class DiscConstraintMixin:
 
     @property
     def vertices(self) -> list[tuple[float, float]]:
-        """区域顶点：单块取外环，被圆盘外约束切开的多个块则收集各块外环顶点
-
-        只做交集的题目区域恒为单块，走的是与父类完全相同的那条分支。
-        """
+        """区域顶点：单块取外环，被圆盘外约束切开的多个块则收集各块外环顶点"""
         geom = self.region
         if geom.is_empty:
             return []
@@ -106,11 +91,7 @@ class DiscConstraintMixin:
 
     @property
     def enclosing_circle(self) -> tuple[float, float, float] | None:
-        """区域的最小覆盖圆 (cx, cy, r)；区域为空或退化时返回 None
-
-        "真源必在区域内 ⊆ 覆盖圆内"对任何集合都成立，不要求凸性，所以多块、非凸时照样能用。
-        这是"走到圆心即可清除"的依据。
-        """
+        """区域的最小覆盖圆 (cx, cy, r)；区域为空或退化时返回 None"""
         def compute() -> tuple[float, float, float] | None:
             """按需算出最小覆盖圆，交给 _memo 缓存"""
             if not self.vertices:
@@ -128,12 +109,7 @@ class DiscConstraintMixin:
         return float(geom.distance(Point(float(p[0]), float(p[1]))))
 
     def provably_out_of_reach(self, at: Sequence[float], receive_max: float) -> bool:
-        """能否证明"在 at 处测这个频道必然收不到"，能证明就省掉这次测量
-
-        可能源集合是真实源位置的超集。区域到 at 的最小距离大于 receive_max，真源到 at 的距离
-        就也大于 receive_max，也就是超过有效接收半径上限，那么必然收不到信号，这次测量不带
-        任何新信息。区域为空、无从判断时返回 False。
-        """
+        """在 at 处测这个频道能否证明必然收不到，能证明就省掉这次测量"""
         if self.region.is_empty:
             return False
         return self.min_distance_to(at) > receive_max + OUT_OF_REACH_MARGIN

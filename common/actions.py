@@ -14,13 +14,7 @@ __all__ = ["ActionRecorder"]
 
 
 class ActionRecorder:
-    """机器狗的基础行为：日志与文件句柄、动作登记、与模拟器的原子动作、几何小工具
-
-    宿主类，也就是各题的 `RobotDog`，须在其 `__init__` 里准备好这些属性：
-    `sim`，带 `measure` / `clear` 的模拟器客户端，另有 `verbose`、`_logfile`、`deadline`、
-    `actions`、`scan_steps`、`_cur_step`、`meas`、`regions`、`tracks`、`cleared`、
-    `pos`、`vt`、`travel_m`、`n_measure`、`n_clear`、`stage`。
-    """
+    """机器狗的基础行为：过程日志、动作登记、与模拟器的原子动作、几何小工具"""
 
     # ---- 日志 ----
     def log(self, msg: str) -> None:
@@ -42,11 +36,8 @@ class ActionRecorder:
 
     # ---- 原子动作 ----
     def clear(self, x: float, y: float, channel: int) -> bool:
-        """在该点清除，返回是否成功
-
-        清除半径只有 20 m，走到源附近本身就是必要动作，所以各题策略都把"到达后顺手试一次"
-        当首选，不设"够不够准"的门槛。
-        """
+        """在该点清除，返回是否成功"""
+        # 清除半径只有 20 m，走到源附近本身就是必要动作，各题策略都顺手试一次，不设准度门槛
         x, y = float(x), float(y)
         r = self.sim.clear(x, y, channel)
         if not r.get("accepted"):
@@ -66,12 +57,8 @@ class ActionRecorder:
     # ---- 动作与逐步扫描的记录 ----
     def _note(self, kind: str, x: float, y: float, channel: int,
               outcome: str | None = None, theta: float | None = None) -> None:
-        """登记一次动作，/measure 或 /clear，供逐局轨迹图与轨迹表使用
-
-        记的是动作点，也就是机器狗实际到达的坐标，与日志逐点对应。画图和落盘都在 /exit
-        之后进行，不占用现实时间预算，也不影响任何实时决策。键名被 `common.trajfigure`
-        和 `common.scanfigure` 按名字读取，改名要同步这两处。
-        """
+        """登记一次动作，/measure 或 /clear，供逐局轨迹图与轨迹表使用"""
+        # 键名被 common.trajfigure 和 common.scanfigure 按名字读取，改名要同步这两处
         self.actions.append({
             "seq": len(self.actions), "kind": kind, "stage": self.stage,
             "x": float(x), "y": float(y), "channel": int(channel),
@@ -81,7 +68,7 @@ class ActionRecorder:
 
     def _begin_scan_step(self, index: int, label: str, at: Sequence[float],
                          n_channels: int) -> None:
-        """开始记录一步扫描，字段见 `scan_steps`。动作由 measure/clear 自动挂到当前步上"""
+        """开始记录一步扫描，动作由 measure/clear 自动挂到当前步上"""
         self._cur_step = {
             "index": int(index), "label": label,
             "x": float(at[0]), "y": float(at[1]), "n_channels": int(n_channels),
@@ -92,19 +79,13 @@ class ActionRecorder:
     # ---- 几何小工具 ----
     @staticmethod
     def _polar_deg(p: Sequence[float]) -> float:
-        """点 p 相对区域圆心，也就是原点的方位角 / 度，[0, 360)。起点 (0,0) 的方位没有定义，
-        调用方得先用 _at_origin 把它排除掉
-
-        用 math 而不是 numpy 的三角函数：虚拟时钟按 5 m/s 精确复算，浮点末位差一点就会造出
-        "时钟对不上"的假不一致。同类教训见 common.geometry.dist。
-        """
+        """点 p 的方位角 / 度，[0, 360)，相对区域圆心也就是原点；起点 (0,0) 得由调用方先排除"""
+        # 用 math 而不是 numpy 的三角函数：虚拟时钟按 5 m/s 精确复算，浮点末位差一点就会
+        # 造出"时钟对不上"的假不一致，同类教训见 common.geometry.dist
         return math.degrees(math.atan2(p[1], p[0])) % 360.0
 
     def _clear_points(self, channels: Sequence[int]) -> np.ndarray:
-        """各频道的清缺点，取定位区域最小覆盖圆的圆心；拿不到估计点的就退回当前位置
-
-        返回的数组与 `channels` 同序，定序算子的下标可以直接映射回频道号。
-        """
+        """各频道的清缺点，取定位区域最小覆盖圆的圆心；拿不到估计点的就退回当前位置"""
         pts = []
         for c in channels:
             mec = self.region(c).enclosing_circle

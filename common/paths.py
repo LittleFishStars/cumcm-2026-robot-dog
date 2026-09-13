@@ -15,12 +15,9 @@ PROJECT_ROOT = PACKAGE_ROOT                                # 拍平之后包根�
 
 
 def default_jammers_dir() -> Path:
-    """演练场目录，也就是 --jammers-dir 的缺省值：先看仓库根，再看当前工作目录
-
-    为什么要看工作目录：代码一旦用 `python -m zipapp` 打成单文件，`__file__` 就落在 zip 内部，
-    包相对路径会指向 `submit.pyz/jammers-py/...` 这种不存在的路径。那就按"仓库相对，然后
-    当前工作目录"的顺序取第一个真实存在的目录，打包版与源码版的行为就一致了。
-    """
+    """演练场目录，也是 --jammers-dir 的缺省值：先看仓库根，再看当前工作目录"""
+    # 打成单文件 zipapp 之后 __file__ 落在 zip 内部，包相对路径会指向不存在的路径，
+    # 所以按"仓库相对，然后当前工作目录"取第一个真实存在的目录
     for cand in (PROJECT_ROOT / JAMMERS_REL_DIR, Path.cwd() / JAMMERS_REL_DIR):
         if (cand / "run.py").exists():
             return cand

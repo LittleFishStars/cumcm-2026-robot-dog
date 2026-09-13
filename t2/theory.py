@@ -44,16 +44,8 @@ def gamma_deg_at(g: Sequence[float], s1: Sequence[float], s2: Sequence[float]) -
 
 def fim_two_station(s1: Sequence[float], theta1: float, s2: Sequence[float], theta2: float,
                     g: Sequence[float], sigma_rad: float | None = None) -> np.ndarray:
-    """两站纯方位测向在真值 G 处的 Fisher 信息矩阵，2×2
-
-    观测方程 θ_i = atan2(Δy, Δx) + e_i，σ = 1°；梯度 ∂θ_i/∂p = n_i / R_i，n_i 是 L.O.S. 的
-    单位法向量。于是
-
-        H = Σ_i (1/σ²)·(1/R_i²)·n_i n_iᵀ,     预测协方差 C = H⁻¹
-
-    它与 `t3.probing.fisher_sigma` 是同一个量，那边写成 n nᵀ，这边是等价形式。t2 和 t3 是并列
-    叶子，不许互相 import，所以各自实现一份，共同点只写在文档里。
-    """
+    """两站纯方位测向在真值 G 处的 Fisher 信息矩阵，2×2"""
+    # 与 t3.probing.fisher_sigma 是同一个量，但 t2 与 t3 是并列叶子不许互相 import，各写一份
     s = math.radians(cfg.BEARING_ERROR_DEG) if sigma_rad is None else float(sigma_rad)
     H = np.zeros((2, 2), dtype=float)
     for (site, theta) in ((s1, theta1), (s2, theta2)):
@@ -70,7 +62,7 @@ def fim_two_station(s1: Sequence[float], theta1: float, s2: Sequence[float], the
 
 
 def ellipse_from_fim(H: np.ndarray) -> dict[str, float]:
-    """由 Fisher 信息矩阵给 1σ 误差椭圆：主次半轴、主轴方向、面积，以及 GDOP = √tr(H⁻¹)"""
+    """由 Fisher 信息矩阵给出 1σ 误差椭圆的半轴、主轴方向、面积与 GDOP"""
     evals, evecs = np.linalg.eigh(H)
     lam_min, lam_max = float(evals[0]), float(evals[1])
     v = evecs[:, 0]
@@ -86,21 +78,14 @@ def ellipse_from_fim(H: np.ndarray) -> dict[str, float]:
 # ---------------------------------------------------------------- 文献闭式
 
 def gdop(d: float, r2: float, gamma_deg: float, err_deg: float = cfg.BEARING_ERROR_DEG) -> float:
-    """文献 GDOP 闭式，位置误差的均方尺度，单位 m：σ√(R₁²+R₂²)/sin γ
-
-    由 H 的迹与行列式直接得到，det H = sin²γ/(σ⁴R₁²R₂²)、tr H = (1/σ²)(1/R₁²+1/R₂²)，
-    于是 √tr(H⁻¹) = σ√(R₁²+R₂²)/sin γ，不必数值求逆。它同时是 CRLB 主半轴的小张角渐近式。
-    """
+    """文献 GDOP 闭式，位置误差的均方尺度 / m"""
     g = math.radians(gamma_deg)
     return math.radians(err_deg) * math.sqrt(d * d + r2 * r2) / math.sin(g)
 
 
 def crlb_major(d: float, r2: float, gamma_deg: float,
                err_deg: float = cfg.BEARING_ERROR_DEG) -> float:
-    """两站测向 CRLB 误差椭圆主半轴的闭式 / m，即任叶童 2016 式(2-52) 的 1σ 形式
-
-        a = √2·σR₁R₂ / √(R₁²+R₂² − √((R₁²+R₂²)² − 4R₁²R₂²sin²γ))
-    """
+    """两站测向 CRLB 误差椭圆主半轴的闭式 / m"""
     g = math.radians(gamma_deg)
     s = math.radians(err_deg)
     a = d * d + r2 * r2
@@ -113,11 +98,7 @@ def crlb_major(d: float, r2: float, gamma_deg: float,
 
 def crlb_area(d: float, r2: float, gamma_deg: float,
               err_deg: float = cfg.BEARING_ERROR_DEG) -> float:
-    """两站测向 CRLB 误差椭圆的面积 / m²：πσ²R₁R₂/sin γ，即任叶童 2016 式(2-54) 的 1σ 形式
-
-    这一式最能说明张角为什么是决定性的：面积正比于 R₁R₂/sin γ，与两站距离之积成正比，与 sin γ
-    成反比。所以"靠近源"和"拉开张角"本就是两个互相竞争的目标，可以对比 Chen 等 2009。
-    """
+    """两站测向 CRLB 误差椭圆的面积 / m²"""
     g = math.radians(gamma_deg)
     s = math.radians(err_deg)
     return math.pi * s * s * d * r2 / math.sin(g)
@@ -125,11 +106,7 @@ def crlb_area(d: float, r2: float, gamma_deg: float,
 
 def foy_rmec(d: float, r2: float, gamma_deg: float,
              err_deg: float = cfg.BEARING_ERROR_DEG) -> float:
-    """Foy 稀释式口径的最小外接圆半径 / m：tan ε·√(R₁²+R₂²)/sin γ
-
-    做法是把 GDOP 里的 σ 换成 tan ε，也就是给定测向误差下沿线方向的横向位移。本项目文献清单
-    把它记作"两测点闭式解 R_MEC"。它与 `minimax_radius` 的差别就落在那个交叉项和 δ 对齐效应上。
-    """
+    """Foy 稀释式口径的最小外接圆半径 / m"""
     g = math.radians(gamma_deg)
     return math.tan(math.radians(err_deg)) * math.sqrt(d * d + r2 * r2) / math.sin(g)
 
@@ -144,12 +121,7 @@ def minimax_radius(d: float, r2: float, gamma_deg: float,
 
 def radius_field(site: Sequence[float], theta1: float, points: np.ndarray, sources: np.ndarray,
                  mode: str = "gdop", err_deg: float = cfg.BEARING_ERROR_DEG) -> np.ndarray:
-    """候选第二检测点上的"最坏情况判据尺度"场 / m，对源不确定集的采样点取最大
-
-    mode 取 gdop / crlb / foy / minimax 四者之一，分别对应上面的四条判据，返回 (N,) 数组，
-    N 是候选点数。这些解析式不做几何构造，比精确的 `region.worst_diameters_all` 快约两个数量级，
-    所以能拿很细的网格做全局预筛。`score.solve` 就是这么用的：细网格快筛，再精确复核。
-    """
+    """候选第二检测点上的判据尺度场 / m，mode 取 gdop、crlb、foy 或 minimax"""
     pts = np.asarray(points, dtype=float).reshape(-1, 2)
     src = np.asarray(sources, dtype=float)
     d = np.hypot(src[:, 0] - float(site[0]), src[:, 1] - float(site[1]))          # (M,)
@@ -184,7 +156,7 @@ def radius_field(site: Sequence[float], theta1: float, points: np.ndarray, sourc
 # ---------------------------------------------------------------- 秩相关与自检
 
 def spearman(a: np.ndarray, b: np.ndarray) -> float:
-    """Spearman 秩相关系数；没有 scipy，按秩的 Pearson 相关自己算"""
+    """Spearman 秩相关系数，按秩的 Pearson 相关手算"""
     a = np.asarray(a, dtype=float).ravel()
     b = np.asarray(b, dtype=float).ravel()
     ok = np.isfinite(a) & np.isfinite(b)
@@ -219,14 +191,7 @@ def spearman(a: np.ndarray, b: np.ndarray) -> float:
 def verify_theory(n: int = 300, seed: int = 2026,
                   err_deg: float = cfg.BEARING_ERROR_DEG,
                   radius: float = cfg.REGION_RADIUS) -> dict[str, Any]:
-    """文献闭式与精确集员构造的抽样对照，打印的数字可以直接写进论文
-
-    每个随机两站配置都把源放在两条标称示向度的交点上，这是 CRLB 线性化的真值场景。然后核三件事：
-    `ellipse_from_fim` 的数值特征值对 `crlb_major`/`gdop`/`crlb_area` 闭式，应逐位一致；
-    `minimax_radius` 这个本文闭式对 `quad_diameters/2` 的精确最坏构造，γ 中等时应 <1%；
-    `gdop`/`crlb_major`/`foy_rmec` 对精确最坏半径，给出低估比例，毕竟它们不是最坏界。被圆域
-    截断和近共线的样本单独计数，不计偏差。
-    """
+    """文献闭式与精确集员构造的抽样对照，返回可直接写进论文的校验数字"""
     from t2.region import D_LO, exact_region
 
     rng = np.random.default_rng(seed)
@@ -278,16 +243,7 @@ def verify_theory(n: int = 300, seed: int = 2026,
     ar = np.asarray(reg, dtype=float).reshape(-1, 4)
 
     def _bucket(lo: float, hi: float, col: int) -> dict[str, Any]:
-        """按 `ar` 第 `col` 列的取值区间 [lo, hi) 分桶统计偏差
-
-        Args:
-            lo: 分桶下界，含
-            hi: 分桶上界，不含
-            col: 用于分桶的列下标
-
-        Returns:
-            dict[str, Any]: 该桶的样本数与三项偏差统计；桶内无样本时只有 lo/hi/n
-        """
+        """按 ar 第 col 列的取值区间 [lo, hi) 分桶统计偏差"""
         m = (ar[:, col] >= lo) & (ar[:, col] < hi)
         if not bool(m.any()):
             return {"lo": lo, "hi": hi, "n": 0}

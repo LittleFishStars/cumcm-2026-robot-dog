@@ -40,11 +40,7 @@ def setup_mpl_env() -> None:
 
 
 def font_context(size: float | None = None, fonts: Sequence[str] | None = None) -> Any:
-    """返回一个 rc_context，用来统一中文字体、坐标轴负号，有需要时连字号一起设
-
-        with font_context(size=10):
-            fig, ax = plt.subplots(); ...
-    """
+    """返回一个 rc_context，统一中文字体与坐标轴负号，给了 size 就一并设字号"""
     setup_mpl_env()
     import matplotlib
 
@@ -64,11 +60,7 @@ def save_png(fig: Any, path: Path, dpi: float = 160.0, **kwargs: Any) -> Path:
 
 
 def slug(text: str) -> str:
-    """把标签压成安全的文件名片段：中文与字母数字留着，其余换成下划线
-
-    扫描图的标签里有中文也有空格，比如 巡视站 3 圆心 5 这种，直接当文件名既难看又有跨文件
-    系统的编码风险，所以统一压成 `巡视站_3_圆心_5`。压完是空的就退回 "step"。
-    """
+    """把标签压成安全的文件名片段：中文与字母数字留着，其余换成下划线，压完为空就退回 step"""
     keep = [c if (c.isalnum() or c in "._-") else "_" for c in text]
     return re.sub(r"_+", "_", "".join(keep)).strip("_") or "step"
 
@@ -79,11 +71,7 @@ _PLOT_HINTED = False
 
 
 def hint_plot_once(reason: str) -> None:
-    """报告一次"图没能生成"，首次调用时打印，其后静默
-
-    两族绘图都走这里，同一个原因在任何一族里都会留下明确的说明。图不会悄悄消失，
-    用户总能看到"为什么没有图"和"怎么才能有图"。
-    """
+    """报告一次"图没能生成"，首次调用时打印，其后静默"""
     global _PLOT_HINTED
     if not _PLOT_HINTED:
         _PLOT_HINTED = True

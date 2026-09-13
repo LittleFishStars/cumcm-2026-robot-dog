@@ -35,7 +35,7 @@ def save_map_csv(save_dir: Path, result: SolveResult, name: str = cfg.MAP_CSV) -
 
 def save_summary_json(save_dir: Path, result: SolveResult,
                       name: str = cfg.SUMMARY_JSON) -> Path:
-    """把结论与校验写成 JSON。报告和论文引用的数字统一从这里取"""
+    """把结论与校验写成 JSON，报告与论文引用的数字统一从这里取"""
     path = Path(save_dir) / name
     path.parent.mkdir(parents=True, exist_ok=True)
     scenario = {k: v for k, v in result.scenario.items() if k != "quad"}
@@ -72,7 +72,7 @@ def save_summary_json(save_dir: Path, result: SolveResult,
 
 
 def _theory_json(result: SolveResult) -> dict[str, Any]:
-    """文献判据层里能序列化的那部分。探针数组只拿来出图，不进 JSON"""
+    """文献判据层里能序列化的那部分，探针数组只拿来出图，不进 JSON"""
     thy = dict(result.theory)
     thy.pop("probe", None)
     return thy
@@ -80,7 +80,7 @@ def _theory_json(result: SolveResult) -> dict[str, Any]:
 
 def print_report(result: SolveResult, figure: Path | None = None,
                  files: Sequence[Path] = ()) -> None:
-    """控制台报表：结论、关键数字、校验状态。异常直接标 ⚠"""
+    """控制台报表：结论、关键数字与校验状态，异常直接标 ⚠"""
     c = result.checks
     x, y = result.best
     sc = result.scenario
@@ -166,7 +166,7 @@ def print_report(result: SolveResult, figure: Path | None = None,
 
 def write_outputs(save_dir: Path, result: SolveResult, figure: Path | None = None,
                   csv_name: str = cfg.MAP_CSV, json_name: str = cfg.SUMMARY_JSON) -> dict[str, Path]:
-    """一次写全 CSV 与 JSON，返回路径表。出图与否由调用方决定，好配合 --no-plot"""
+    """一次写全 CSV 与 JSON，返回路径表；出图与否由调用方决定"""
     save_dir = Path(save_dir)
     return {"csv": save_map_csv(save_dir, result, csv_name),
             "json": save_summary_json(save_dir, result, json_name)}

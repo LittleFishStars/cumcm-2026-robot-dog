@@ -20,10 +20,7 @@ def truth_check(truth: Sequence[dict] | None, plan: CoverPlan,
                 obs: dict[int, list[Obs]], cleared: set,
                 tracks: dict[int, dict[str, Any]] | None = None) -> dict[str, Any]:
     """逐源核对，只有演练模式拿得到真值
-
-    核两件事。一是覆盖保证：源到最近覆盖圆圆心的距离是否 ≤ 1000 m，它的频道是否真的被听到。
-    二是清除结果：清除点与真值的距离就是定位误差，看它是否落在 20 m 清除半径内。
-    """
+    核覆盖保证（源到最近圆心 ≤ 1000 m、频道是否被听到）与清除点是否落在 20 m 半径内。"""
     tracks = tracks or {}
     rows: list[dict[str, Any]] = []
     for j in truth or []:
@@ -124,13 +121,7 @@ def summarize(rows: Sequence[dict]) -> dict[str, Any]:
 def save_survey(save_dir: Path, rows: list[dict], observations: list[dict],
                 plan_json: dict[str, Any], meta: dict | None = None) -> list[Path]:
     """巡视扫描结果落盘：逐局统计 JSON + 逐条观测 CSV
-
-    `meta` 说明这次运行的来源，mode 取 practice 或 official，另含地址、局数等。这里不写参赛
-    队号：队号一律运行时经 `--robot-id` 传入、只用于通信，落盘会把它带进交付物，而竞赛要求
-    交付物里不含身份信息。结果目录已不按模式分家，目录名和文件名都不再透露模式，来源只能靠
-    这份元数据交代。官方产物没有真值，接口不返回；`mode` 是事后判断"这批数字为何缺真值字段"
-    的唯一线索。
-    """
+    这里不写参赛队号，结果目录也不按模式分家，来源只能靠 meta 里的 mode 交代。"""
     save_dir.mkdir(parents=True, exist_ok=True)
     json_path = save_dir / SURVEY_JSON
     json_path.write_text(json.dumps({
@@ -159,10 +150,7 @@ def episode_row(ep: int, seed: int | None, truth: Sequence[dict] | None,
                 dog: RobotDog,
                 stats: dict[str, Any], check: dict[str, Any]) -> dict[str, Any]:
     """单局汇总行：把引擎统计、真值核对与逐频道档案合成一行，供 JSON 与绘图使用
-
-    `seed` 在演练模式下是本局的随机种子；官方模式的场景由平台生成，不受我们控制，所以传 None。
-    `truth` 同理：官方模式拿不到真值，传 None 之后需要真值的指标都留空，定位误差就是其中一个。
-    """
+    seed 与 truth 在官方模式下都传 None，因为场景由平台生成、拿不到真值。"""
     n_src = len(truth) if truth else stats.get("channels_heard")
     cleared = stats.get("cleared", 0)
     return {

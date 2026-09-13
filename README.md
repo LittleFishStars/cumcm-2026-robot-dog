@@ -16,7 +16,12 @@ results/           最后一次正式运行的产物
 README.md          本文件
 pyproject.toml     Python 版本与依赖声明
 .venv/             本队在 Linux（Arch + Python 3.14.7）下建的虚拟环境
+AI工具使用详情.pdf  按竞赛 AI 工具使用规定第 4 条附的详情表，独立文件，不进代码目录
 ```
+
+`AI工具使用详情.pdf` 的源文件是 `resources/latex/ai-declaration.tex`，同一份文件独立编译出这张
+详情表，被论文 `\input` 时就只出参考文献前那一句声明。`resources/` 整体不进包，所以这里单放了
+编译好的 PDF。
 
 所以包内能跑的是离线命令和演练；只有"连官方模拟器"那条路走不通，它要官方的
 `jammers-simulator.exe` 在本机跑着，而且一共只有 3 次机会，评审时别用。

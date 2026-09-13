@@ -149,8 +149,9 @@ the same floating-point operations as the scalar reference, which keeps `python 
 this reason: replacing `np.hypot` by `sqrt(x²+y²)` in the T2 diameter pair loop, which shifted the
 last bits of `t2_second_site.json`.
 
-Design rationale lives in the docstrings, mostly on the functions and constants that carry it. `README.md`
-only covers environment and usage.
+Design rationale lives in the docstrings, mostly on the functions and constants that carry it.
+`README.md` is deliberately short: the file layout and the runtime environment, nothing else. Usage
+belongs in each CLI's `--help`; the caveats below stay in this file.
 
 ## Code style (follows the author's conventions in `~/Projects`)
 

@@ -35,3 +35,7 @@ results/
 *.vrb
 *.bcf
 *.run.xml
+
+# 论文正文：本机写作中，不入库
+*.tex
+!resources/latex/*.tex

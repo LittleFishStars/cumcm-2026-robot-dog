@@ -1,19 +1,4 @@
-"""逐局轨迹图：把机器狗的行驶轨迹、覆盖圆与测量结果画成图。
-
-绘图在 `/exit` 之后进行（`save_trajectory` 由运行编排在收尾时调用），**不占用现实时间预算**、
-也不影响任何实时决策 —— 图上画的就是 `RobotDog.actions` 里记录的实际动作点，可与过程日志
-逐点对账。同名 CSV 轨迹表让"图上每个点"都能被逐行复核。
-
-绘制内容：作业圆域 1800 m 与源生成域 1770 m、7 个半径 1000 m 的覆盖圆与圆心（标注访问
-序号）、从原点起的行驶路径、按结果分类的动作点（测得示向度 / 无信号 / 近距 / 清除尝试 /
-清除成功）、干扰源真值与 20 m 清除半径。
-
-与问题四共用的那部分画法（动作点分类、真值源、清除半径小圆、图例排版、轨迹表与落盘编排）
-在 `common.trajfigure`；本模块只管问题三独有的元素（7 个覆盖圆与圆心访问序号）与
-问题三口径的图例文字。
-
-输出目录是 `<save-dir>/trajectory/`，落在 results/t3/ 结果树下。
-"""
+"""逐局轨迹图：把机器狗的行驶轨迹、覆盖圆与测量结果画成图"""
 
 from __future__ import annotations
 
@@ -43,18 +28,18 @@ def draw_trajectory(out_path: Path, actions: Sequence[dict[str, Any]],
                     sources: Sequence[dict[str, Any]] = (),
                     title: str | None = None,
                     figsize: tuple[float, float] = (9.0, 7.6)) -> Path:
-    """把一局的轨迹画成图并存盘（格式由后缀决定，.png / .pdf）。
+    """把一局的轨迹画成图并存盘，格式由后缀决定，.png 或 .pdf
 
-    - `actions`：逐次动作记录（RobotDog.actions），含测向与清除的落点、结果类型、虚拟时刻；
-    - `plan`：覆盖圆方案，用来画 7 个半径 1000 m 的覆盖圆与圆心（巡视航路点）；
-    - `order`：巡视访问顺序，用于给圆心标序号，直观看出"依次到圆心"的路线；
-    - `sources`：干扰源真值（仅演练模式有），画成红叉并按 20 m 清除半径画圈；
-    - `title`：图内小标题。论文用图传 None（大标题交给 caption）。
+    `actions` 是逐次动作记录，也就是 RobotDog.actions，含测向与清除的落点、结果类型、虚拟
+    时刻。`plan` 是覆盖圆方案，用来画 7 个半径 1000 m 的覆盖圆与圆心，那些圆心就是巡视航路点。
+    `order` 是巡视访问顺序，给圆心标序号，一眼能看出"依次到圆心"的路线。`sources` 是干扰源
+    真值，只有演练模式有，画成红叉再按 20 m 清除半径画圈。`title` 是图内小标题，论文用图传
+    None，大标题交给 caption。
 
-    matplotlib 只在本函数内导入，故未安装时只会抛 ImportError、由调用方忽略 —— 官方测试机上
-    没有 matplotlib 也能正常完成整局。出图去掉时间戳类元数据，同一输入两次出图逐字节一致。
+    matplotlib 只在本函数内导入，没装的话只会抛 ImportError，由调用方忽略，官方测试机上
+    没有 matplotlib 也能正常跑完整局。出图去掉了时间戳类元数据，同一输入两次出图逐字节一致。
     """
-    # 配置目录与中文字体的统一处理见 common.plotting（此处只调用）
+    # 配置目录与中文字体的统一处理都在 common.plotting，这里只管调用
     setup_mpl_env()
     import matplotlib
     matplotlib.use("Agg")
@@ -74,7 +59,7 @@ def draw_trajectory(out_path: Path, actions: Sequence[dict[str, Any]],
         gen_r = REGION_RADIUS - 30.0
         ax.plot(gen_r * cos_th, gen_r * sin_th, color=C_FRAME, lw=0.8, ls="--", alpha=0.85)
 
-        # 7 个覆盖圆（半径 1000 m）与圆心：逐圆画但不逐个进图例（否则图例会被撑爆）
+        # 7 个覆盖圆与圆心：逐圆画，但不逐个进图例，否则图例会被撑爆
         wp = np.asarray(plan.waypoints, dtype=float)
         for cx, cy in wp:
             ax.plot(cx + COVER_RADIUS * cos_th, cy + COVER_RADIUS * sin_th,
@@ -101,10 +86,10 @@ def draw_trajectory(out_path: Path, actions: Sequence[dict[str, Any]],
                     zorder=4.0)
             handles.append(Line2D([], [], color=C_PATH, lw=1.0,
                                   label=f"行驶路径（{len(actions)} 次动作）"))
-            # 动作点按结果分类（测得示向度 / 无信号 / 近距 / 清除尝试 / 清除成功）见公共画法
+            # 动作点按结果分类：测得示向度、无信号、近距、清除尝试、清除成功。画法见公共模块
             plot_action_points(ax, actions, handles, MEASURE_LABELS_T3)
 
-        # 干扰源真值（仅演练模式）与 20 m 清除半径
+        # 干扰源真值，只有演练模式有；再叠 20 m 清除半径
         if sources:
             plot_source_markers(ax, sources, cos_th, sin_th, CLEAR_RADIUS)
             handles.append(Line2D([], [], marker="X", ms=8, ls="none", color=C_SRC,
@@ -136,10 +121,10 @@ def save_trajectory(save_dir: Path, name: str, actions: Sequence[dict[str, Any]]
                     sources: Sequence[dict[str, Any]] = (),
                     title: str | None = None,
                     traj_dir: str = TRAJ_DIR) -> list[Path]:
-    """落盘一局的轨迹：同名 PNG（图）与 CSV（轨迹表），返回已写出的文件列表。
+    """落盘一局的轨迹：同名的 PNG 图和 CSV 轨迹表，返回已写出的文件列表
 
-    轨迹表让"图上每个点"都能与过程日志逐点对账（序号、动作类型、阶段、坐标、结果、频道、
-    虚拟时刻、累计里程）。matplotlib 缺失只提示一次并跳过出图，轨迹表照常写出。
+    轨迹表让"图上每个点"都能与过程日志逐点对账，序号、动作类型、阶段、坐标、结果、频道、
+    虚拟时刻、累计里程都在里面。matplotlib 缺失只提示一次并跳过出图，轨迹表照常写出。
     """
     return _save_trajectory(
         save_dir, name, actions,
@@ -151,7 +136,7 @@ def save_scan_figures(save_dir: Path, name: str, steps: Sequence[dict[str, Any]]
                       plan: CoverPlan, order: Sequence[int] = (),
                       sources: Sequence[dict[str, Any]] = (),
                       step_dir: str = STEP_DIR_NAME) -> list[Path]:
-    """把一局内**每一步扫描**各画一张结果图，落在 <save-dir>/<step_dir>/ 下。
+    """把一局内每一步扫描各画一张结果图，落在 <save-dir>/<step_dir>/ 下
 
     文件名形如 `ep01_s00_起点全频道扫描.png`、`ep01_s03_巡视站3.png`：局号 + 步序，排序后
     与执行顺序一致，便于按时间顺次翻阅"信息是怎么一步步积累起来的"。
@@ -160,13 +145,13 @@ def save_scan_figures(save_dir: Path, name: str, steps: Sequence[dict[str, Any]]
     out_dir = save_dir / step_dir
     out_dir.mkdir(parents=True, exist_ok=True)
     wp = [tuple(map(float, c)) for c in plan.waypoints]
-    # 各站"已访问"集合：到第 i 步时，计划顺序里前 i 个站已走过（起点扫描不含任何站）
+    # 各站"已访问"集合：到第 i 步时，计划顺序里前 i 个站已经走过。起点扫描不含任何站
     visited: list[int] = []
     paths: list[Path] = []
     for k, raw in enumerate(steps):
         idx = int(raw.get("index", k))
         if idx > 0:                                  # 第 idx 个巡视站访问完，加进已访问集合
-            # 标签里带了圆心号（六边形族下"第 1 站"可能就是原点站），故从标签里取圆心编号
+            # 标签里带着圆心号，六边形族下"第 1 站"可能就是原点站，所以从标签里取圆心编号
             wp_i = _waypoint_of_label(str(raw.get("label", "")), order, idx)
             if wp_i is not None and wp_i not in visited:
                 visited.append(wp_i)
@@ -186,7 +171,7 @@ def save_scan_figures(save_dir: Path, name: str, steps: Sequence[dict[str, Any]]
 
 
 def _waypoint_of_label(label: str, order: Sequence[int], step_i: int) -> int | None:
-    """从步骤标签里取出圆心编号（标签形如 "巡视站 3（圆心 5）"）。取不到时按顺序退推。"""
+    """从步骤标签里取出圆心编号。标签形如 "巡视站 3（圆心 5）"，取不到时按顺序退推"""
     m = re.search(r"圆心\s*(\d+)", label)
     if m:
         return int(m.group(1))

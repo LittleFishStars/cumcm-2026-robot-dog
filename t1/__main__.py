@@ -1,4 +1,4 @@
-"""python -m t1：问题 1 的 4 检测点示例（等价于原来的 `python T1.py`）"""
+"""python -m t1：问题 1 的 4 检测点示例"""
 
 from __future__ import annotations
 

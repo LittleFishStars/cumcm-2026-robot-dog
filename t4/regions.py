@@ -1,24 +1,4 @@
-"""问题四的定位区域：只把"direction / near"当作硬约束，no_signal 不作为区域约束。
-
-问题四同时存在全向源与定向源，且**无法预先知道某个频道属于哪一类**，所以"收不到信号"不再
-像问题三那样等价于"源在检测点 1000 m 之外"——它可能是太远，也可能是机器狗站在定向源的
-背面（方向不对，见 config.DIR_BEAM_HALF_DEG）。因此本模块的"可能源集合"（DirProbRegion）
-只叠加两类可证明约束：
-
-    direction ：收得到 ⇒ d ≤ R_rec ≤ 1500 ⇒ 源在"以测量点为心、1500 m"的圆盘**内**；
-    near      ：d ≤ 5 m（题目近距阈值）  ⇒ 源在"以测量点为心、5 m"的圆盘**内**。
-
-no_signal 一律**不**作为区域约束（它给出的"源在覆盖范围之外或背向"无法转成可证明的圆盘
-内/外约束）。代价是单条射线只能给出"一条贯穿圆域的长带 ∩ 接收半径内包"，定位收敛完全靠
-**广角度的多视角交会**——这正由扫描阶段 20 个测量位置自然提供。
-
-保守性由两种相反方向的多边形近似保证：交（"在内"）用外接多边形、差（"在外"）用内接多边形。
-本类只做交集运算（楔形交 ∩ 圆域 ∩ 圆盘内包），全部是凸集交集，故区域保持凸、不会裂成多块。
-叠加机制本身（增量、惰性、缓存）在 `common.disc_region`。
-
-`Obs` 是一条示向度（用于射线交会）；`Meas` 是一次测量的完整记录（含 no_signal，保留用于
-核对与出图——只是不作为区域约束）。
-"""
+"""问题四的定位区域，只叠 direction 与 near 两类约束"""
 
 from __future__ import annotations
 
@@ -30,9 +10,9 @@ from t4.config import EXCL_QUAD
 
 
 class Obs(NamedTuple):
-    """一次 direction 检测：在 (x, y) 处测得频道 channel 的示向度 theta（度）。
+    """一次 direction 检测：在 (x, y) 处测得频道 channel 的示向度 theta，单位为度
 
-    stage 记录该次观测来自哪个阶段（sweep = 扫描，refine = 文献准则补测，clear = 清除）。
+    stage 记这次观测出自哪个阶段，sweep 是扫描，refine 是补测，clear 是清除。
     """
 
     channel: int
@@ -43,10 +23,10 @@ class Obs(NamedTuple):
 
 
 class Meas(NamedTuple):
-    """一次测量的完整记录（**含 no_signal**）。
+    """一次测量的完整记录，no_signal 也照记
 
-    no_signal 在问题四里**不是**区域约束（可能是方向不对），但仍完整记录：核对/出图要用它
-    说明"这步在这里测了哪些频道、结果如何"。
+    no_signal 在问题四里不当区域约束，因为可能只是方向不对，但核对和出图要拿它
+    说清"这步在这里测了哪些频道、结果如何"，所以照样留全。
     """
 
     channel: int
@@ -58,24 +38,24 @@ class Meas(NamedTuple):
 
 
 class DirProbRegion(DiscConstraintMixin, TriangulationRegion):
-    """问题四的"可能源集合"：交会楔形 ∩ 目标圆域，再叠加"direction ⇒ 接收半径内包"。
+    """问题四的可能源集合：交会楔形交目标圆域，再叠加 direction 给的接收半径内包
 
-    与问题三 ProbRegion 的差别：**只有 add_inside（direction/near 给出的圆盘内约束），没有
-    add_outside** —— `WITH_OUTSIDE = False`，一旦误调 add_outside 会直接报错，不会悄悄改变
-    区域语义。原因是定向源使 no_signal 无法转成"源在圆盘外"的可证明约束（见模块文档）。
+    跟问题三 ProbRegion 只差一处，这里只有 add_inside，管 direction 和 near 给出的圆盘内约束，
+    没有 add_outside：`WITH_OUTSIDE = False`，误调会直接报错而不会悄悄改掉区域语义，因为定向源
+    让 no_signal 转不成"源在圆盘外"的可证明约束。
 
-    所有运算都是凸集交集，区域保持凸，因此 `vertices` / `diameter` / `enclosing_circle` 按
-    凸多边形的口径计算即可（`vertices` 的多块分支在这里永不触发）。
+    所有运算都是凸集求交，区域保持凸，所以 `vertices`、`diameter`、`enclosing_circle` 按
+    凸多边形口径算就是对的，`vertices` 里那个多块分支在这里永远不走。
     """
 
     WITH_OUTSIDE = False
 
     def __init__(self, err: float = 1.0, radius: float | None = None,
                  sides: int | None = None, quad: int = EXCL_QUAD) -> None:
-        """err / radius / sides 见父类；quad 为圆盘近似的正多边形精度（见 config.EXCL_QUAD）。"""
+        """err / radius / sides 都在父类里；quad 照 config.EXCL_QUAD，是圆盘近似的正多边形精度"""
         super().__init__(err, radius, sides, quad)
 
     @property
     def diameter(self) -> float:
-        """区域直径 / m：父类按顶点算最远点对（本题区域恒为凸，即为精确值）。"""
+        """区域直径，单位 m：父类按顶点取最远点对，本题区域恒为凸，算出来就是精确值"""
         return self._memo("diameter", lambda: TriangulationRegion.diameter.fget(self))

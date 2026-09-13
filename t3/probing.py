@@ -1,19 +1,4 @@
-"""按文献准则选补测点（Fisher 信息 / 交会几何）。
-
-文献依据：任叶童(2016) 的 AOA 双站交会模糊区面积公式与多站加权最小二乘权重 1/(σᵢRᵢ)，
-以及 Chen et al.(2009, ICICS) 的"均方位置误差 ∝ 1/(σ²r²)、最优轨迹兼顾贴近与角度分集"。
-本模块把它们落成两个可计算的东西：
-
-* `fisher_sigma`   —— 由 Fisher 信息矩阵给出位置的 1σ：J = Σ(1/σ²)(1/rᵢ²)nᵢnᵢᵀ，
-                      σ_pos = √tr(J⁻¹)。两条等距观测在夹角 90° 时最优（tr(J⁻¹) = 2σ²r²/sin²φ）。
-* `probe_candidates` —— 枚举候选补测点并排序：先剔掉与已有观测共线的（交会退化），再按
-                      **对全部假设源位置的平均 σ** 排序，2% 以内视为并列则取路近者，
-                      最后按字典序打破剩余并列（保证确定性）。
-* `ambiguity_area` —— 文献公式本身，用于与 Fisher σ 并列对照（论文里解释"为什么这样选点"）。
-
-`hypothesis_points` 给出"源可能在哪里"的代表点：优先取自当前定位区域（最小覆盖圆圆心 +
-区域顶点的最远点采样），区域退化时才回退到沿单条射线枚举距离。
-"""
+"""按文献准则选补测点，用 Fisher 信息和交会几何"""
 
 from __future__ import annotations
 
@@ -29,16 +14,16 @@ from t3.regions import Obs
 
 
 def fisher_sigma(p: Sequence[float], bearings: Sequence[Sequence[float]]) -> float:
-    """在假设源位置 p 处、由一组 (检测点x, 检测点y, 示向度) 预测的位置 1σ / m。
+    """在假设源位置 p 处，由一组 (检测点x, 检测点y, 示向度) 预测的位置 1σ / m
 
-    测向的观测方程 θ = atan2(Δy, Δx) + e，e 的标准差取 σ = 1°。梯度 ∂θ/∂p = n / r
-    （n 为示向度方向的单位法向量，r 为检测点到源的距离），故 Fisher 信息矩阵
+    测向的观测方程是 θ = atan2(Δy, Δx) + e，e 的标准差取 σ = 1°。梯度 ∂θ/∂p = n / r，
+    其中 n 是示向度方向的单位法向量，r 是检测点到源的距离。于是 Fisher 信息矩阵
 
         J = Σᵢ (1/σ²) · (1/rᵢ²) · nᵢ nᵢᵀ,      预测协方差 C = J⁻¹,   σ_pos = √tr(C)
 
-    权重 1/(σᵢ²rᵢ²) 与文献一致：任叶童（2016）多站交会的加权最小二乘权为 1/(σᵢRᵢ)；
-    Chen 等（2009）证明观测站到目标的距离越近、均方位置误差越小（∝ 1/(σ²r²)）。
-    J 退化（单条射线、近共线）时行列式 ≈ 0，返回 inf，表示"无法定距"。
+    权重 1/(σᵢ²rᵢ²) 与文献对得上：任叶童(2016) 给多站交会的加权最小二乘权为 1/(σᵢRᵢ)；
+    Chen 等(2009) 证明观测站离目标越近，均方位置误差越小，正比于 1/(σ²r²)。J 退化时
+    单条射线或者近共线时行列式 ≈ 0，直接返回 inf，意思是"定不了距"。
     """
     J = np.zeros((2, 2))
     for qx, qy, theta in bearings:
@@ -58,22 +43,22 @@ def hypothesis_points(region: "ProbRegion",
                       obs_list: Sequence[Obs]) -> list[tuple[float, float]]:
     """补测选点用的"假设源位置"集合
 
-    区域已知时统一取"最小覆盖圆圆心 + 最远点采样出的若干顶点"（单条射线也适用：叠加 no_signal
-    禁区与接收半径环带后，区域不再是无限长的一条带，而是有限的一段）；区域退化时（尚无禁区
-    约束）才退回"沿那条射线按可能距离枚举"。
+    区域已知时统一取最小覆盖圆圆心加最远点采样出的几个顶点。单条射线也适用，因为叠上
+    no_signal 禁区与接收半径环带之后，区域不再是无限长的一条带，而是有限的一段。只有区域
+    退化、还没有禁区约束时，才退回"沿那条射线按可能距离枚举"。
 
     Args:
-        region: 该频道当前的定位区域（可能源集合）
+        region: 该频道当前的定位区域，也就是可能源集合
         obs_list: 该频道已有的示向度观测
 
     Returns:
-        list[tuple[float, float]]: 假设源位置列表（区域已知时为最小覆盖圆圆心与最远点采样顶点）
+        list[tuple[float, float]]: 假设源位置列表；区域已知时是最小覆盖圆圆心与最远点采样顶点
     """
     pts: list[tuple[float, float]] = []
     mec = region.enclosing_circle
     verts = list(region.vertices)
     if verts:
-        # 区域已知（含 no_signal 禁区与接收半径环带）：最小覆盖圆心 + 最远点采样若干顶点
+        # 区域已知，含 no_signal 禁区与接收半径环带：最小覆盖圆心加最远点采样出的几个顶点
         if mec is not None:
             pts.append((mec[0], mec[1]))
         while len(pts) < HYP_MAX and verts:
@@ -81,14 +66,14 @@ def hypothesis_points(region: "ProbRegion",
             verts.remove(far)
             pts.append(far)
     elif len(obs_list) == 1:
-        # 区域退化（尚无禁区约束）：只能沿那条射线按可能距离枚举
+        # 区域退化、还没有禁区约束：只能沿那条射线按可能距离枚举
         o = obs_list[0]
         for s in SINGLE_HYP:
             hx = o.x + s * math.cos(math.radians(o.theta))
             hy = o.y + s * math.sin(math.radians(o.theta))
             if math.hypot(hx, hy) <= REGION_RADIUS:
                 pts.append((hx, hy))
-    # 与已有检测点太近的假设点无法估计距离（r → 0），剔除；并去重
+    # 离已有检测点太近的假设点估不了距离，r → 0，剔除；顺手去重
     keep: list[tuple[float, float]] = []
     for h in pts:
         if any(dist(h, (o.x, o.y)) < HYP_GAP for o in obs_list):
@@ -100,7 +85,7 @@ def hypothesis_points(region: "ProbRegion",
 
 
 class Probe(NamedTuple):
-    """一个补测候选点：坐标、对全部假设源位置的最坏预测 σ、从当前位置出发的里程。"""
+    """一个补测候选点：坐标、对全部假设源位置的最坏预测 σ、从当前位置出发的里程"""
 
     x: float
     y: float
@@ -110,23 +95,24 @@ class Probe(NamedTuple):
 
 def probe_candidates(obs_list: Sequence[Obs], hyps: Sequence[Sequence[float]],
                      pos: Sequence[float]) -> list[Probe]:
-    """按文献准则给补测点排序：最小化"对全部假设源位置的平均预测 σ"。
+    """按文献准则给补测点排序，目标是让"对全部假设源位置的平均预测 σ"最小
 
-    候选点 = 每个假设源位置周围若干半径（PROBE_RADII，均 < 1000 m，保证落在源的有效接收
-    半径内）× 若干方位角（PROBE_ANGLES）的环上点。评价用 Fisher 信息口径的预测 σ：
-    该准则同时实现了文献的两条结论 —— 检测点越接近源 σ 越小（Chen 的定理：均方位置误差
-    ∝ 1/(σ²r²)），且新射线与已有射线的交角越接近正交 σ 越小（角度分集）；单射线时
-    J 退化，准则自动把补测点放到能"定距"的位置上，即完成单射线→双射线的补测。
+    候选点是这么撒出来的：每个假设源位置周围取若干半径 PROBE_RADII，都小于 1000 m，保证
+    落在源的有效接收半径内，再乘若干方位角 PROBE_ANGLES，得到一圈圈环上的点。评价用
+    Fisher 信息口径的预测 σ，一条准则同时兑现了文献的两条结论：检测点越接近源，σ 越小，
+    这是 Chen 的定理，均方位置误差正比于 1/(σ²r²)；新射线与已有射线的交角越接近正交，
+    σ 也越小，也就是角度分集。单射线时 J 退化，这条准则会自动把补测点放到能"定距"的位置
+    上，单射线到双射线的补测顺带完成。
 
-    共线候选（与已有射线夹角 ≈ 0，σ = ∞，无法定距）直接剔除 —— 单射线频道的假设点排成一条
-    直线，若用"对全部假设取最坏 σ"排序会退化成"所有候选都不可用"，从而按里程误选到共线上的
-    点（实测踩过：测了 26 次仍没缩小区域）；取平均 σ 既保留"靠近源 + 拉开交角"的偏好，
-    又不会因个别极远假设把好点全部否掉。
+    与已有射线夹角 ≈ 0 的共线候选，σ = ∞，定不了距，直接剔除。单射线频道的假设点本来就排成
+    一条直线，若改用"对全部假设取最坏 σ"排序，会退化成"所有候选都不可用"，然后按里程误选到
+    共线上的点。这里实测踩过：测了 26 次仍然没把区域缩小。取平均 σ 既保住了"靠近源加拉开
+    交角"的偏好，又不会因为个别极远的假设把好点全部否掉。
 
-    排序规则（确定性）：先按平均 σ 升序；σ 与最优值相差 2% 以内的候选视为"同等好"，
-    其中取里程最短者（省时间），里程并列时取坐标字典序最小者。返回前 PROBE_TRY 个候选。
+    排序规则是确定的：先按平均 σ 升序；与最优值相差 2% 以内的候选算"同等好"，其中取里程
+    最短的，省时间；里程并列时取坐标字典序最小的。返回前 PROBE_TRY 个候选。
     """
-    base = [(o.x, o.y, o.theta) for o in obs_list]      # 已有观测的（检测点, 示向度）
+    base = [(o.x, o.y, o.theta) for o in obs_list]      # 已有观测：检测点加示向度
     cands: list[Probe] = []
     seen = set()
     for hx, hy in hyps:
@@ -143,9 +129,9 @@ def probe_candidates(obs_list: Sequence[Obs], hyps: Sequence[Sequence[float]],
                     continue
                 seen.add(key)
                 total, ok = 0.0, True
-                for h in hyps:                          # 对全部假设源位置求平均 σ（见下）
+                for h in hyps:                          # 对全部假设源位置求平均 σ
                     sig = fisher_sigma(h, base + [(qx, qy, bearing((qx, qy), h))])
-                    if sig == math.inf:                 # 与已有射线共线：不提供任何新信息
+                    if sig == math.inf:                 # 与已有射线共线，提供不了新信息
                         ok = False
                         break
                     total += sig
@@ -164,13 +150,13 @@ def probe_candidates(obs_list: Sequence[Obs], hyps: Sequence[Sequence[float]],
 
 def ambiguity_area(baseline: float, alpha1_deg: float, alpha2_deg: float,
                    err_deg: float = SIGMA_DEG) -> float:
-    """文献的定位模糊区面积口径（任叶童 2016 式 2-15，供对照/校核用）：/ m²
+    """文献的定位模糊区面积口径，任叶童 2016 式 2-15，留给对照与校核用，单位 m²
 
         S = 4·R²·Δθ²·sinα₁·sinα₂ / sin³(α₁+α₂)
 
-    其中 R 为两检测点基线，αᵢ 为基线两端观测站处的内角，Δθ 为测向误差半宽（弧度）。
-    该式在"基线 R 固定、目标位置自由"的口径下取最小值；与本文"检测点自由、最小化预测
-    协方差"的口径不同，代码中保留此函数以便论文同时给出两种准则的结论。
+    R 是两检测点基线，αᵢ 是基线两端观测站处的内角，Δθ 是测向误差半宽，按弧度算。该式在
+    "基线 R 固定、目标位置自由"的口径下取最小值，与本文"检测点自由、最小化预测协方差"的
+    口径不是一回事。函数留着，论文里好把两种准则的结论一起给出来。
     """
     a1, a2 = math.radians(alpha1_deg), math.radians(alpha2_deg)
     s = math.sin(a1) * math.sin(a2)

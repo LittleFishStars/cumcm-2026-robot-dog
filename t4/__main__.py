@@ -1,4 +1,4 @@
-"""python -m t4：问题 4 的扫描方案、演练或官方模式（等价于原来的 `python T4.py`）"""
+"""python -m t4：问题 4 的扫描方案、演练或官方模式"""
 
 from __future__ import annotations
 

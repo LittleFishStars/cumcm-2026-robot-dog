@@ -1,16 +1,4 @@
-"""问题二的成果落盘：CSV 适合度表、JSON 结论、控制台报表。
-
-三份产物各有明确用途，互不替代：
-
-* `t2_suitability.csv`：全域粗网格（缺省 25 m）的逐行记录（x, y, 到源集的最坏距离、可测性、
-  最坏定位直径 J、适合度 F）。图上的每个色块都能在这张表里找到对应行 —— "图数据一致"就靠它。
-* `t2_second_site.json`：结论与全部校验（最优第二检测点、极坐标、候选区域两瓣的范围与面积、
-  可行域面积、最坏情形细节、shapely 对照、离散化加密对照、弧带连续性）。报告中引用的每个
-  数字都来自这里，避免"正文数字与程序输出不一致"。
-* 控制台报表：跑一次就能看懂的 6 行小结 + 校验状态（出现异常值时直接给 ⚠ 而不是悄悄通过）。
-
-CSV 写的是"最坏定位直径"而不是适合度为主键，因为 J 是算法的原始量，F 只是它的归一化。
-"""
+"""问题二的成果落盘：CSV 适合度表、JSON 结论与控制台报表"""
 
 from __future__ import annotations
 
@@ -19,8 +7,6 @@ import json
 from pathlib import Path
 from typing import Any, Sequence
 
-import numpy as np
-
 from t2 import config as cfg
 from t2.score import SolveResult, suitability
 
@@ -28,7 +14,7 @@ __all__ = ["save_map_csv", "save_summary_json", "print_report", "write_outputs"]
 
 
 def save_map_csv(save_dir: Path, result: SolveResult, name: str = cfg.MAP_CSV) -> Path:
-    """把全域粗网格的适合度场写成 CSV（x, y, 到源集最坏距离, 可测, J, F）。"""
+    """把全域粗网格的适合度场写成 CSV，列为 x, y, 到源集最坏距离, 可测, J, F"""
     path = Path(save_dir) / name
     path.parent.mkdir(parents=True, exist_ok=True)
     x = result.fields["x"].ravel()
@@ -49,7 +35,7 @@ def save_map_csv(save_dir: Path, result: SolveResult, name: str = cfg.MAP_CSV) -
 
 def save_summary_json(save_dir: Path, result: SolveResult,
                       name: str = cfg.SUMMARY_JSON) -> Path:
-    """把结论与校验写成 JSON（报告与论文引用的数字统一从这里取）。"""
+    """把结论与校验写成 JSON。报告和论文引用的数字统一从这里取"""
     path = Path(save_dir) / name
     path.parent.mkdir(parents=True, exist_ok=True)
     scenario = {k: v for k, v in result.scenario.items() if k != "quad"}
@@ -86,7 +72,7 @@ def save_summary_json(save_dir: Path, result: SolveResult,
 
 
 def _theory_json(result: SolveResult) -> dict[str, Any]:
-    """文献判据层的可序列化子集（探针数组只用于出图，不进 JSON）。"""
+    """文献判据层里能序列化的那部分。探针数组只拿来出图，不进 JSON"""
     thy = dict(result.theory)
     thy.pop("probe", None)
     return thy
@@ -94,7 +80,7 @@ def _theory_json(result: SolveResult) -> dict[str, Any]:
 
 def print_report(result: SolveResult, figure: Path | None = None,
                  files: Sequence[Path] = ()) -> None:
-    """控制台报表：结论 + 关键数字 + 校验状态（异常直接标 ⚠）。"""
+    """控制台报表：结论、关键数字、校验状态。异常直接标 ⚠"""
     c = result.checks
     x, y = result.best
     sc = result.scenario
@@ -138,7 +124,7 @@ def print_report(result: SolveResult, figure: Path | None = None,
               f"本文闭式 {cr['closed_form_m']['minimax_radius_m']:.2f} m"
               f"（{cr['closed_form_rel_dev']['minimax_radius_m']*100:+.1f}%）、"
               f"GDOP {cr['closed_form_m']['gdop_m']:.2f} m"
-              f"（{cr['closed_form_rel_dev']['gdop_m']*100:+.1f}%）—— 文献式偏低，故只作快筛")
+              f"（{cr['closed_form_rel_dev']['gdop_m']*100:+.1f}%）。文献式偏低，只能当快筛")
         print("  准则对照（同一张表三个口径互评）：")
         for name, tag in (("minimax", "本文 minimax"), ("gdop", "文献 GDOP  "),
                           ("expected", "期望口径  ")):
@@ -148,7 +134,7 @@ def print_report(result: SolveResult, figure: Path | None = None,
                   f"（比最优差 {q['worst_diam_loss_pct']:+.2f}%）、期望直径 {q['mean_diam_m']:.2f} m、"
                   f"GDOP {q['gdop_m']:.1f} m")
     print("-" * 74)
-    ok = lambda b: "✓" if b else "⚠ 需检查"          # noqa: E731（局部小工具，语义清楚）
+    ok = lambda b: "✓" if b else "⚠ 需检查"          # noqa: E731（局部小工具，意思一眼就懂）
     print("校验：")
     print(f"  {ok(c['scenario_rel_dev'] < 1e-9)} 最坏情形：解析构造 {c['scenario_analytic_m']:.4f} m"
           f" vs shapely 精确 {c['scenario_exact_m']:.4f} m（相对偏差 {c['scenario_rel_dev']:.1e}，"
@@ -173,14 +159,14 @@ def print_report(result: SolveResult, figure: Path | None = None,
               f"最大相对偏差 {tv['closed_vs_eigen_max_rel_dev']:.1e}（{tv['n_used']} 个有效样本）")
         print(f"  {ok(tv['minimax_closed_median_rel_dev'] < 0.01)} 本文闭式 vs 精确最坏半径："
               f"中位 {tv['minimax_closed_median_rel_dev']:.2%}；文献 GDOP 类判据中位偏差 "
-              f"{tv['gdop_vs_exact_median_rel_dev']:+.1%}（低估，故不作保险判据）")
+              f"{tv['gdop_vs_exact_median_rel_dev']:+.1%}（低估了，所以不能作保险判据）")
     for p in list(files) + ([figure] if figure else []):
         print(f"  → {p}")
 
 
 def write_outputs(save_dir: Path, result: SolveResult, figure: Path | None = None,
                   csv_name: str = cfg.MAP_CSV, json_name: str = cfg.SUMMARY_JSON) -> dict[str, Path]:
-    """一次写全 CSV 与 JSON，返回路径表（出图由调用方决定，便于 --no-plot）。"""
+    """一次写全 CSV 与 JSON，返回路径表。出图与否由调用方决定，好配合 --no-plot"""
     save_dir = Path(save_dir)
     return {"csv": save_map_csv(save_dir, result, csv_name),
             "json": save_summary_json(save_dir, result, json_name)}

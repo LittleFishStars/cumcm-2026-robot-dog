@@ -1,44 +1,4 @@
-"""扫描布局：原点 + 7 覆盖基点 + 12 个均匀方位外圈点（问题四检测阶段）。
-
-定向源在检测点 p 处可被听到 ⟺
-
-    |p − g| ≤ R  且  (p − g) · u(θ) ≥ 0        （R 为接收半径 1000~1500，θ 为定向方向，含边界）
-
-即检测区是"接收圆 ∩ 前向半平面"= 半径 R 的**半圆盘**，圆心 g、半径 R、朝向 θ 全部未知。
-问题三的 7 点覆盖只保证"圆域内任意点到最近巡视点 ≤ 1000 m"（对全向源必听到）；对定向源，
-**背对着所有巡视点的源即使近在咫尺也听不到**（引擎返回 no_signal，见 engine.py 的
-_in_directional_coverage —— 这就是"搜索不到还有可能是方向不对"）。
-
-本模块的布局（最终定案：20 个测量位置）：
-
-  1. **原点**：起点全频道扫描（位置成本为零）；
-  2. **7 个覆盖基点** = 问题三巡视站（t3.config.SURVEY_CENTERS，直接复用，全向覆盖保证）；
-  3. **12 个均匀方位外圈点**，半径 OUTER_RING_RAD = 1850 m（MID_RING_N = 0，不加内部补点），
-     起始方位自 0° 旋转 OUTER_RING_ROT_DEG = 7.5°（2026-09-12 定案：与内圈基点方位错开，
-     方位互补；两组 seed A/B 复核 0°→7.5°：seed 2026-2030 时间持平、误差 8.61→7.15 m，
-     seed 2031-2035 时间 6858→6411 s（−447 s）、里程 −1880 m）。
-
-为什么外圈取 1850 m、12 个方位（这是对"7+21 中点外推"布局的结构优化）：
-
-  * **半径 1850 m**：任意源的迎光区在源前方 [|g|, |g|+R] 纵深；源最远半径 1770，所以**任意
-    贴边源**的迎光区内沿 = 1770 m，外圈设在其内侧 1850 m 时径向偏差 < 80 m。原"中点外推"
-    布局把多数点推到 2270 m，反而离内部源的迎光面太远（实测只剩 99.81%）；1850 m 单圈 +
-    12 个方位同时覆盖贴边源与内部半径源的迎光区，实测 **99.9891%**（4 224 640 个算例、漏
-    460，其中贴边对抗 4.3 万例 0 漏）；
-  * **12 个方位（间隔 30°）**：相邻外圈点最大距离 ≈ 1850·sin15° ≈ 479 m < 接收半径一半，
-    任何方向的源都能被方向差 ≤ 15° 的外圈点听到。**为什么不是更少的点**：试过 11 点
-    （间隔 32.7°、布局路线 16 725 m），但方位间隔变宽使顺路清除的方位扇区也变宽、绕路更多，
-    实战总里程反升 464 m——12 点是"减少路程"的实战最优；
-  * **里程**：20 个测量位置的最短开放路径 16 995.65 m（外圈起始角 7.5° 与内圈错开）—— 比
-    "7+21 中点外推"（29 点、21 580 m）省 21%，还少 9 个测量位置。
-  * **为什么不加内部补点（20 点定案）**：曾试过加 3 个内部补点（r = 850 m，23 个位置）把听率
-    提到 99.9974%，但 20 局演练实测多 ~34 次测向、慢 80 s；20 点版听率 99.9891%（422.5 万
-    算例、漏 460；贴边对抗 0 漏）对每局 16 个源的实战任务 20 局实测 256/256 全清，耗时与完成
-    率双优。
-
-仍是**非严格保证**（残余漏例约 0.01%），论文按实测统计报告（verify_hearing_stats），不声称
-严格不漏。
-"""
+"""问题四的扫描布局与听到率统计"""
 
 from __future__ import annotations
 
@@ -56,10 +16,11 @@ from t4.config import (MID_RING_N, MID_RING_RAD, MID_RING_ROT_DEG,
 
 
 def measure_layout() -> list[tuple[float, float]]:
-    """20 个测量位置：原点 + 7 覆盖基点 + 12 均匀方位外圈点（MID_RING_N=0 无内部补点）。
+    """20 个测量位置：原点 + 7 覆盖基点 + 12 均匀方位外圈点，MID_RING_N=0 无内部补点
 
-    定案布局（见模块文档）：听率 99.9891% + 贴边对抗 0 漏 + 20 局演练 6 445 s、24 392 m
-    （20 局 256/256 全清）；比曾用的 23 点版（+3 内部补点，该轮听率 99.9974%）少 ~34 次测向。
+    定案布局的账：听率 99.9891%，贴边对抗 0 漏，20 局演练 6 445 s、24 392 m，20 局 256/256
+    全清。比曾用的 23 点版少 ~34 次测向，23 点版就是加了 3 个内部补点的那一版，该轮听率
+    99.9974%。
     """
     base = np.asarray(SURVEY_CENTERS, dtype=float)
     ang = np.arange(OUTER_RING_N, dtype=float) * (2.0 * math.pi / OUTER_RING_N) \
@@ -77,11 +38,11 @@ def measure_layout() -> list[tuple[float, float]]:
 
 @dataclass(frozen=True)
 class SweepPlan:
-    """扫描方案：测量点集合 + 访问顺序（从原点出发的开放路径）。
+    """扫描方案：测量点集合 + 访问顺序，从原点出发的开放路径
 
-    `points` 的第 0 个恒为原点 (0, 0)；`route` 是 points 的下标列表，表示机器狗的访问顺序
-    （以 0 开头）。`route_m` 为按该顺序走完的里程。`verification` 保存听到率统计
-    （见 verify_hearing_stats），供报告与校验脚本引用。
+    points 的第 0 个恒为原点 (0, 0)。route 是 points 的下标列表，表示机器狗的访问顺序，以 0
+    开头。route_m 是按该顺序走完的里程。verification 存听到率统计，见 verify_hearing_stats，
+    供报告与校验脚本引用。
     """
 
     outer_n: int
@@ -95,15 +56,15 @@ class SweepPlan:
 
     @property
     def n_points(self) -> int:
-        """测量位置个数（含原点的起点扫描）"""
+        """测量位置个数，含原点那一次起点扫描"""
         return len(self.points)
 
     def route_points(self) -> list[tuple[float, float]]:
-        """按访问顺序列出测量位置坐标（从原点起，顺序与 route 一致）"""
+        """按访问顺序列出测量位置坐标，从原点起，顺序与 route 一致"""
         return [(float(self.points[i][0]), float(self.points[i][1])) for i in self.route]
 
     def to_json(self) -> dict[str, Any]:
-        """把扫描方案导出成 JSON 可序列化的字典（落盘 t4_sweep_plan.json 用）
+        """把扫描方案导出成 JSON 可序列化的字典，落盘 t4_sweep_plan.json 用
 
         Returns:
             dict[str, Any]: 布局参数、测量点数、访问里程、坐标、访问顺序与听到率统计
@@ -124,10 +85,10 @@ class SweepPlan:
 
 
 def build_sweep_plan() -> SweepPlan:
-    """构造默认扫描方案：20 个测量位置，从原点出发的最近邻 + 2-opt 精修开路径。
+    """构造默认扫描方案：20 个测量位置，从原点出发，最近邻 + 2-opt 精修开路径
 
-    顺序与里程不参与检测效果（效果只取决于**点集**），只影响行驶耗时，故这里取确定性下
-    里程较短的一种；`nearest_order`/`two_opt_*` 都是无随机算子（见 common.routing）。
+    顺序与里程都不参与检测效果，效果只取决于点集，它们只影响行驶耗时。所以这里取确定性下
+    里程较短的一种，nearest_order/two_opt_* 都是无随机算子，见 common.routing。
     """
     arr = np.asarray(measure_layout(), dtype=float)
     D = dist_matrix(arr, (0.0, 0.0))
@@ -144,11 +105,11 @@ def build_sweep_plan() -> SweepPlan:
 
 
 def plan_from_points(points: Sequence[Sequence[float]]) -> SweepPlan:
-    """按给定点集构造扫描方案（供布局对照实验复现同一路线口径）。
+    """按给定点集构造扫描方案，供布局对照实验复现同一路线口径
 
-    与 :func:`build_sweep_plan` 用完全相同的确定性排序（最近邻 + 2-opt 开路径），故
-    "某布局在 20 局演练里耗时多少"这一对照口径与定案布局一致。点集第 0 个应为原点。
-    报告用的 `outer_n` / `interior_n` 按半径粗分（> 1200 m 记外圈），只影响报告文字。
+    这里和 build_sweep_plan 用完全相同的确定性排序，最近邻 + 2-opt 开路径，所以"某布局在 20
+    局演练里耗时多少"这一对照口径与定案布局一致。点集第 0 个应为原点。报告用的 outer_n 与
+    interior_n 按半径粗分，> 1200 m 记外圈，只影响报告文字。
     """
     arr = np.asarray(points, dtype=float)
     assert arr.ndim == 2 and arr.shape[1] == 2, "点集形状应为 (K, 2)"
@@ -167,11 +128,11 @@ def plan_from_points(points: Sequence[Sequence[float]]) -> SweepPlan:
 
 
 def _hit_report(pts: np.ndarray, g: np.ndarray, theta_rad: float, R: float) -> tuple[bool, float]:
-    """单个算例：是否存在测量点在（距离 ≤ R 且 在光束内）；返回 (命中?, 命中深度 |m−g|/R)。
+    """单个算例：是否存在测量点在距离 ≤ R 且在光束内；返回 (命中?, 命中深度 |m−g|/R)
 
-    保留为**单例参考实现**：批量路径（`_hit_cases`）必须与它逐例等价，`python -m t4.sweep`
-    的随机对照就是这么核的。热点不在这里 —— 整套统计有 422 万个算例，逐个调用本函数时开销全在
-    numpy 调用本身（每个算例只算 20 个点），故统计走批量路径。
+    这个函数是单例参考实现，批量路径 _hit_cases 必须与它逐例等价，python -m t4.sweep 的随机
+    对照就是这么核的。热点不在这里：整套统计有 422 万个算例，逐个调用本函数时开销全在 numpy
+    调用本身，每个算例只算 20 个点，所以统计走批量路径。
     """
     d = pts - g
     r2 = np.einsum("ij,ij->i", d, d)
@@ -184,10 +145,10 @@ def _hit_report(pts: np.ndarray, g: np.ndarray, theta_rad: float, R: float) -> t
 
 def _hit_cases(pts: np.ndarray, gx: np.ndarray, gy: np.ndarray, theta: np.ndarray,
                R: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-    """**一批**算例的命中掩码与命中深度；逐例与 `_hit_report` 同一套算式（逐元素对应）。
+    """一批算例的命中掩码与命中深度；逐例与 `_hit_report` 同一套算式，逐元素对应
 
-    批量口径与逐例完全一致的三处细节：距离仍是"两分量平方和"（与 `einsum` 两次乘加同序）；
-    命中深度仍是"先取命中点里最小的 r²，再开一次方除以 R"（开方单调，故 √(min r²) = min √(r²)）；
+    批量口径与逐例完全一致，靠的是三处细节：距离仍是"两分量平方和"，与 einsum 的两次乘加同序；
+    命中深度仍是"先取命中点里最小的 r²，再开一次方除以 R"，开方单调，所以 √(min r²) = min √(r²)；
     判定用的容差项 1e-9 原样保留。
     """
     pts = np.asarray(pts, dtype=float)
@@ -204,13 +165,13 @@ def _hit_cases(pts: np.ndarray, gx: np.ndarray, gy: np.ndarray, theta: np.ndarra
 
 def _scan_cases(pts: np.ndarray, gx: np.ndarray, gy: np.ndarray, theta: np.ndarray,
                 R: np.ndarray, chunk: int = 20_000) -> tuple[int, int, dict | None]:
-    """按**枚举顺序**分批扫描算例，返回 (算例数, 漏例数, 首个漏例描述)。
+    """按枚举顺序分批扫描算例，返回 (算例数, 漏例数, 首个漏例描述)
 
-    首个漏例取"顺序上最早的那个"，与原先逐例扫描的口径一致（报告里的 `worst_fail`）。
+    首个漏例取"顺序上最早的那个"，与原先逐例扫描的口径一致，也就是报告里的 worst_fail。
 
-    `chunk` 只影响一次批处理多大、不改变任何数值：批太大时中间数组超出 CPU 缓存，元素处理
-    反而变慢。本机实测 422 万算例的自检耗时：200 000 → 2.8 s、50 000 → 2.2 s、
-    **20 000 → 1.5 s**、5 000 → 1.6 s，故取 20 000。
+    chunk 只影响一次批处理多大，不改任何数值。批太大时中间数组超出 CPU 缓存，元素处理反而
+    变慢。本机实测 422 万算例的自检耗时：200 000 → 2.8 s、50 000 → 2.2 s、20 000 → 1.5 s、
+    5 000 → 1.6 s，所以取 20 000。
     """
     gx = np.asarray(gx, dtype=float)
     n_cases = n_fail = 0
@@ -235,13 +196,13 @@ def adversarial_cases(n_azi: int = 360, n_off: int = 40, radius: float = 1770.0,
                       Rs: Sequence[float] = (1000.0, 1250.0, 1500.0),
                       span_deg: float = 8.0, wrap: bool = True
                       ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-    """贴边对抗算例 `(gx, gy, θ/rad, R)`：源贴在源生成圆盘边缘、θ 取径向 ±span/2 内的偏角。
+    """贴边对抗算例 `(gx, gy, θ/rad, R)`：源贴在源生成圆盘边缘、θ 取径向 ±span/2 内的偏角
 
-    枚举顺序是 R → 方位 → 偏角，与原先的双层循环完全一致（`wrap=True` 时 θ 取模 2π，与
-    `verify_hearing_stats` 的贴边对抗口径相同；布局搜索里的快速子集版不取模，故用 `wrap=False`）。
+    枚举顺序是 R → 方位 → 偏角，与原先的双层循环完全一致。wrap=True 时 θ 取模 2π，与
+    verify_hearing_stats 的贴边对抗口径相同；布局搜索里的快速子集版不取模，那边用 wrap=False。
 
-    结果按参数缓存（返回的是**共享的只读数组**，调用方不要就地修改）：算例集合只与参数有关、
-    与测量点布局无关，而布局搜索会拿同一批算例评估成千上万个候选布局。
+    结果按参数缓存。返回的是共享的只读数组，调用方不要就地修改：算例集合只与参数有关、与测量
+    点布局无关，而布局搜索会拿同一批算例评估成千上万个候选布局。
     """
     gx: list[float] = []
     gy: list[float] = []
@@ -266,19 +227,20 @@ def adversarial_cases(n_azi: int = 360, n_off: int = 40, radius: float = 1770.0,
 def verify_hearing_stats(points: Sequence[Sequence[float]],
                          mc_n: int = 4_000_000,
                          seed: int = 2026) -> dict[str, Any]:
-    """对测量点集合做"半圆盘命中"统计校验，返回听到率与最坏漏例。
+    """对测量点集合做"半圆盘命中"统计校验，返回听到率与最坏漏例
 
-    校验 1（贴边对抗，最严）：g 贴在源生成圆盘边缘（1770 m）、θ 取径向 ±8° 内 40 个偏角 ×
-     360 方位、R ∈ {1000,1250,1500}——精确打击"外翻光束"刀口（1755/1765 亦含在 0~1800 枚举）。
-    校验 2（精细对抗枚举）：g 取半径 {0,300,…,1770} × 48 方位，θ 取 180 个等分角，R 取 3 档。
-    校验 3（蒙特卡洛）：g 在圆域内面积均匀、θ 均匀、R ∈ [1000,1500] 均匀，共 mc_n 例。
+    校验 1 贴边对抗，也是最严的一档：g 贴在源生成圆盘边缘 1770 m，θ 取径向 ±8° 内 40 个偏角
+    乘 360 方位，R ∈ {1000,1250,1500}。这一档精确打击"外翻光束"的刀口，1755/1765 也在 0~1800
+    的枚举里。
+    校验 2 精细对抗枚举：g 取半径 {0,300,…,1770} × 48 方位，θ 取 180 个等分角，R 取 3 档。
+    校验 3 蒙特卡洛：g 在圆域内面积均匀、θ 均匀、R ∈ [1000,1500] 均匀，共 mc_n 例。
 
-    返回：{n_cases, n_fail, hear_rate, worst_fail(首例漏例), mc_miss, edge_miss}。
-    注意这是**统计**口径（本布局仍非严格 0 漏），调用方不得把它当"严格不漏"使用。
+    返回 {n_cases, n_fail, hear_rate, worst_fail(首例漏例), mc_miss, edge_miss}。
+    注意这是统计口径，本布局仍不是严格 0 漏，调用方不得把它当"严格不漏"用。
 
-    422 万个算例按批（5 万例一批）过 `_hit_cases`：逐例调用时每个算例只算 20 个测量点、时间
-    几乎全花在 numpy 调用开销上，批量后同一份算式快一个数量级；枚举顺序与随机数抽取顺序都
-    保持不变，故统计口径（含"首个漏例"）与逐例完全一致。
+    422 万个算例按批过 _hit_cases，一批 5 万例。逐例调用时每个算例只算 20 个测量点，时间几乎
+    全花在 numpy 调用开销上，批量后同一份算式快一个数量级。枚举顺序与随机数抽取顺序都没变，
+    所以统计口径连"首个漏例"在内都与逐例完全一致。
     """
     P = np.asarray(points, dtype=float)
     n_cases = 0
@@ -346,12 +308,12 @@ def verify_hearing_stats(points: Sequence[Sequence[float]],
         "edge_miss": edge_miss,
         "worst_fail": worst_fail,
         "guaranteed": False,
-        "note": "原点 + 7 覆盖基点 + 12 均匀外圈点（20 点定案）：实测听到率统计（非严格不漏）",
+        "note": "原点 + 7 覆盖基点 + 12 均匀外圈点（20 点定案）：实测听到率统计，不是严格不漏",
     }
 
 
 def print_sweep_report(plan: SweepPlan, verify: dict[str, Any] | None) -> None:
-    """打印扫描方案与听到率统计报告（命令行 --plan-only / 每局开头使用）。"""
+    """打印扫描方案与听到率统计报告，命令行 --plan-only 与每局开头都用它"""
     print(f"扫描方案：7 覆盖基点"
           + (f" + {plan.interior_n} 内部补点" if plan.interior_n > 0 else "")
           + f" + {plan.outer_n} 均匀外圈点"
@@ -366,7 +328,7 @@ def print_sweep_report(plan: SweepPlan, verify: dict[str, Any] | None) -> None:
         print(f"  听到率统计：{verify['n_cases']} 个算例中漏 {verify['n_fail']} 个"
               f"（{verify['hear_rate'] * 100:.4f}% 听到）；贴边对抗漏 "
               f"{verify['edge_miss']}、蒙特卡洛漏 {verify['mc_miss']}/{verify['mc_n']}；"
-              f"首例漏 {verify['worst_fail']} —— 非严格保证，按实测报告")
+              f"首例漏 {verify['worst_fail']}，非严格保证，按实测报告")
 
 
 if __name__ == '__main__':

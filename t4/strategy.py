@@ -1,22 +1,21 @@
 """机器狗策略，问题四：先扫描，再按定向感知定位清除
 
-其余手法都跟问题三同源复用：就近试清、K 圆覆盖、Fisher 准则补测、沿示向度逼近，细节见
-t3.strategy 的模块文档。下面只写不一样的地方。
+其余手法都跟问题三同源复用，就近试清、K 圆覆盖、Fisher 准则补测、沿示向度逼近的细节见 t3.strategy
+的模块文档，下面只写不一样的地方。
 
-阶段一复用问题三的 7 个覆盖基点，外圈再扩一圈。按 t4.sweep 给的方案依次走 20 个测量点：
-原点、7 个覆盖基点、12 个均匀方位的 1850 m 外圈点。每个点都对"还没听到过"的频道测向；
-已经听到但估计还不够准、且当前点就在其估计附近的频道，顺路补一两个视角。布局效果按实测
-报：听到率 99.9891%，4 224 640 个算例漏 460，20 局演练 256/256 全清。绝大多数干扰源，
-不管全向还是定向，扫描没结束就被听到了。这是"确保所有干扰源被清除"的检测侧依据，清除侧
-在后面。
+阶段一复用问题三的 7 个覆盖基点，外圈再扩一圈，按 t4.sweep 给的方案依次走 20 个测量点，也就是原点、
+7 个覆盖基点、12 个均匀方位的 1850 m 外圈点。每个点都对"还没听到过"的频道测向，已经听到但估计还
+不够准、且当前点就在其估计附近的频道顺路补一两个视角。布局效果按实测报：听到率 99.9891%，
+4 224 640 个算例漏 460，20 局演练 256/256 全清，绝大多数干扰源不管全向还是定向，扫描没结束就被
+听到了，这就是"确保所有干扰源被清除"的检测侧依据。
 
-no_signal 不再是"源在接收半径之外"这种硬约束，原因还是方向可能不对，见 DirProbRegion 与
-config。定位区域只用 direction 和 near 两类约束。"跳过必无信号的测量"这一条留着，区域整体
-落在 1500 m 外才算可证，但适用范围比问题三小得多。
+no_signal 不再是"源在接收半径之外"这种硬约束，因为方向可能不对，见 DirProbRegion 与 config，定位
+区域只用 direction 和 near 两类约束；"跳过必无信号的测量"这一条留着，区域整体落在 1500 m 外才算
+可证，但适用范围比问题三小得多。
 
-homing 兜底针对"起始点可能恰好落在波束背面"补了反方向修正。起点实测没信号就朝该频道的
-测量点质心步进，质心必在迎光侧，等重新采到示向度再正常逼近。半圆盘是凸集，从迎光侧朝源
-逼近一路都留在波束内，最后总能贴到 20 m 内清掉。
+homing 兜底针对"起始点可能恰好落在波束背面"补了反方向修正：起点实测没信号就朝该频道的测量点质心
+步进，质心必在迎光侧，等重新采到示向度再正常逼近，半圆盘是凸集，从迎光侧朝源逼近一路都留在波束内，
+最后总能贴到 20 m 内清掉。
 
 阶段二对"扫描结束时已听到的频道"一个不落，逐频道四级清除。
 """
@@ -54,14 +53,13 @@ clamp_to_region = partial(_clamp_to_region, radius=REGION_RADIUS - REGION_MARGIN
 class RobotDog(ActionRecorder):
     """两阶段机器狗，这是问题四的实现
 
-    阶段一扫描。先在出发点把全频道扫一遍，那是原点测量位置，然后按扫描方案依次走到其余
-    测量点，每点对"还没听到过"的频道测向，近距的就地清掉，保证任何源至少被听到 1 次。
-    估计附近的频道顺路补第二、第三视角。站间移动时按问题三的机制做途中顺路清除，也就是
-    _inline_clear：方位扇区里那些未清频道的估计点顺路试清。扫描结束大约能清掉 60% 的源。
+    阶段一扫描：先在出发点把全频道扫一遍，那是原点测量位置，然后按扫描方案依次走到其余测量点，每点对
+    "还没听到过"的频道测向，近距的就地清掉，保证任何源至少被听到 1 次，估计附近的频道顺路补第二、
+    第三视角；站间移动时按问题三的机制做 _inline_clear，方位扇区里那些未清频道的估计点顺路试清，扫描
+    结束大约能清掉 60% 的源。
 
-    阶段二定位与清除。扫描结束时已听到的频道逐个走四级清除，每次清除动作之后还要顺路补测
-    所有"直径偏大、超过 200 m，而且观测没满"的未清频道，靠多视角把定位区域压小，见
-    _side_scan。
+    阶段二定位与清除：扫描结束时已听到的频道逐个走四级清除，每次清除动作之后还要顺路补测所有"直径偏大、
+    超过 200 m，而且观测没满"的未清频道，靠多视角把定位区域压小，见 _side_scan。
 
       1. 就近试清：走到定位区域最小覆盖圆圆心直接 /clear 一次，没命中就就地复测；
       2. 多清几次：区域用 K 个半径 20 m 的圆盖满，逐个圆心依次补清；
@@ -111,11 +109,9 @@ class RobotDog(ActionRecorder):
         self.sweep_opp_radius = float(sweep_opp_radius)   # 顺路补测半径 / 米
         self.inline_r_min = float(inline_r_min)           # 前向顺路半径下界 / 米，内外组缺省源自它
         self.inline_r_max = float(inline_r_max)           # 前向顺路半径上界 / 米
-        # 内圈、外圈的前向半径，None 时内圈跟随全局 inline_r_min/inline_r_max。内外分组是
-        # 2026-09-12 分的。外圈不设半径上界，取 +inf：源生成域半径 1770 m，估计点半径 r_est
-        # 恒 ≤ 1770，上界要设到 1770 以下才起作用，而实测只会更差，1533 对应 6727 s、1689
-        # 对应 6430 s，1767 以上都是 6363 s 的平台。这种上界对 r_est 谈不上约束，所以不留
-        # 可调参数。
+        # 内外圈的前向半径，None 时内圈跟随全局 inline_r_min/inline_r_max。外圈不设半径上界：
+        # 源生成域半径 1770 m 而 r_est 恒 ≤ 1770，上界要设到 1770 以下才有用，实测只会更差，
+        # 1533 对应 6727 s、1689 对应 6430 s，1767 以上全是 6363 s 的平台。
         self.inline_r_min_in = float(inline_r_min if inline_r_min_in is None else inline_r_min_in)
         self.inline_r_max_in = float(inline_r_max if inline_r_max_in is None else inline_r_max_in)
         self.inline_r_min_out = float(inline_r_min if inline_r_min_out is None else inline_r_min_out)
@@ -154,16 +150,7 @@ class RobotDog(ActionRecorder):
     def measure(self, x: float, y: float, channel: int) -> dict:
         """在坐标 (x, y) 处测频道 channel，结果一并进定位区域和观测记录
 
-        Args:
-            x: 测量点 x 坐标 / 米
-            y: 测量点 y 坐标 / 米
-            channel: 频道号
-
-        Returns:
-            dict: 模拟器原始响应（含 measure_result / svd_deg / virtual_time_s）
-
-        Raises:
-            RuntimeError: 模拟器拒绝本次 /measure
+        返回模拟器原始响应，含 measure_result / svd_deg / virtual_time_s，被拒绝了就抛 RuntimeError。
         """
         x, y = float(x), float(y)
         r = self.sim.measure(x, y, channel)
@@ -203,8 +190,7 @@ class RobotDog(ActionRecorder):
     def _end_scan_step(self, counts: dict[str, int]) -> None:
         """收尾当前扫描步骤：补齐统计、路径、区域与估计点，然后追加进 scan_steps
 
-        Args:
-            counts: 本站各测量结果的计数，键是 direction / near / no_signal / skip
+        counts 是本站各测量结果的计数，键为 direction / near / no_signal / skip。
         """
         step = self._cur_step
         self._cur_step = None
@@ -225,12 +211,6 @@ class RobotDog(ActionRecorder):
 
     def region(self, channel: int) -> DirProbRegion:
         """取频道 channel 的定位区域，头一次访问时按已有测量惰性重建
-
-        Args:
-            channel: 频道号
-
-        Returns:
-            DirProbRegion: 该频道的可能源集合
         """
         if channel not in self.regions:
             reg = DirProbRegion(err=BEARING_ERROR_DEG, radius=REGION_RADIUS, sides=CLIP_SIDES)
@@ -250,13 +230,7 @@ class RobotDog(ActionRecorder):
             reg.add_inside(m.x, m.y, NEAR_RADIUS)      # 落在 5 m 内，位置几乎确定
 
     def diameter(self, channel: int) -> float:
-        """取频道 channel 定位区域的直径，单位米
-
-        Args:
-            channel: 频道号
-
-        Returns:
-            float: 可能源集合的直径，越小说明定位越准
+        """取频道 channel 定位区域的直径，单位米，越小说明定位越准
         """
         return float(self.region(channel).diameter)
 
@@ -270,13 +244,7 @@ class RobotDog(ActionRecorder):
 
     # ---- 阶段一：扫描 ----
     def _est(self, channel: int) -> tuple[float, float] | None:
-        """取频道 channel 的位置估计，就是区域最小覆盖圆的圆心
-
-        Args:
-            channel: 频道号
-
-        Returns:
-            tuple[float, float] | None: 估计点坐标，区域为空或退化时给 None
+        """取频道 channel 的位置估计，就是区域最小覆盖圆的圆心，区域为空或退化时给 None
         """
         mec = self.region(channel).enclosing_circle
         return (mec[0], mec[1]) if mec is not None else None
@@ -284,10 +252,9 @@ class RobotDog(ActionRecorder):
     def _sweep_channels(self, at: Sequence[float]) -> list[int]:
         """该测量位置要测哪些频道：没清除的，而且要么从未听到，要么值得顺路补一个视角
 
-        从未听到的频道必须测。扫描布局能起作用，靠的就是"每个测量位置都把没听到的频道测一遍"。
-        已经听到但视角还不够，少于 OBS_CAP，估计也还不够准，当前点又落在其估计点
-        sweep_opp_radius 以内的频道，顺路补一条不同角度的射线。对只能单侧听到的定向源来说，
-        多这一条射线尤其金贵。
+        从未听到的频道必须测，扫描布局能起作用靠的就是"每个测量位置都把没听到的频道测一遍"；已经听到但视角还
+        没满、少于 OBS_CAP，估计也还不够准，当前点又落在其估计点 sweep_opp_radius 以内的频道，顺路补一条不同
+        角度的射线，对只能单侧听到的定向源尤其金贵。
         """
         out: list[int] = []
         for c in CHANNELS:
@@ -346,10 +313,9 @@ class RobotDog(ActionRecorder):
                      f"累计听到 {heard} 个频道")
             if k == 0:
                 continue          # 起点段的顺路清除已按问题三的优化删掉，2026-09-12 同步
-            # 到站后的顺路清除，沿用问题三优化过的机制：
-            #   1) 近距清：距本站 INLINE_NEAR_R 以内的估计点全清，不分方位，走 _nearby_clear；
-            #   2) 前向清：去下一站的方位扇区里，估计点距原点落在 [INLINE_R_MIN, INLINE_R_MAX]
-            #      而且区域够小的频道，走 _inline_clear。
+            # 到站后顺路清除，沿用问题三的两档：_nearby_clear 清距本站 INLINE_NEAR_R 以内
+            # 不分方位的估计点，_inline_clear 清去下一站方位扇区里、估计点距原点落在
+            # [INLINE_R_MIN, INLINE_R_MAX] 且区域够小的频道。
             self._nearby_clear()
             if k + 1 < len(plan.route):
                 nxt = plan.route[k + 1]
@@ -359,8 +325,7 @@ class RobotDog(ActionRecorder):
     def diagnose(self) -> dict[str, int]:
         """阶段二开头先诊断：数一数已听到多少频道、其中几个估计已经够准，顺带初始化 tracks
 
-        Returns:
-            dict[str, int]: 已听到频道数、估计够准的个数与跳过测量的次数
+        返回已听到频道数、估计够准的个数与跳过测量的次数。
         """
         precise = 0
         for ch in sorted(self.obs):
@@ -383,9 +348,9 @@ class RobotDog(ActionRecorder):
 
     # ---- 阶段 2b：访问顺序 ----
     def _nearest_order(self, channels: Sequence[int]) -> list[int]:
-        """精确最短开放路径定序，用 Held-Karp；算法本身见 t3.strategy 同名函数的注释
+        """精确最短开放路径定序，用 Held-Karp，算法本身见 t3.strategy 同名函数的注释
 
-        输入为空就直接返回空。r0 顺路清除之后真会出现"扫描即全清、收尾没剩下什么"的局。
+        输入为空就直接返回空：r0 顺路清除之后真会出现"扫描即全清、收尾没剩下什么"的局。
         """
         if not channels:
             return []
@@ -395,13 +360,7 @@ class RobotDog(ActionRecorder):
 
     # ---- 阶段 2c：补测 ----
     def refine(self, channel: int) -> int:
-        """按文献准则补测缩小频道 channel 的定位区域，直到够准或没有候选
-
-        Args:
-            channel: 频道号
-
-        Returns:
-            int: 本次实际补测的次数
+        """按文献准则补测缩小频道 channel 的定位区域，直到够准或没有候选，返回实际补测次数
         """
         n_probe = 0
         for _ in range(REFINE_MAX):
@@ -444,9 +403,9 @@ class RobotDog(ActionRecorder):
     def _homing(self, channel: int) -> bool:
         """兜底：沿最新实测示向度按 HOMING_STEP 的步长逼近，直到清掉，过程是确定性的
 
-        问题四补的修正：起点有可能恰好落在波束背面，实测就是 no_signal，这时先朝该频道的
-        测量点质心步进。质心必在迎光侧，方向观测全来自迎光侧。采到示向度之后再照常逼近。
-        半圆盘是凸集，从迎光侧沿向源方向步进始终留在波束内，最后一定贴得上。
+        问题四补的修正是起点有可能恰好落在波束背面，实测就是 no_signal，这时先朝该频道的测量点质心步进（质心
+        必在迎光侧，方向观测全来自迎光侧），采到示向度后再照常逼近；半圆盘是凸集，从迎光侧沿向源方向步进始终
+        留在波束内，最后一定贴得上。
         """
         obs = self.obs.get(channel, ())
         centroid = (np.mean([o.x for o in obs]), np.mean([o.y for o in obs])) if obs else None
@@ -492,10 +451,9 @@ class RobotDog(ActionRecorder):
     def _side_scan(self, exclude: int) -> None:
         """清除动作发生时顺路补测：把所有"直径比较大"、也就是定位区域还没收敛的未清频道测一次
 
-        定向源只有迎光侧测得出方向，多视角交会就格外值钱。每次计划性清除尝试之前，把当前
-        仍然"不确定"的频道各补测一条，判据是最小覆盖圆直径超过 SIDE_SCAN_DIAM，且示向度条数
-        还没满，少于 OBS_CAP。等于拿这个正好路过的位置换一个新视角，把它们的可能区域缩小，
-        后面清除就能省点事，少走文献补测和兜底逼近。
+        定向源只有迎光侧测得出方向，多视角交会就格外值钱：每次计划性清除尝试之前，把最小覆盖圆直径超过
+        SIDE_SCAN_DIAM 且示向度条数还没满、少于 OBS_CAP 的频道各补测一条，等于拿这个正好路过的位置换一个新视
+        角，后面清除就能少走文献补测和兜底逼近。
         """
         if self._out_of_time():
             return
@@ -528,20 +486,16 @@ class RobotDog(ActionRecorder):
                         est: Sequence[float]) -> tuple[float, float, float] | None:
         """估计点 est 落没落在「本站→圆心」和「下一站→圆心」两条连线夹出的扇区里
 
-        判据以区域圆心为参照看极角扇区，半径则按本站属于内圈还是外圈分别卡。
+        判据以区域圆心为参照看极角扇区：方位上要求 est 与圆心的连线方向 th_est 落在 th_at 和 th_next 夹出的
+        较短弧上，也就是 ang_diff(th_est, th_at) + ang_diff(th_est, th_next) == ang_diff(th_at, th_next)，这
+        是三角不等式取等，而 ang_diff 值域 [0,180] 让较短弧成为唯一候选；半径上本站算内圈，距原点不超过
+        inline_outer_r，就用 [INLINE_R_MIN_IN, INLINE_R_MAX_IN]，算外圈就用 [INLINE_R_MIN_OUT, ∞)，外圈不设
+        上界是因为源生成域 1770 m 而 r_est 恒不超过 1770，上界设到 1770 以下才起作用且必然更差，原来的"排除
+        近圆心点"语义则由下界接着。
 
-        方位上，est 与圆心的连线方向 th_est 要落在 th_at 和 th_next 夹出的较短弧上，也就是
-        ang_diff(th_est, th_at) + ang_diff(th_est, th_next) == ang_diff(th_at, th_next)。
-        这是三角不等式取等。ang_diff 的值域是 [0,180]，较短弧是唯一候选。
-
-        半径上，本站算内圈，也就是距原点不超过 inline_outer_r，就用 [INLINE_R_MIN_IN,
-        INLINE_R_MAX_IN]；算外圈就用 [INLINE_R_MIN_OUT, ∞)。外圈不设上界：源生成域 1770 m，
-        r_est 恒不超过 1770，上界只有设到 1770 以下才起作用，而那样必然更差，留它没意义。
-        下界接的是原来"排除近圆心点"那套语义，并进判据里了。
-
-        反侧点，也就是 th_est 与 th_at 差 180° 的点，由三角不等式自己排除。这里必须比角度，
-        不能拿 sin 比：|sin 180°| 等于 0，会把反侧点误判成同向。返回值是三元组，短弧上的
-        进度 0~1、距圆心的半径、与 th_at 的角度差。
+        反侧点由三角不等式自己排除，也就是 th_est 与 th_at 差 180° 的那种；这里必须比角度而不能拿 sin
+        比，因为 |sin 180°| 等于 0 会把反侧点误判成同向。返回值是短弧上的进度 0~1、距圆心的半径、与
+        th_at 的角度差这三项。
         """
         if math.hypot(at[0], at[1]) > self.inline_outer_r:   # 本站为外圈点
             r_min, r_max = self.inline_r_min_out, self.inline_r_max_out
@@ -568,12 +522,11 @@ class RobotDog(ActionRecorder):
     def _cover_clear(self, channel: int, why: str) -> int:
         """在覆盖该频道定位区域的那个半径 20 m 圆的圆心处清除，这是顺路清除的新清法
 
-        2026-09-12 用户指定，问题三同步改的。清点就取区域的覆盖圆圆心：拿半径 `CLEAR_RADIUS`
-        的圆去盖定位区域，一个圆盖不住，也就是最小覆盖圆半径超过 20 m，就按贪心补选几个半径
-        20 m 的圆，复用的是 _k_cover_points，它的第 1 个圆就是区域最小覆盖圆的圆心。然后逐个
-        在圆心处 /clear，命中就停。k_clear_max 个圆还盖不满区域时只清第 1 个圆心，大区域多清
-        几次命中率趋近于零，纯属白跑。圆心顺序按距当前位置由近及远排，最近邻，命中概率最高的
-        先试。返回的是清除成功数，只有 0 或 1：命中后频道就进 cleared，剩下的圆不再试。
+        2026-09-12 用户指定、问题三同步：清点取区域的覆盖圆圆心，拿半径 `CLEAR_RADIUS` 的圆去盖定位区域，一
+        个圆盖不住、最小覆盖圆半径超过 20 m 的话，就按贪心补选几个半径 20 m 的圆，走 _k_cover_points，它的第
+        1 个圆就是区域最小覆盖圆的圆心；然后逐个圆心 /clear，命中就停，k_clear_max 个圆还盖不满区域时只清第
+        1 个圆心，因为大区域多清几次命中率趋近于零，纯属白跑。圆心顺序按距当前位置由近及远排，最近邻，命中概
+        率最高的先试。清除成功数只可能是 0 或 1，命中后频道就进 cleared，剩下的圆不再试。
         """
         region = self.region(channel)
         mec = region.enclosing_circle
@@ -616,10 +569,9 @@ class RobotDog(ActionRecorder):
     def _nearby_clear(self, radius: float | None = None) -> int:
         """每站到站后的近距顺路清除：把距当前点 radius 以内的估计点全清掉
 
-        radius 不给就取 self.inline_near_r。同样 2026-09-12 用户指定，问题三同步：这里不分
-        方位，估计点距当前点只要不超过 180 m 就清，清法还是那一套，在覆盖圆圆心处清，多个圆
-        就清多次，走 _cover_clear。顺序按距离由近到远。只有区域够小的频道才参与，判据是最小
-        覆盖圆半径不超过 self.inline_max_mec_r。返回本段清掉几个。
+        2026-09-12 用户指定、问题三同步：这里不分方位，估计点距当前点只要不超过 180 m 就清，清法仍是
+        _cover_clear 那一套，在覆盖圆圆心处清、多个圆就清多次，顺序按距离由近到远，只有最小覆盖圆半径不超过
+        self.inline_max_mec_r 的小区域频道才参与。返回本段清掉几个。
         """
         radius = self.inline_near_r if radius is None else float(radius)
         if not self.clear_enabled or self._out_of_time():
@@ -650,19 +602,16 @@ class RobotDog(ActionRecorder):
     def _inline_clear(self, at: Sequence[float], next_wp: Sequence[float]) -> int:
         """途中的前向顺路清除：去下一站方向上，扇区里的估计点顺手清掉
 
-        判据是 2026-09-12 用户改的，问题三同步。参照物是区域圆心，也就是原点，看的是一个方位
-        扇区，判断交给 _in_azimuth_arc：估计点与圆心的连线方向要落在「本站→圆心」和「下一站→
-        圆心」两条连线夹出的较短弧上，同时估计点距原点的半径落在 [INLINE_R_MIN, INLINE_R_MAX]
-        之间。这里没有"估计可信度"门槛，也没有起点段兜底，起点段的顺路清除已经删掉了，本站
-        恒为测量位置，at 不会是原点。原来那条独立的 600 m 排除规则也撤了，语义并进半径下界。
+        判据是 2026-09-12 用户改的、问题三同步：以区域圆心，也就是原点，为参照看方位扇区，判断交给
+        _in_azimuth_arc，要求估计点与圆心的连线方向落在「本站→圆心」和「下一站→圆心」夹出的较短弧上，且估计
+        点距原点的半径落在 [INLINE_R_MIN, INLINE_R_MAX] 之间；这里没有"估计可信度"门槛，也没有起点段兜底，起
+        点段顺路清除已删，本站恒为测量位置、at 不会是原点，原来那条独立的 600 m 排除规则也撤了，语义并进半径
+        下界。
 
-        只清区域小的频道：定位区域最小覆盖圆半径不超过 INLINE_MAX_MEC_R，也就是 75 m，才肯
-        顺路走一趟。大区域清中的概率太低，留给收尾阶段专程处理。
-
-        成本要算清楚：清点得走到估计点再走回来。但这些源收尾阶段反正也要清，顺路清掉省下的
-        是"从别处专程跑一趟"的里程。清点固定 5 s 命中、3 s 未命中，命中之后该频道在后续测量
-        点都不再测向。清法还是 _cover_clear：在覆盖定位区域的半径 20 m 圆的圆心处清，区域大
-        需要多个圆就逐个清，命中即停。
+        只清区域小的频道，也就是最小覆盖圆半径不超过 INLINE_MAX_MEC_R、即 75 m 的频道，因为大区域清中的概率
+        太低，留给收尾阶段专程处理。成本上清点要走到估计点再走回来，但这些源收尾阶段反正也要清，顺路清掉省下
+        的是"从别处专程跑一趟"的里程；清点固定 5 s 命中、3 s 未命中，命中之后该频道在后续测量点都不再测向，
+        清法仍是 _cover_clear。
         """
         if not self.clear_enabled or self._out_of_time():
             return 0
@@ -711,12 +660,7 @@ class RobotDog(ActionRecorder):
     def _try_clear(self, channel: int, tag: str) -> str | None:
         """走到区域最小覆盖圆圆心清一次，顺便在清除点补测其它大直径频道
 
-        Args:
-            channel: 频道号
-            tag: 命中时写进 tracks 的方法标记
-
-        Returns:
-            str | None: 命中就把 tag 原样返回，没命中返回 None
+        tag 是命中时写进 tracks 的方法标记，命中就把它原样返回，没命中返回 None。
         """
         mec = self.region(channel).enclosing_circle
         if mec is None:
@@ -760,15 +704,8 @@ class RobotDog(ActionRecorder):
                         radius: float = CLEAR_RADIUS) -> tuple[list[tuple[float, float]], float]:
         """贪心补选至多 k_extra 个半径 radius 的圆，盖住频道 channel 的定位区域
 
-        第 1 个圆固定是区域最小覆盖圆，那个由调用方自己用，本函数只返回补选出来的圆心。
-
-        Args:
-            channel: 频道号
-            k_extra: 最多补选几个圆
-            radius: 每个覆盖圆的半径 / 米
-
-        Returns:
-            tuple[list[tuple[float, float]], float]: 补选的圆心，以及没被盖住的目标点占比
+        第 1 个圆固定是区域最小覆盖圆，那个由调用方自己用，本函数只返回补选出来的圆心，以及没被盖住的目标点
+        占比。
         """
         region = self.region(channel)
         mec = region.enclosing_circle
@@ -806,11 +743,7 @@ class RobotDog(ActionRecorder):
     def _multi_try_clear(self, channel: int) -> str | None:
         """多清几次：区域能被 k_clear_max 个 20 m 圆盖满时，就在这些圆心依次补清，就近优先
 
-        Args:
-            channel: 频道号
-
-        Returns:
-            str | None: 命中返回 "multi"，盖不满区域或者全都没命中返回 None
+        命中返回 "multi"，盖不满区域或者全都没命中则返回 None。
         """
         if not self.clear_enabled or self._out_of_time():
             return None
@@ -838,9 +771,6 @@ class RobotDog(ActionRecorder):
 
     def process(self, channel: int) -> None:
         """对频道 channel 走四级清除：就近试清、多清几次、补测、兜底逼近，最后落进 tracks
-
-        Args:
-            channel: 频道号
         """
         rec = self.tracks.setdefault(channel, {})
         if channel in self.cleared:

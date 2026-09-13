@@ -37,10 +37,13 @@ request, so paper output has to be rebuilt from `results/t2/` (T2 figures) and `
 `pyproject.toml` requires Python >= 3.14 and points at the Tsinghua PyPI mirror. The stack is Python
 3.14 plus numpy, matplotlib and shapely.
 
-uv is mandatory: `uv sync`, then `uv run -m <package>` (long form `uv run python -m <package>`). Do
-not call a bare system `python`. The `.venv` interpreter shipped with the submission package,
-`.venv/bin/python`, is the only other supported entry; README documents both. Add `-X utf8` when
-Chinese output has to render.
+uv is mandatory: `uv sync` once to build `.venv` from `pyproject.toml` and `uv.lock`, then
+`uv run -m <package>` (long form `uv run python -m <package>`). Do not call a bare system `python`.
+`uv init` is only for a tree that has no `pyproject.toml` yet, so the shipped package never needs it.
+`.venv/` is not part of the submission package; the reviewer runs `uv sync` or installs the three
+dependencies by hand, and README walks through both. For a local run inside this workspace,
+`.venv/bin/python -m <package>` is equivalent and avoids uv's network and cache entirely, which is
+what the verification steps below use. Add `-X utf8` when Chinese output has to render.
 
 Console output has three levels, defined once in `common/console.py` and wired through each package's
 CLI. Default prints the conclusions per step, `--verbose` prints the full process report, `--quiet`

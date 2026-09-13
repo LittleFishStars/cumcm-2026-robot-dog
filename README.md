@@ -15,9 +15,11 @@ jammers-py/        本地复刻模拟器，纯标准库，--practice 靠它
 results/           最后一次正式运行的产物
 README.md          本文件
 pyproject.toml     Python 版本与依赖声明
-.venv/             本队在 Linux（Arch + Python 3.14.7）下建的虚拟环境
+uv.lock            依赖版本锁，装出来的就是本队验证过的那几个版本
 AI工具使用详情.pdf  按竞赛 AI 工具使用规定第 4 条附的详情表，独立文件，不进代码目录
 ```
+
+包里不带 `.venv/`，环境按下面一节自己建，首次联网两分钟搞定。
 
 `AI工具使用详情.pdf` 的源文件是 `resources/latex/ai-declaration.tex`，同一份文件独立编译出这张
 详情表，被论文 `\input` 时就只出参考文献前那一句声明。`resources/` 整体不进包，所以这里单放了
@@ -34,22 +36,21 @@ AI工具使用详情.pdf  按竞赛 AI 工具使用规定第 4 条附的详情�
 需要 Python ≥ 3.14，依赖 numpy ≥ 2.5、shapely ≥ 2.1（问题一、二的楔形交计算）和
 matplotlib ≥ 3.11（出图）。纯求解和自检不用 matplotlib，加 `--no-plot` 就只算数与落地文件。
 
-装依赖两条路，挑一条（在包根目录执行）：
+在包根目录装依赖，两条路挑一条：
 
 ```bash
-python -m pip install "numpy>=2.5" "shapely>=2.1" "matplotlib>=3.11"   # 用本机 Python
-uv sync                     # 用 uv：本队开发方式，自动建/更新 .venv，首次要联网
-uv run python -V            # 用 uv 的话应显示 3.14.x
+# 用 uv（本队的开发方式，推荐）
+uv init                     # 只有源码目录、手上没有 pyproject.toml 时才需要先建工程。
+                            # 本包自带 pyproject.toml，跑它会报 Project is already initialized，跳过
+uv sync                     # 按 pyproject.toml 与 uv.lock 建 .venv 并装依赖，首次要联网
+uv run python -V            # 应显示 3.14.x
+
+# 用本机 Python（评审机上没装 uv 时走这条）
+python -m pip install "numpy>=2.5" "shapely>=2.1" "matplotlib>=3.11"
 ```
 
-包里那份 `.venv/` 是 Linux 上建的。`.venv/bin/python` 其实只是指向系统 `python3.14` 的软链接，
-site-packages 里也全是 linux-x86_64 的扩展模块（numpy 2.5.3、shapely 2.1.2、matplotlib 3.11.2），
-所以同类 Linux 上直接 `.venv/bin/python -m t2` 就能跑。换别的平台就按上面自己装：Windows 上连
-`.venv\Scripts\` 都不存在，别照搬这一行。
-
-本队开发时统一走 uv：`uv run -m <包名>`。uv 会用本目录的 .venv，不必手动激活；评审机上没装 uv，
-把前缀换成 `python -m <包名>`（自己装好了依赖）或 `.venv/bin/python -m <包名>`（Linux 上直接用
-包内环境），三者等价。中文输出乱码就加 `-X utf8`。
+本队开发时统一走 uv：`uv run -m <包名>`。uv 会用本目录的 `.venv`，不必手动激活；pip 那条路把前缀
+换成 `python -m <包名>` 就行。中文输出乱码加 `-X utf8`。
 
 ## 命令
 

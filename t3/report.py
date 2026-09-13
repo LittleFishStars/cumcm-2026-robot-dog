@@ -68,7 +68,7 @@ def truth_check(truth: Sequence[dict] | None, plan: CoverPlan,
 
 
 # ----------------------------------------------------------------------------
-# 本地演练场：拉起 jammers-py 并用其控制台 REST 开一局
+# 落盘：覆盖圆方案、逐局汇总与观测明细
 
 def save_plan(res: CoverSolveResult, save_dir: Path) -> list[Path]:
     """覆盖圆方案落盘：一份 JSON 带校验与对照，一份 CSV 记圆心坐标"""

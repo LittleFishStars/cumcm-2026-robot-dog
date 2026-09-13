@@ -35,22 +35,19 @@ AI工具使用详情.pdf  按竞赛 AI 工具使用规定第 4 条附的详情�
 
 需要 Python ≥ 3.14，依赖 numpy ≥ 2.5、shapely ≥ 2.1（问题一、二的楔形交计算）和
 matplotlib ≥ 3.11（出图）。纯求解和自检不用 matplotlib，加 `--no-plot` 就只算数与落地文件。
+Python 不用自己备，uv 按 pyproject.toml 挑一个 3.14，本机没有就下装。
 
-在包根目录装依赖，两条路挑一条：
+在包根目录建环境，本队统一走 uv：
 
 ```bash
-# 用 uv（本队的开发方式，推荐）
-uv init                     # 只有源码目录、手上没有 pyproject.toml 时才需要先建工程。
-                            # 本包自带 pyproject.toml，跑它会报 Project is already initialized，跳过
-uv sync                     # 按 pyproject.toml 与 uv.lock 建 .venv 并装依赖，首次要联网
-uv run python -V            # 应显示 3.14.x
-
-# 用本机 Python（评审机上没装 uv 时走这条）
-python -m pip install "numpy>=2.5" "shapely>=2.1" "matplotlib>=3.11"
+uv init         # 只有源码目录、手上没有 pyproject.toml 时才需要先建工程。
+                # 本包自带 pyproject.toml，跑它会报 Project is already initialized，跳过
+uv sync         # 按 pyproject.toml 与 uv.lock 建 .venv 并装依赖，首次要联网
+uv run python -V    # 应显示 3.14.x
 ```
 
-本队开发时统一走 uv：`uv run -m <包名>`。uv 会用本目录的 `.venv`，不必手动激活；pip 那条路把前缀
-换成 `python -m <包名>` 就行。中文输出乱码加 `-X utf8`。
+之后每条命令都加 `uv run` 前缀，例如 `uv run -m t2`。uv 用本目录的 `.venv`，不必手动激活。
+中文输出乱码加 `-X utf8`。
 
 ## 命令
 

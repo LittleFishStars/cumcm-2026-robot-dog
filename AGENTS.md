@@ -38,11 +38,11 @@ request, so paper output has to be rebuilt from `results/t2/` (T2 figures) and `
 3.14 plus numpy, matplotlib and shapely.
 
 uv is mandatory: `uv sync` once to build `.venv` from `pyproject.toml` and `uv.lock`, then
-`uv run -m <package>` (long form `uv run python -m <package>`). Do not call a bare system `python`.
-`uv init` is only for a tree that has no `pyproject.toml` yet, so the shipped package never needs it.
-`.venv/` is not part of the submission package; the reviewer runs `uv sync` or installs the three
-dependencies by hand, and README walks through both. For a local run inside this workspace,
-`.venv/bin/python -m <package>` is equivalent and avoids uv's network and cache entirely, which is
+`uv run -m <package>` (long form `uv run python -m <package>`). Do not call a bare system `python`,
+and do not document a pip path: uv is the only supported entry, it brings its own Python when the
+machine has none, and `uv init` is only for a tree that has no `pyproject.toml` yet, so the shipped
+package never needs it. `.venv/` is not part of the submission package and the reviewer builds it with
+`uv sync`. Inside this workspace `.venv/bin/python -m <package>` skips uv's cache and network, which is
 what the verification steps below use. Add `-X utf8` when Chinese output has to render.
 
 Console output has three levels, defined once in `common/console.py` and wired through each package's

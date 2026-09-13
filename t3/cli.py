@@ -1,9 +1,9 @@
-"""运行编排与命令行入口（两种模式 + 参数解析）。
+"""运行编排与命令行入口，两种模式加参数解析
 
-* `run_practice` —— 本地演练模式：用 jammers-py 生成固定场景，能拿到真值，可核对覆盖保证；
-* `run_official` —— 正式模式：连官方模拟器，真值不可见，策略完全相同。
+* `run_practice` 是本地演练模式：用 jammers-py 生成固定场景，能拿到真值，可核对覆盖保证；
+* `run_official` 是正式模式：连官方模拟器，真值不可见，策略完全相同。
 
-命令行入口就是本模块（`python -m t3`），用法与拆分前一致。
+命令行入口就是本模块，也就是 `python -m t3`，用法与拆分前一致。
 """
 
 from __future__ import annotations
@@ -33,9 +33,9 @@ from t3.strategy import RobotDog
 
 
 def _api_log(args: argparse.Namespace, echo: bool) -> "AbstractContextManager[ApiLog | None]":
-    """接口日志上下文（把 CLI 参数拆成公共层 api_log 所需的参数）
+    """接口日志上下文，把 CLI 参数拆成公共层 api_log 需要的参数
 
-    路径优先取 --api-log；未指定时用 <save-dir>/api_calls.jsonl；显式传空串则关闭日志。
+    路径优先取 --api-log，没指定就用 <save-dir>/api_calls.jsonl，显式传空串则关闭日志。
 
     Args:
         args: 已解析的命令行参数
@@ -43,27 +43,27 @@ def _api_log(args: argparse.Namespace, echo: bool) -> "AbstractContextManager[Ap
 
     Returns:
         AbstractContextManager[ApiLog | None]: 上下文管理器；进入时得到日志对象，
-            日志被关闭（--api-log 传空串）时为 None
+            日志被关闭时为 None，--api-log 传空串就是关闭
     """
     return _api_log_raw(args.save_dir, args.api_log, echo)
 
 
 def _episode_printer(clear: bool) -> "Callable[[dict, dict, int | None], None]":
-    """按模式打印本局小结（只在需要时输出清除相关字段）；过程明细仅 `--verbose` 时输出
+    """按模式打印本局小结，只在需要时输出清除相关字段；过程明细仅 `--verbose` 时输出
 
     Args:
-        clear: 是否做了阶段二（定位与清除）；False 时只报巡视扫描相关字段
+        clear: 是否做了阶段二定位与清除；False 时只报巡视扫描相关字段
 
     Returns:
         Callable[[dict, dict, int | None], None]: 打印函数 show(stats, check, n_sources)
     """
     def show(stats: dict, check: dict, n_sources: int | None) -> None:
-        """打印一局的巡视小结与覆盖核对结果（详细档；缺省档只在外面打一行结论）
+        """打印一局的巡视小结与覆盖核对结果。详细档走这里，缺省档只在外面打一行结论
 
         Args:
-            stats: 本局统计（圆心数、里程、虚拟时间、测向次数、清除个数等）
-            check: 真值核对结果（定位误差、最坏最近距离等；官方模式无真值时为 None）
-            n_sources: 本局干扰源个数（官方模式无真值时为 None）
+            stats: 本局统计，含圆心数、里程、虚拟时间、测向次数、清除个数等
+            check: 真值核对结果，含定位误差、最坏最近距离等；官方模式无真值时为 None
+            n_sources: 本局干扰源个数，官方模式无真值时为 None
         """
         if not is_verbose():
             return
@@ -89,7 +89,7 @@ def _episode_printer(clear: bool) -> "Callable[[dict, dict, int | None], None]":
 
 
 def run_practice(args: argparse.Namespace, res: CoverSolveResult, save_dir: Path) -> int:
-    """本地演练：自动拉起 jammers-py，跑 N 局（巡视扫描 + 定位 + 清除）并汇总。"""
+    """本地演练：自动拉起 jammers-py 跑 N 局，巡视扫描加定位加清除，最后汇总"""
     jammers_dir = (Path(args.jammers_dir) if args.jammers_dir
                    else default_jammers_dir())
     clear = not args.survey_only
@@ -137,7 +137,7 @@ def run_practice(args: argparse.Namespace, res: CoverSolveResult, save_dir: Path
                 name = f"ep{ep + 1:02d}_seed{seed}"
                 tp = truth_points(truth)
                 # 每一局先清掉上一局的图：图形目录只保留最新一局，避免新旧图混在一起
-                # （文件名带局号，肉眼很难分辨哪张属于这一轮）。结果表（json/csv）不受影响。
+                # 文件名带局号，肉眼很难分辨哪张属于这一轮。结果表 json/csv 不受影响。
                 reset_dir(save_dir / args.traj_dir)
                 reset_dir(save_dir / STEP_DIR_NAME)
                 files = save_trajectory(
@@ -147,16 +147,16 @@ def run_practice(args: argparse.Namespace, res: CoverSolveResult, save_dir: Path
                     traj_dir=args.traj_dir)
                 scans = save_scan_figures(save_dir, name, dog.scan_steps, dog.plan,
                                           dog.survey_order_used, tp)
-                # 打印**绝对**路径：--save-dir 缺省是相对路径，在不同工作目录下运行会把图
-                # 写到别处，只报相对路径时"图在哪"很容易看岔（报 None 张更会让人以为没出图）。
+                # 打印绝对路径：--save-dir 缺省是相对路径，换个工作目录运行就把图写到别处，
+                # 只报相对路径时"图在哪"很容易看岔，报 None 张更会让人以为没出图。
                 if is_verbose():
                     print("  总轨迹图：" + "，".join(str(Path(f).resolve()) for f in files))
                     print(f"  逐步扫描结果图：{len(scans)} 张 → "
                           f"{(save_dir / STEP_DIR_NAME).resolve()}/"
                           + ("（已清掉上一局的图，只保留本局）" if ep else ""))
         if not args.no_plot and not is_verbose() and not is_quiet():
-            # 缺省档：图形目录只留最新一局，故报一行"图在哪"即可
-            print(f"图（只保留最新一局）：{(save_dir / args.traj_dir).resolve()}/、"
+            # 缺省档：图形目录只留最新一局，所以报一行"图在哪"就够了
+            print(f"图只保留最新一局：{(save_dir / args.traj_dir).resolve()}/、"
                   f"{(save_dir / STEP_DIR_NAME).resolve()}/")
     if is_verbose():
         print("\n" + "=" * 78)
@@ -205,14 +205,14 @@ def run_practice(args: argparse.Namespace, res: CoverSolveResult, save_dir: Path
 
 
 def run_official(args: argparse.Namespace, res: CoverSolveResult, save_dir: Path) -> int:
-    """官方评测接口模式：连 127.0.0.1 上已开放接口的模拟器，跑完整一局。
+    """官方评测接口模式：连 127.0.0.1 上已开放接口的模拟器，跑完整一局
 
-    与演练的两处差别：① **拿不到干扰源真值**，故定位误差等需要真值的指标留空（覆盖核对也
-    无从做）；② 结果与演练写同一目录（<RESULTS_DIR>），不按模式分家。
-    策略代码与参数完全一致，因此演练里验证过的行为在正式模式同样成立。
+    与演练有两处差别。一是拿不到干扰源真值，定位误差这些需要真值的指标只能留空，覆盖核对
+    也无从做起。二是结果与演练写同一目录 <RESULTS_DIR>，不按模式分家。策略代码和参数完全
+    一致，所以演练里验证过的行为在正式模式同样成立。
 
-    接口调用全程落盘到 <save-dir>/api_calls.jsonl（--api-log 改路径、传空串关闭）：官方模式
-    没有真值，这份逐次请求/响应的记录就是唯一的证据链，事后可据此复核每次测量与清除。
+    接口调用全程落盘到 <save-dir>/api_calls.jsonl，用 --api-log 改路径、传空串关闭。官方模式
+    没有真值，这份逐次请求与响应的记录就是唯一的证据链，事后可据此复核每次测量与清除。
     """
     sim = Simulator(robot_id=args.robot_id, base_url=args.base_url, timeout=args.timeout)
     if is_verbose():
@@ -231,7 +231,7 @@ def run_official(args: argparse.Namespace, res: CoverSolveResult, save_dir: Path
                   f"里程 {stats['travel_m']:.0f} m，虚拟时间 {stats['virtual_time_s']:.0f} s，"
                   f"测向 {stats['n_measure']} 次（补测 {stats['n_probe']} 次），"
                   f"听到 {stats['channels_heard']} 个频道（{stats['n_bearings']} 条示向度）")
-        # 官方模式的场景由平台生成，不受我们的 --seed 控制，故 seed 记为 None 以免误读
+        # 官方模式的场景由平台生成，不受我们的 --seed 控制，所以 seed 记为 None 以免误读
         row = episode_row(1, None, None, dog, stats,
                           truth_check(None, dog.plan, dog.obs, dog.cleared, dog.tracks))
         if not args.no_plot:
@@ -258,7 +258,7 @@ def run_official(args: argparse.Namespace, res: CoverSolveResult, save_dir: Path
                                {"mode": "official", "problem_no": 3,
                                 "base_url": args.base_url, "episodes": 1,
                                 "bearing_error_deg": BEARING_ERROR_DEG,
-                                "note": "官方模式接口不返回真值，故真值相关字段为 null"}))
+                                "note": "官方模式接口不返回真值，真值相关字段为 null"}))
         print("结果已保存：" + "，".join(str(p) for p in paths))
         if api_log is not None and not is_quiet():
             api_log.report()
@@ -266,101 +266,99 @@ def run_official(args: argparse.Namespace, res: CoverSolveResult, save_dir: Path
 
 
 def build_parser() -> argparse.ArgumentParser:
-    """构建命令行解析器
-
-    Returns:
-        argparse.ArgumentParser: 已配置演练 / 官方 / 仅规划三种模式全部选项的解析器
-    """
+    """构建命令行解析器，演练、官方、仅规划三种模式的全部选项都在这里配上"""
     p = argparse.ArgumentParser(
         description="2026 CUMCM B 题问题三（第一阶段）：1000 m 覆盖圆求解 + 依次到圆心巡视扫描")
     p.add_argument("--practice", type=int, nargs="?", const=1, default=0,
-                   help="本地演练局数：自动拉起 jammers-py 跑 N 局（缺省 1 局）")
+                   help="本地演练局数：自动拉起 jammers-py 跑 N 局，缺省 1 局")
     p.add_argument("--base-url", default=BASE_URL,
-                   help=f"官方模拟器地址（缺省 {BASE_URL}）；不带任何参数即连它跑完一局。"
+                   help=f"官方模拟器地址，缺省 {BASE_URL}。不带任何参数就连它跑完一局；"
                         f"只想求覆盖圆方案、不连模拟器时用 --plan-only")
     p.add_argument("--plan-only", action="store_true",
-                   help="只求解并保存 1000 m 覆盖圆方案（含校验与文献对照），不连模拟器")
+                   help="只求解并保存 1000 m 覆盖圆方案，含校验与文献对照，不连模拟器")
     p.add_argument("--api-log", default=None,
-                   help=f"接口调用日志路径（缺省 <save-dir>/{API_LOG_NAME}；传空串关闭）。"
+                   help=f"接口调用日志路径，缺省 <save-dir>/{API_LOG_NAME}，传空串关闭。"
                         f"官方模式下这是唯一的证据链，建议保留")
     p.add_argument("--robot-id", default=None,
-                   help="参赛队号（跑演练/官方模式时**必须显式给出**，代码里不存队号；"
-                        "官方模式须与模拟器登录的队号一致，演练模式会把它传给模拟器的 --team）")
+                   help="参赛队号，跑演练和官方模式时必须显式给出，代码里不存队号。"
+                        "官方模式须与模拟器登录的队号一致，演练模式会把它传给模拟器的 --team")
     p.add_argument("--timeout", type=float, default=5.0, help="HTTP 超时 / s")
     p.add_argument("--ring-radius", type=float, default=None,
-                   help=f"（仅六边形族）覆盖圆环半径 d / m（缺省 {CHOSEN_RING_RADIUS:.0f}；"
-                        f"传 {optimal_ring_radius():.3f} 取余量最大的 d*，里程增加约 2153 m）。"
-                        f"指定本项即自动改用六边形族")
+                   help=f"覆盖圆环半径 d / m，只对六边形族有效。缺省 {CHOSEN_RING_RADIUS:.0f}，"
+                        f"传 {optimal_ring_radius():.3f} 则取余量最大的 d*，里程增加约 2153 m。"
+                        f"指定本项就自动改用六边形族")
     p.add_argument("--hex-layout", action="store_true",
-                   help="改用经典「1 中心 + 6 正六边形环心」布局（缺省是一般 7 点布局，"
-                        "里程 ~6167 m 对六边形族最优的 6737.7 m）")
+                   help="改用经典「1 中心 + 6 正六边形环心」布局。缺省是一般 7 点布局，"
+                        "里程 ~6167 m，六边形族最优也只有 6737.7 m")
     p.add_argument("--layout", choices=("uniform", "optimized"), default="uniform",
-                   help="一般 7 点布局的两个变体（缺省 uniform，用户 2026-09-12 指定）："
-                        "uniform = 7 个圆心均匀分布在半径 1000 m 的圆上（正七边形，零余量，"
-                        "里程 ~6207 m）；optimized = 数值优化的最短路径布局（余量 ~5 m，"
-                        "里程 ~6167 m）。仅当未用六边形族时生效")
+                   help="一般 7 点布局的两个变体，缺省 uniform，用户 2026-09-12 指定。"
+                        "uniform 把 7 个圆心均匀铺在半径 1000 m 的圆上，正七边形，零余量，"
+                        "里程 ~6207 m；optimized 是数值优化的最短路径布局，余量 ~5 m，"
+                        "里程 ~6167 m。仅当未用六边形族时生效")
     p.add_argument("--jammers-dir", default=None,
-                   help="jammers-py 目录（缺省为本仓库根目录下的 resources/jammers-py/）")
+                   help="jammers-py 目录，缺省是本仓库根目录下的 resources/jammers-py/")
     p.add_argument("--console-port", type=int, default=8090,
-                   help="演练时 jammers-py 控制台端口（缺省 8090，被占用则自动顺延）")
+                   help="演练时 jammers-py 控制台端口，缺省 8090，被占用则自动顺延")
     p.add_argument("--robot-port", type=int, default=2026,
-                   help="演练时 jammers-py 的机器狗接口端口（缺省 2026，与官方一致）")
+                   help="演练时 jammers-py 的机器狗接口端口，缺省 2026，与官方一致")
     p.add_argument("--no-reuse", action="store_true",
-                   help="不使用已在运行的 jammers-py，另起一个独占实例（多个会话并行演练时用；"
-                        "配合 --console-port/--robot-port 避免端口冲突）")
+                   help="不使用已在运行的 jammers-py，另起一个独占实例。多个会话并行演练时"
+                        "用它，配合 --console-port/--robot-port 避免端口冲突")
     p.add_argument("--seed", type=int, default=SEED,
-                   help="演练第 1 局的种子（场景布局与示向度噪声都由它确定，可复现）")
+                   help="演练第 1 局的种子，场景布局与示向度噪声都由它确定，可复现")
     p.add_argument("--save-dir", default=None,
-                   help=f"结果输出目录（缺省 {RESULTS_DIR}/，不按演练/官方分家："
-                        f"一个目录 = 最新一次运行）")
-    p.add_argument("--log", default=None, help="过程日志文件（逐站扫描的文字过程，每局重写，只留最新一局）")
+                   help=f"结果输出目录，缺省 {RESULTS_DIR}/。不按演练和官方分家，"
+                        f"一个目录就是最新一次运行")
+    p.add_argument("--log", default=None,
+                   help="过程日志文件，记逐站扫描的文字过程；每局重写，只留最新一局")
     p.add_argument("--k-clear-max", type=int, default=K_CLEAR_MAX,
-                   help=f"试清未中后最多再补清几个点（用 K 个半径 20 m 的圆覆盖定位区域；"
-                        f"缺省 {K_CLEAR_MAX}，只在能盖满区域时才用，盖不满则转入补测）")
+                   help=f"试清未中后最多再补清几个点：用 K 个半径 20 m 的圆覆盖定位区域。"
+                        f"缺省 {K_CLEAR_MAX}，只在能盖满区域时才用，盖不满就转入补测")
     p.add_argument("--inline-r-min", type=float, default=INLINE_R_MIN,
-                   help=f"站点间前向顺路清除的估计点半径**下界** / m（缺省 {INLINE_R_MIN:.0f}）")
+                   help=f"站点间前向顺路清除的估计点半径下界 / m，缺省 {INLINE_R_MIN:.0f}")
     p.add_argument("--inline-r-max", type=float, default=INLINE_R_MAX,
-                   help=f"站点间前向顺路清除的估计点半径**上界** / m（缺省 {INLINE_R_MAX:.0f}）")
+                   help=f"站点间前向顺路清除的估计点半径上界 / m，缺省 {INLINE_R_MAX:.0f}")
     p.add_argument("--inline-near-r", type=float, default=INLINE_NEAR_R,
-                   help=f"每站到站后的近距顺路清除半径 / m（缺省 {INLINE_NEAR_R:.0f}）")
+                   help=f"每站到站后的近距顺路清除半径 / m，缺省 {INLINE_NEAR_R:.0f}")
     p.add_argument("--inline-max-mec-r", type=float, default=INLINE_MAX_MEC_R,
-                   help=f"参与顺路清除的区域最大最小覆盖圆半径 / m（缺省 {INLINE_MAX_MEC_R:.0f}；"
-                        f"区域更大的频道不参与顺路，留给阶段二）")
+                   help=f"参与顺路清除的区域最大最小覆盖圆半径 / m，缺省 {INLINE_MAX_MEC_R:.0f}。"
+                        f"区域更大的频道不参与顺路，留给阶段二")
     p.add_argument("--survey-only", action="store_true",
-                   help="只做阶段一（巡视扫描 + 覆盖核对），不做定位与清除")
+                   help="只做阶段一：巡视扫描加覆盖核对，不做定位与清除")
     p.add_argument("--traj-dir", default=TRAJ_DIR,
-                   help=f"轨迹图输出子目录（相对 --save-dir；缺省 {TRAJ_DIR}）")
+                   help=f"轨迹图输出子目录，相对 --save-dir，缺省 {TRAJ_DIR}")
     p.add_argument("--no-rotate", action="store_true",
-                   help="不做起始扫描后的布局旋转（保持设计基准朝向，用于对照实验）")
+                   help="不做起始扫描后的布局旋转，保持设计基准朝向，用于对照实验")
     p.add_argument("--no-plot", action="store_true",
-                   help=f"不出逐局轨迹图（缺省每局在 <save-dir>/{TRAJ_DIR}/ 生成同名 png + csv）")
+                   help=f"不出逐局轨迹图。缺省每局在 <save-dir>/{TRAJ_DIR}/ 生成同名 png + csv")
     p.add_argument("--quiet", action="store_true",
-                   help="只输出最终结论与产物路径（比缺省更安静，供批处理用）")
+                   help="只输出最终结论与产物路径，比缺省更安静，供批处理用")
     p.add_argument("--verbose", action="store_true",
-                   help="打印完整过程（覆盖校验明细、每局阶段统计、接口回显等；与 --quiet 同时给出时以它为准）")
+                   help="打印完整过程，含覆盖校验明细、每局阶段统计、接口回显等。"
+                        "与 --quiet 同时给出时以它为准")
     return p
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    """按模式分派：`--practice` → 本地演练；`--plan-only` → 只求覆盖圆；其余 → 官方模拟器。
+    """按模式分派：--practice 走本地演练，--plan-only 只求覆盖圆，其余走官方模拟器
 
-    即 `python -m t3` 不带任何参数时**直接连官方模拟器**（缺省 http://127.0.0.1:2026）跑完一局。
-    三种模式共用同一次覆盖圆求解与同一份策略代码，差别只在
-    "场景从哪来"与"结果写哪去"。输出缺省只报关键结论（每步 1~2 行），
-    `--verbose` 还原完整过程，`--quiet` 只留最终产物路径。
+    也就是说，`python -m t3` 不带任何参数时会直接连官方模拟器跑完一局，缺省地址就是
+    http://127.0.0.1:2026。三种模式共用同一次覆盖圆求解和同一份策略代码，差别只在"场景从
+    哪来"和"结果写哪去"。输出缺省只报关键结论，每步 1~2 行；`--verbose` 还原完整过程，
+    `--quiet` 只留最终产物路径。
     """
     relax_console_encoding()
     args = build_parser().parse_args(argv)
     set_level(LEVEL_VERBOSE if args.verbose else LEVEL_QUIET if args.quiet else LEVEL_NORMAL)
     official = not args.practice and not args.plan_only
-    # 队号一律运行时传入（代码里不留任何队号）；只有纯离线的 --plan-only 不需要
+    # 队号一律运行时传入，代码里不留任何队号；只有纯离线的 --plan-only 不需要
     if args.robot_id is None and (args.practice or official):
         print("错误：跑演练/官方模式必须用 --robot-id 传入参赛队号（如 --robot-id <12 位队号>）。",
               file=sys.stderr)
         return 2
     # 官方模式与演练写同一目录：一个结果目录 = 最新一次运行，不按模式分家。
-    # 代价是官方跑一局就会覆盖该目录里的演练批产物，故"先跑演练批 → 验证/出图"是一个
-    # 固定次序（演练批可由 --practice N --seed M 逐字节复现，重跑一次即可）。
+    # 代价是官方跑一局就会覆盖该目录里的演练批产物，所以"先跑演练批，再验证和出图"是一个
+    # 固定次序。演练批可由 --practice N --seed M 逐字节复现，重跑一次就行。
     if args.save_dir is None:
         args.save_dir = RESULTS_DIR
     save_dir = Path(args.save_dir)
@@ -384,7 +382,7 @@ def main(argv: Sequence[str] | None = None) -> int:
               f"最坏最近距离 {res.worst_distance:.3f} m（余量 {res.margin:.3f} m、"
               f"采样覆盖 {res.coverage_ratio * 100:.2f}%），巡视里程 {res.survey_length:.0f} m")
     paths = save_plan(res, save_dir)
-    # 覆盖圆方案是三种模式共同的产物，故这一行在缺省与 --quiet 下都保留（--quiet 只留产物路径）
+    # 覆盖圆方案是三种模式共同的产物，所以这一行在缺省与 --quiet 下都保留，--quiet 只留路径
     print("覆盖圆方案已保存：" + "，".join(str(p) for p in paths))
 
     try:
@@ -404,7 +402,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                   file=sys.stderr)
         return 1
     if is_verbose():
-        print("提示：不加参数即连官方模拟器；加 --practice N 跑本地演练（自动拉起 jammers-py）。")
+        print("提示：不加参数就连官方模拟器；加 --practice N 跑本地演练（自动拉起 jammers-py）。")
     return 0
 
 

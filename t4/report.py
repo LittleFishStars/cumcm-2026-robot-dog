@@ -1,9 +1,9 @@
-"""结果核对与落盘（问题四）：真值核对、整批汇总、拖网方案/逐局统计/观测明细的写出。
+"""结果核对与落盘（问题四）：真值核对、整批汇总、拖网方案/逐局统计/观测明细的写出
 
 演练模式下能拿到真值，于是逐源核对两件本该保证的事：
-* **检测保证**：每个源（含定向源）的频道在拖网结束前确实被听到过（拖网命中该源的半圆盘），
-  统计首次听到发生在拖网的第几步；
-* **清除结果**：清除点与真值的距离（定位误差）是否落在 20 m 清除半径内。
+* 检测保证：每个源（定向源也算）的频道在拖网结束前确实被听到过，也就是拖网命中过该源的半圆盘，
+  记下首次听到发生在拖网的第几步；
+* 清除结果：清除点与真值的距离（定位误差）是否落在 20 m 清除半径内。
 
 正式模式下真值不可见，这些字段自动省略，但落盘格式与逐局统计保持不变。
 """
@@ -27,10 +27,10 @@ from t4.sweep import SweepPlan
 def truth_check(truth: Sequence[dict] | None, plan: SweepPlan,
                 obs: dict[int, list[Obs]], cleared: set, tracks: dict,
                 first_heard: dict[int, int] | None = None) -> dict[str, Any]:
-    """逐源核对（仅演练模式有真值）：
+    """逐源核对，只有演练模式拿得到真值
 
-    * 检测：该源频道是否被听到（拖网保证每个源 ≥ 1 次示向度），记录首次听到的拖网步骤；
-      对定向源额外记录其定向方向，用于说明"方向不对"的场景也被拖网兜住（听到即证明命中）；
+    * 检测：该源频道是否被听到，拖网保证每个源 ≥ 1 次示向度，同时记下首次听到的拖网步骤；
+      定向源额外记下它的定向方向，用来交代"方向不对"的场景也被拖网兜住了，听到就证明命中；
     * 清除：清除点与真值的距离（定位误差）、判定是否在 20 m 清除半径内。
     """
     tracks = tracks or {}
@@ -78,18 +78,18 @@ def truth_check(truth: Sequence[dict] | None, plan: SweepPlan,
 
 def episode_row(ep: int, seed: int | None, truth: Sequence[dict] | None,
                 dog: "RobotDog", stats: dict, check: dict) -> dict:
-    """一局的汇总行（整批汇总表 + 落盘 JSON 都用它）
+    """一局的汇总行，整批汇总表与落盘 JSON 都用它
 
     Args:
-        ep: 局号（从 1 开始）
-        seed: 该局的种子（官方模式场景不由 --seed 控制，记 None 以免误读）
-        truth: 干扰源真值列表（官方模式无真值，为 None）
-        dog: 该局的机器人策略实例（本行字段取自 stats 与 check，此参数用于统一调用口径）
+        ep: 局号，从 1 开始
+        seed: 该局的种子；官方模式的场景不由 --seed 控制，记 None 以免误读
+        truth: 干扰源真值列表，官方模式没有，为 None
+        dog: 该局的机器人策略实例；本行字段取自 stats 与 check，这个参数只为统一调用口径留着
         stats: dog.run() 返回的本局统计
         check: truth_check() 给出的真值核对结果
 
     Returns:
-        dict: 一行的汇总字段（清除比例、里程、虚拟时间、测向次数、定位误差等）
+        dict: 汇总字段，清除比例、里程、虚拟时间、测向次数、定位误差等
     """
     return {
         "episode": int(ep),
@@ -123,7 +123,7 @@ def episode_row(ep: int, seed: int | None, truth: Sequence[dict] | None,
 
 
 def observation_rows(ep: int, plan: SweepPlan, meas: dict[int, list[Meas]]) -> list[dict]:
-    """逐条观测明细（channel, x, y, outcome, theta, stage, episode）。"""
+    """逐条观测明细：channel, x, y, outcome, theta, stage, episode"""
     rows = []
     for ch in sorted(meas):
         for m in meas[ch]:
@@ -136,7 +136,7 @@ def observation_rows(ep: int, plan: SweepPlan, meas: dict[int, list[Meas]]) -> l
 
 
 def save_plan(plan: SweepPlan, save_dir: Path, verify: dict | None = None) -> list[Path]:
-    """扫描方案落盘：JSON（含听到率统计）与 CSV（测量点坐标）。"""
+    """扫描方案落盘：JSON 带听到率统计，CSV 存测量点坐标"""
     save_dir.mkdir(parents=True, exist_ok=True)
     plan = SweepPlan(outer_n=plan.outer_n, outer_radius=plan.outer_radius,
                      points=plan.points, route=plan.route, route_m=plan.route_m,
@@ -158,7 +158,7 @@ def save_plan(plan: SweepPlan, save_dir: Path, verify: dict | None = None) -> li
 
 def save_survey(save_dir: Path, rows: Sequence[dict], observations: Sequence[dict],
                 plan_json: dict, meta: dict) -> list[Path]:
-    """逐局统计（JSON）与观测明细（CSV）落盘。"""
+    """逐局统计 JSON 与观测明细 CSV 落盘"""
     save_dir.mkdir(parents=True, exist_ok=True)
     out = {
         "meta": meta,

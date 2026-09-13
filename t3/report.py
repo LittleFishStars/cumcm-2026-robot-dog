@@ -1,8 +1,8 @@
-"""结果核对与落盘：真值核对、整批汇总、覆盖方案/巡视统计/观测明细的写出。
+"""结果核对与落盘：真值核对、整批汇总、覆盖方案/巡视统计/观测明细的写出
 
 演练模式下能拿到干扰源真值，于是可以逐源核对两件本该保证的事：
-* **覆盖保证**：源到最近覆盖圆圆心的距离 ≤ 1000 m，且它的频道确实被听到了；
-* **清除结果**：清除点与真值的距离（即定位误差）是否落在 20 m 清除半径内。
+* 覆盖保证：源到最近覆盖圆圆心的距离 ≤ 1000 m，且它的频道确实被听到了；
+* 清除结果：清除点与真值的距离，也就是定位误差，是否落在 20 m 清除半径内。
 
 正式模式下真值不可见，这些字段自动省略，但落盘格式与逐局统计保持不变。
 """
@@ -26,10 +26,10 @@ from t3.regions import Meas, Obs
 def truth_check(truth: Sequence[dict] | None, plan: CoverPlan,
                 obs: dict[int, list[Obs]], cleared: set,
                 tracks: dict[int, dict[str, Any]] | None = None) -> dict[str, Any]:
-    """逐源核对（仅演练模式拿得到真值）：
+    """逐源核对，只有演练模式拿得到真值
 
-    * 覆盖保证：源到最近覆盖圆圆心的距离是否 ≤ 1000 m、它的频道是否真的被听到；
-    * 清除结果：清除点与真值的距离（定位误差）、是否落在 20 m 清除半径内。
+    核两件事。一是覆盖保证：源到最近覆盖圆圆心的距离是否 ≤ 1000 m，它的频道是否真的被听到。
+    二是清除结果：清除点与真值的距离就是定位误差，看它是否落在 20 m 清除半径内。
     """
     tracks = tracks or {}
     rows: list[dict[str, Any]] = []
@@ -71,7 +71,7 @@ def truth_check(truth: Sequence[dict] | None, plan: CoverPlan,
 # 本地演练场：拉起 jammers-py 并用其控制台 REST 开一局
 
 def save_plan(res: CoverSolveResult, save_dir: Path) -> list[Path]:
-    """覆盖圆方案落盘：JSON（含校验与对照）+ CSV（圆心坐标）。"""
+    """覆盖圆方案落盘：一份 JSON 带校验与对照，一份 CSV 记圆心坐标"""
     save_dir.mkdir(parents=True, exist_ok=True)
     json_path = save_dir / PLAN_JSON
     json_path.write_text(json.dumps(res.to_json(), ensure_ascii=False, indent=2),
@@ -87,7 +87,7 @@ def save_plan(res: CoverSolveResult, save_dir: Path) -> list[Path]:
 
 
 def summarize(rows: Sequence[dict]) -> dict[str, Any]:
-    """整批演练的阶段二汇总：清除率、时间、定位误差、清除方式分布。"""
+    """整批演练的阶段二汇总：清除率、时间、定位误差、清除方式分布"""
     src = [s for r in rows for s in r.get("truth_check", {}).get("sources", ())]
     methods: dict[str, int] = {}
     for s in src:
@@ -114,8 +114,8 @@ def summarize(rows: Sequence[dict]) -> dict[str, Any]:
         "localize_err_max_m": round(float(np.max(errs)), 3) if errs else None,
         "n_within_clear_radius": sum(1 for e in errs if e <= CLEAR_RADIUS),
         "methods": methods,
-        # 布局旋转：每局按起始扫描听到的源把覆盖圆环转到"源最密集的 60° 扇区"，
-        # 故旋转角逐局不同（它是策略输出，不是设计参数）。未旋转（--no-rotate）时恒为 0。
+        # 布局旋转：每局按起始扫描听到的源把覆盖圆环转到"源最密集的 60° 扇区"，所以旋转角
+        # 逐局不同。它是策略输出，不是设计参数。加 --no-rotate 时恒为 0。
         "rotation_deg_mean": round(float(np.mean([r.get("rotation_deg", 0.0)
                                                   for r in rows])), 3),
         "rotation_deg_min": round(float(np.min([r.get("rotation_deg", 0.0)
@@ -130,12 +130,13 @@ def summarize(rows: Sequence[dict]) -> dict[str, Any]:
 
 def save_survey(save_dir: Path, rows: list[dict], observations: list[dict],
                 plan_json: dict[str, Any], meta: dict | None = None) -> list[Path]:
-    """巡视扫描结果落盘：逐局统计 JSON + 逐条观测 CSV。
+    """巡视扫描结果落盘：逐局统计 JSON + 逐条观测 CSV
 
-    `meta` 说明这次运行的来源（mode 取 practice / official，另含地址、局数等）。**不写参赛队号**：
-    队号一律运行时经 `--robot-id` 传入、只用于通信，落盘会把它带进交付物（竞赛要求交付物中不含
-    身份信息）。结果目录已不按模式分家，故**目录名与文件名都不再透露模式信息**，来源只能靠这份
-    元数据交代；官方产物没有真值（接口不返回），`mode` 是事后判断"这批数字为何缺真值字段"的唯一线索。
+    `meta` 说明这次运行的来源，mode 取 practice 或 official，另含地址、局数等。这里不写参赛
+    队号：队号一律运行时经 `--robot-id` 传入、只用于通信，落盘会把它带进交付物，而竞赛要求
+    交付物里不含身份信息。结果目录已不按模式分家，目录名和文件名都不再透露模式，来源只能靠
+    这份元数据交代。官方产物没有真值，接口不返回；`mode` 是事后判断"这批数字为何缺真值字段"
+    的唯一线索。
     """
     save_dir.mkdir(parents=True, exist_ok=True)
     json_path = save_dir / SURVEY_JSON
@@ -164,10 +165,10 @@ def save_survey(save_dir: Path, rows: list[dict], observations: list[dict],
 def episode_row(ep: int, seed: int | None, truth: Sequence[dict] | None,
                 dog: RobotDog,
                 stats: dict[str, Any], check: dict[str, Any]) -> dict[str, Any]:
-    """单局汇总行：把引擎统计、真值核对与逐频道档案合成一行（供 JSON / 绘图使用）。
+    """单局汇总行：把引擎统计、真值核对与逐频道档案合成一行，供 JSON 与绘图使用
 
-    `seed` 在演练模式下是本局的随机种子；官方模式的场景由平台生成、不受我们控制，故传 None。
-    `truth` 同理：官方模式拿不到真值，传 None 后需真值的指标（定位误差等）留空。
+    `seed` 在演练模式下是本局的随机种子；官方模式的场景由平台生成，不受我们控制，所以传 None。
+    `truth` 同理：官方模式拿不到真值，传 None 之后需要真值的指标都留空，定位误差就是其中一个。
     """
     n_src = len(truth) if truth else stats.get("channels_heard")
     cleared = stats.get("cleared", 0)
@@ -188,7 +189,7 @@ def episode_row(ep: int, seed: int | None, truth: Sequence[dict] | None,
     }
 
 def observation_rows(ep: int, plan: CoverPlan, meas: dict[int, list[Meas]]) -> list[dict]:
-    """把本局全部测量整理成 CSV 行（含 no_signal，并附"测量点到最近圆心的距离"）。"""
+    """把本局全部测量整理成 CSV 行，no_signal 也留在里面，另附测量点到最近圆心的距离"""
     rows = []
     for ch, ml in sorted(meas.items()):
         for m in ml:

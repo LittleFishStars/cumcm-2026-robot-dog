@@ -1,24 +1,27 @@
 """问题二的成果图。
 
-* **`draw_suitability`**（主图）：第二检测点的适合度图（一张图说清"往哪儿走"）。
+主图是 `draw_suitability`，把第二检测点的适合度画成一眼能看出"往哪儿走"的样子。另一张
+`draw_criteria` 拿文献判据和本文的精确判据做对照。
 
-题目要的是"第二个检测点的候选区域"，一张能直接支撑结论的图必须同时回答四个问题：
-① 第二点必须落在哪（可行域，否则第二次测向可能什么都听不到）；② 落在不同位置的效果差多少
-（适合度场）；③ 最优的那一点在哪、离 S1 多远、偏示向度多少度；④ 为什么是现在这个形状
-（最坏情形下定位区域长什么样）。因此图的版式是：
+题目要的是"第二个检测点的候选区域"，一张能直接支撑结论的图得同时回答四个问题。第二点必须
+落在哪，也就是可行域，出了这个范围第二次测向可能什么都听不到；落在不同位置的效果差多少，
+这是适合度场；最优的那一点在哪、离 S1 多远、偏示向度多少度；最后还有为什么长成这个形状，
+也就是最坏情形下的定位区域是什么样。版式就照这四个问题排：
 
-* **(a) 全域视图**：1800 m 圆域、源不确定集（以 S1 为顶点、长 1500 m、±1° 的窄扇形）、S1 与
-  示向度射线、灰色的"不保证可测"区域、可行域透镜、适合度场与等值线 —— 回答 ①②；并画出
-  放大框指明 (b) 的位置。
-* **(b) 放大视图**：把可行域透镜放大，画细网格适合度场、适合度等值线（标注对应的最坏定位
-  直径 J，单位 m）、候选区域弧带（J ≤ (1+η)$J^*$）、最优第二检测点 $S_2^*$ 及其实测极坐标标注
-  （距 S1 的距离 $r^*$、相对示向度的方位差 $\\varphi^*$）—— 回答 ②③。
-* **(b) 的内嵌小图（最坏情形几何）**：放大到定位区域尺度，画出两条示向度的 4 条 ±1° 边界射线
-  与它们围成的四边形，标出直径（= $J^*$）—— 回答 ④，也解释了"为什么要把交会角做到 40° 左右"。
+* (a) 全域视图：1800 m 圆域、源不确定集，以 S1 为顶点、长 1500 m、张角 ±1° 的窄扇形，S1 与
+  示向度射线，灰色的"不保证可测"区域，可行域透镜，适合度场与等值线。这一幅回答前两问；边上
+  画出放大框指明 (b) 的位置。
+* (b) 放大视图：把可行域透镜放大，画细网格适合度场与适合度等值线。等值线标签上给的是这一
+  条线对应的最坏定位直径 J，单位 m。再叠候选区域弧带，判据是 J ≤ (1+η)$J^*$，以及最优第二
+  检测点 $S_2^*$ 和它的实测极坐标标注：距 S1 的距离 $r^*$、相对示向度的方位差 $\\varphi^*$。
+  第二、三两问在这里回答。
+* (b) 的内嵌小图，画最坏情形几何：放大到定位区域尺度，画出两条示向度的 4 条 ±1° 边界射线
+  与它们围成的四边形，标出直径。直径就是 $J^*$。这一幅回答第四问，也解释了"为什么要把交会角
+  做到 40° 左右"。
 
-图上的每一次定量标注（$r^*$、$\\varphi^*$、$J^*$、面积、缩小倍数）都取自 `t2.score.SolveResult` 的
-数值字段，与 JSON/CSV 输出同源，便于逐项对账；PNG 走 `save_png`（去掉时间戳元数据），PDF 用
-固定 CreationDate，故同一输入两次出图逐字节一致。
+图上的每一次定量标注，$r^*$、$\\varphi^*$、$J^*$、面积、缩小倍数，都取自 `t2.score.SolveResult`
+的数值字段，与 JSON/CSV 输出同源，便于逐项对账。PNG 走 `save_png`，它会去掉时间戳元数据；
+PDF 用固定 CreationDate。同一输入两次出图逐字节一致。
 """
 
 from __future__ import annotations
@@ -48,7 +51,7 @@ _PDF_DATE = datetime.datetime(2026, 1, 1, tzinfo=datetime.timezone.utc)  # 固�
 
 def zoom_window(result: SolveResult, margin: float = 150.0,
                 aspect: float = 1.10) -> tuple[float, float, float, float]:
-    """放大视图窗口：可行域透镜的包围盒 + 边距，再按目标长宽比补成矩形 (x0, x1, y0, y1)。"""
+    """放大视图的窗口：可行域透镜的包围盒加一圈边距，再按目标长宽比补成矩形 (x0, x1, y0, y1)"""
     x0, y0, x1, y1 = result.lens.bounds
     x0, x1, y0, y1 = x0 - margin, x1 + margin, y0 - margin, y1 + margin
     w, h = x1 - x0, y1 - y0
@@ -69,7 +72,7 @@ def _frame(ax: Any, result: SolveResult) -> None:
             zorder=0.5)
     ax.plot(cfg.REGION_RADIUS * cos_t, cfg.REGION_RADIUS * sin_t, color=C_FRAME, lw=1.4,
             zorder=2.0)
-    corners = result.corners                       # 顺序：近端两角（d=D_LO）、远端两角（d=D_HI）
+    corners = result.corners                       # 顺序：近端两角落在 d=D_LO，远端两角落在 d=D_HI
     wedge = np.vstack([[result.site], corners[2:4], [result.site]])
     ax.fill(wedge[:, 0], wedge[:, 1], color=C_MEAS, alpha=0.18, lw=0.0, zorder=1.0)
     ax.plot(corners[:2, 0], corners[:2, 1], marker="o", ms=2.4, color=C_MEAS, zorder=1.6)
@@ -83,7 +86,7 @@ def _frame(ax: Any, result: SolveResult) -> None:
 
 
 def _cell_edges(v: np.ndarray) -> np.ndarray:
-    """单调一维网格 → 单元边界（首末外扩半格，中间取中点）。"""
+    """单调一维网格 → 单元边界：中间取相邻中心的中点，首末各向外扩半格"""
     d = np.diff(v)
     return np.concatenate([[v[0] - d[0] / 2.0], v[:-1] + d / 2.0, [v[-1] + d[-1] / 2.0]])
 
@@ -91,10 +94,10 @@ def _cell_edges(v: np.ndarray) -> np.ndarray:
 def _suitability_panel(ax: Any, result: SolveResult, x: np.ndarray, y: np.ndarray,
                        j: np.ndarray, feasible: np.ndarray, label_contours: bool,
                        polar: bool = False) -> Any:
-    """铺适合度场 + 等值线 + 候选弧带，返回 pcolormesh 供 colorbar 使用。
+    """铺适合度场、等值线与候选弧带，返回 pcolormesh 供 colorbar 使用
 
-    `polar=True` 时网格来自绕 S1 的极坐标（x、y 沿行/列都不单调），必须显式给出单元边界，
-    否则 pcolormesh 只能猜边界（会警告并可能画错）。边界由相邻单元中心的中点外推得到。
+    `polar=True` 时网格来自绕 S1 的极坐标，x、y 沿行和列都不单调，必须显式给出单元边界，
+    否则 pcolormesh 只能自己猜，会警告，也可能画错。边界由相邻单元中心的中点外推得到。
     """
     f = np.ma.masked_where(~feasible, suitability(j, result.j_star))
     if polar:
@@ -123,7 +126,7 @@ def _suitability_panel(ax: Any, result: SolveResult, x: np.ndarray, y: np.ndarra
 
 
 def _lens_outline(ax: Any, result: SolveResult) -> None:
-    """可行域透镜边界（点线）—— 第二点越出它就可能听不到最坏的那个源。"""
+    """可行域透镜边界，画成点线。第二点越出它就可能听不到最坏的那个源"""
     polys = result.lens.geoms if result.lens.geom_type == "MultiPolygon" else [result.lens]
     for poly in polys:
         xy = np.asarray(poly.exterior.coords)
@@ -132,7 +135,7 @@ def _lens_outline(ax: Any, result: SolveResult) -> None:
 
 def _best_marker(ax: Any, result: SolveResult, fontsize: float = 7.0,
                  annotate: bool = True) -> None:
-    """最优第二检测点：星标 + 到 S1 的连线 + 极坐标标注。"""
+    """最优第二检测点：星标，到 S1 的连线，外加极坐标标注"""
     bx, by = result.best
     ax.plot([result.site[0], bx], [result.site[1], by], color=C_PATH, lw=1.0, zorder=3.0)
     ax.plot([bx], [by], marker="*", ms=13, color=C_SRC, mec="white", mew=0.6, ls="none",
@@ -147,7 +150,7 @@ def _best_marker(ax: Any, result: SolveResult, fontsize: float = 7.0,
 
 
 def _line_through(ax: Any, p: tuple[float, float], ang_deg: float, **kw: Any) -> None:
-    """画过点 p、方向 ang_deg 的整条直线（超出视窗的部分交给坐标轴裁剪）。"""
+    """画过点 p、方向为 ang_deg 的整条直线，超出视窗的部分交给坐标轴去裁"""
     a = math.radians(ang_deg)
     span = 6000.0
     ax.plot([p[0] - span * math.cos(a), p[0] + span * math.cos(a)],
@@ -155,10 +158,10 @@ def _line_through(ax: Any, p: tuple[float, float], ang_deg: float, **kw: Any) ->
 
 
 def _worst_case_inset(ax: Any, result: SolveResult) -> None:
-    """内嵌小图：最坏情形的定位区域（两条示向度的 ±1° 边界射线所围的四边形）与它的直径。
+    """内嵌小图画最坏情形的定位区域与它的直径
 
-    按真实几何画：S1 的两条边界射线在 $\\theta_1$ ± 1°，S2 的两条在"最坏那次的实测示向度" ± 1°，
-    四线围成的就是附录图 2 的四边形；直径即最长对角线（= $J^*$）。
+    按真实几何画。S1 的两条边界射线在 $\\theta_1$ ± 1°，S2 的两条在"最坏那次的实测示向度"
+    ± 1°，四线围成的就是附录图 2 的四边形。直径取最长对角线，等于 $J^*$。
     """
     poly = scenario_quad(result)
     verts = np.asarray(poly.exterior.coords)
@@ -193,7 +196,7 @@ def _worst_case_inset(ax: Any, result: SolveResult) -> None:
 
 
 def _farthest_pair(pts: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-    """一组点中最远的一对（顶点只有几个，直接穷举）。"""
+    """一组点里最远的那一对。顶点只有几个，直接穷举就行"""
     best = (0.0, 0, 0)
     for i in range(len(pts)):
         for j in range(i + 1, len(pts)):
@@ -205,14 +208,14 @@ def _farthest_pair(pts: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
 
 def draw_suitability(out_path: Path, result: SolveResult, dpi: float = cfg.DPI,
                      pdf_path: Path | None = None) -> Path:
-    """画"第二检测点适合度图"并落盘，返回 PNG 路径（给出 pdf_path 时同时输出矢量 PDF）。"""
+    """画第二检测点适合度图并落盘，返回 PNG 路径。给了 pdf_path 就同时输出矢量 PDF"""
     setup_mpl_env()
     try:
         import matplotlib
         matplotlib.use("Agg")
         import matplotlib.pyplot as plt
         from matplotlib.lines import Line2D
-    except ImportError:                                   # 没有 matplotlib 时明确告知
+    except ImportError:                                   # 没装 matplotlib 就明说，别让它烂在栈里
         no_plot_hint()
         return Path(out_path)
 
@@ -252,7 +255,7 @@ def draw_suitability(out_path: Path, result: SolveResult, dpi: float = cfg.DPI,
         cb.set_label("适合度 F = $J^*$/J（1 = 最优）", fontsize=8.0)
         cb.ax.tick_params(labelsize=7.0)
 
-        # ---------------- (b) 放大视图 + 最坏情形内嵌图 ----------------
+        # ---------------- (b) 放大视图，右下方嵌最坏情形小图 ----------------
         ax2 = fig.add_subplot(gs[0, 1])
         fine = result.band.fine
         _suitability_panel(ax2, result, fine["x"], fine["y"], fine["j"], fine["feasible"],
@@ -306,10 +309,11 @@ def draw_suitability(out_path: Path, result: SolveResult, dpi: float = cfg.DPI,
 
 def _exact_radius_at(R1: float, R2: float, gamma_deg: float,
                      err_deg: float = cfg.BEARING_ERROR_DEG) -> float:
-    """构造一个恰好实现 (R1, R2, γ) 的两站构型，并用精确构造给出最坏半径 / m。
+    """构造一个恰好实现 (R1, R2, γ) 的两站构型，用精确构造给出最坏半径 / m
 
-    记源 G 在 (R1, 0)、S1 在原点，则 G→S1 方向为 180°；取 G→S2 方向为 180°−γ、长度 R2，
-    于是两站在源处的交会角恰为 γ。再用 `quad_diameters`（±1° 楔形交的精确直径）取一半。
+    源 G 放在 (R1, 0)，S1 放在原点，于是 G→S1 方向是 180°。再取 G→S2 方向为 180°−γ、长度
+    R2，两站在源处的交会角就恰是 γ。最坏半径让 `quad_diameters` 算，它给的是 ±1° 楔形交的
+    精确直径，取一半就行。
     """
     gx, gy = R1, 0.0
     ang = math.radians(180.0 - gamma_deg)
@@ -322,16 +326,17 @@ def _exact_radius_at(R1: float, R2: float, gamma_deg: float,
 
 def draw_criteria(out_path: Path, result: SolveResult, dpi: int = cfg.DPI,
                   pdf_path: Path | None = None) -> Path:
-    """文献判据 vs 本文精确判据的对照图（写论文"为什么这么选点"用）。
+    """文献判据与本文精确判据的对照图，写论文里"为什么这么选点"要用
 
-    * **(a) 交会角的影响**：固定 R₁ = 1500 m、R₂ = 907 m（本文最坏情形的距离组合），
-      按 γ ∈ [15°, 90°] 逐点用**精确构造**算出最坏半径，与三条文献闭式/本文闭式并排 ——
-      直接显示 Foy 1976 的几何稀释（γ 越小半径越大），以及文献 GDOP 式系统性偏低约三成。
-    * **(b) 判据一致性**：可行域内 1200 余个采样点上，文献 GDOP 判据与本文精确 J 的散点
-      （双对数），给出 Spearman 秩相关 —— 说明它**适合做快筛**（秩几乎一致）但**不能当硬界**
-      （点云整体在对角线下方，即 GDOP 低估最坏直径）。
+    左图看交会角的影响。固定 R1 = 1500 m、R2 = 907 m，这是本文最坏情形的距离组合，按
+    γ ∈ [15°, 90°] 逐点用精确构造算出最坏半径，和三条文献闭式、本文闭式并排画。Foy 1976 的
+    几何稀释一眼可见，γ 越小半径越大；文献 GDOP 式则系统性偏低约三成。
+
+    右图看两个判据的一致性。可行域内 1200 余个采样点上，文献 GDOP 判据与本文精确 J 做双对数
+    散点，给出 Spearman 秩相关。秩几乎一致，说明它适合做快筛；点云整体压在对角线下方，
+    GDOP 低估了最坏直径，所以不能当硬界用。
     """
-    setup_mpl_env()          # 必须在 import matplotlib 之前：配置目录只在首次导入时读取一次
+    setup_mpl_env()          # 得赶在 import matplotlib 之前，配置目录只在首次导入时读一次
     try:
         import matplotlib
         matplotlib.use("Agg")
@@ -397,8 +402,8 @@ def draw_criteria(out_path: Path, result: SolveResult, dpi: int = cfg.DPI,
                          fontsize=7.2, color="#202020",
                          bbox=dict(boxstyle="round,pad=0.3", fc="white", ec=C_GRAY, lw=0.5,
                                    alpha=0.92))
-            # 三个口径的最优点在 (GDOP, J) 平面上几乎重合（相差 < 0.2%），故只画星标 + 一处合注，
-            # 避免三个文字标签叠在一起（数值对照放在右下角的框里）
+            # 三个口径的最优点在 (GDOP, J) 平面上几乎重合，相差不到 0.2%，所以只画星标和一处
+            # 合注，省得三个文字标签叠在一起。数值对照挪到右下角的框里
             tags = {"minimax": "本文 minimax", "gdop": "文献 GDOP", "expected": "期望口径"}
             lines = []
             for name, q in result.theory.get("points", {}).items():

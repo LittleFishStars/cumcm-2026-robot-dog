@@ -1,5 +1,5 @@
 [project]
-name = "2026 CUMCM B"
+name = "2026_CUMCM_B"
 version = "1.0.0"
 description = "2026 CUMCM B 题：机器狗搜索与清除干扰源（问题一~四的求解代码）"
 requires-python = ">=3.14"

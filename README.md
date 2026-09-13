@@ -31,7 +31,7 @@
 python -m t1                            # 问题一：4 个检测点的交会定位区域示例
 python -m t2                            # 问题二：最优第二检测点 + 成果图（离线，约 15 s）
 python -m t3 --plan-only                # 问题三：只求覆盖圆方案（不连模拟器，约 0.6 s）
-python -m t3 --practice 3               # 问题三：本地演练 3 局
+python -m t3 --practice 1               # 问题三：本地演练 1 局
 python -m t4 --plan-only                # 问题四：只求扫描方案 + 听到率统计（约 1.7 s）
 python -m t4 --practice 20 --seed 0     # 问题四：本地演练 20 局（固定 seed 逐字节可复现）
 

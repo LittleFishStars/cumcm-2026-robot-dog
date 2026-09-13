@@ -8,7 +8,7 @@ from typing import Any, Sequence
 import numpy as np
 
 from t2 import config as cfg
-from t2.region import analytic_diameter, quad_diameters
+from t2.region import analytic_diameter
 
 __all__ = ["CITATIONS", "gamma_deg_at", "fim_two_station", "ellipse_from_fim", "crlb_closed",
            "crlb_major", "crlb_area", "gdop", "foy_rmec", "minimax_radius", "radius_field",

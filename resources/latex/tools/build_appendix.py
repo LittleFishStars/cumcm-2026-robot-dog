@@ -16,10 +16,11 @@ FONT_BEGIN = "% ---------- 附录代码块字体：拉丁用 DejaVu 等宽、中
 FONT_END = "% ---------- 附录代码块字体结束 ----------"
 FONT_TEMPLATE = """{begin}
 % 代码块里的希腊字母、≤、√、±、m² 在 Latin Modern Mono 里没有字形，换成 DejaVu 等宽；
-% 中文改走 Noto 等宽，和中英混排的字符宽度对齐。字号 SCALE 由 build_appendix.py 按
-% 正文中最宽的一行代码反推，正文的等宽字不受影响。
+% 中文改走 Noto 等宽。两个比例尺由 build_appendix.py 按最宽的一行代码反推：拉丁等宽字符
+% 宽 0.602 em，中文全角宽 1 em，所以中文取 1.204 倍，一个汉字正好两个半角位，中英混排的
+% 注释才对得齐。正文里的等宽字不受影响。
 \\newfontfamily\\codefont{{DejaVu Sans Mono}}[Scale={scale:.3f}]
-\\setCJKfamilyfont{{zhcode}}{{Noto Sans Mono CJK SC}}[Scale={scale:.3f}]
+\\setCJKfamilyfont{{zhcode}}{{Noto Sans Mono CJK SC}}[Scale={cjk_scale:.3f}]
 \\newcommand{{\\codefamily}}{{\\codefont\\CJKfamily{{zhcode}}}}
 % 圈数字 ① 到 ⑦ 交给中文字体，DejaVu 等宽里没有这几个字形
 \\xeCJKDeclareCharClass{{CJK}}{{"2460 -> "2473}}
@@ -138,14 +139,17 @@ def collect() -> list[tuple[dict, str, str]]:
     return out
 
 
+TEXT_WIDTH_PT = 415.0      # 正文宽度 / pt，21 cm 版心减两侧 3.18 cm 边距
+CHAR_RATIO = 0.602         # DejaVu Sans Mono 的字符宽除以字号
+BASE_PT = 9.0              # \small 在五号正文下的字号 / pt
+
+
 def pick_scale(code_lines: list[str]) -> float:
-    """按正文宽度反推代码字号：0.80 的比例尺下一行放得下 86 个半角字符"""
-    widths = sorted(display_width(line) for line in code_lines if line.strip())
+    """按正文宽度反推代码字号，以最长的一行为准，一行都不用折；下限 0.62 免得字太小"""
+    widths = [display_width(line) for line in code_lines if line.strip()]
     if not widths:
         return 0.80
-    idx = min(len(widths) - 1, int(0.98 * len(widths)))
-    target = max(widths[idx], 1)
-    return min(0.80, max(0.58, 0.80 * 86.0 / target))
+    return min(0.80, max(0.62, TEXT_WIDTH_PT / (max(widths) * CHAR_RATIO * BASE_PT)))
 
 
 def main() -> None:
@@ -158,8 +162,10 @@ def main() -> None:
     all_lines = [line for _, _, code in blocks for line in code.splitlines()]
     code_lines = sum(len(code.splitlines()) for _, _, code in blocks)
     scale = pick_scale(all_lines)
+    # 一个汉字占两个半角位：中文全角宽 1 em、拉丁等宽宽 0.602 em，比例尺就得差 1.204 倍
+    cjk_scale = min(1.0, scale * 2.0 * CHAR_RATIO)
     print(f"代码段 {len(blocks)} 个，共 {code_lines} 行，最长行 {max(map(display_width, all_lines))} 列，"
-          f"字号比例 {scale:.3f}")
+          f"字号比例 拉丁 {scale:.3f}、中文 {cjk_scale:.3f}")
 
     body = []
     for section in SECTIONS:
@@ -188,7 +194,8 @@ def main() -> None:
         return
 
     text = TEX.read_text(encoding="utf-8")
-    font_block = FONT_TEMPLATE.format(begin=FONT_BEGIN, end=FONT_END, scale=scale)
+    font_block = FONT_TEMPLATE.format(begin=FONT_BEGIN, end=FONT_END, scale=scale,
+                                      cjk_scale=cjk_scale)
     marker = re.compile(re.escape(FONT_BEGIN) + r".*?" + re.escape(FONT_END), re.S)
     if marker.search(text):
         text = marker.sub(lambda _: font_block.rstrip(), text, count=1)

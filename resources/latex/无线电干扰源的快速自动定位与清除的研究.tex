@@ -68,6 +68,24 @@
     aboveskip=6pt,
     belowskip=6pt
 }
+% ---------- 附录代码块字体：拉丁用 DejaVu 等宽、中文用 Noto 等宽 ----------
+% 代码块里的希腊字母、≤、√、±、m² 在 Latin Modern Mono 里没有字形，换成 DejaVu 等宽；
+% 中文改走 Noto 等宽。两个比例尺由 build_appendix.py 按最宽的一行代码反推：拉丁等宽字符
+% 宽 0.602 em，中文全角宽 1 em，所以中文取 1.204 倍，一个汉字正好两个半角位，中英混排的
+% 注释才对得齐。正文里的等宽字不受影响。
+\newfontfamily\codefont{DejaVu Sans Mono}[Scale=0.666]
+\setCJKfamilyfont{zhcode}{Noto Sans Mono CJK SC}[Scale=0.802]
+\newcommand{\codefamily}{\codefont\CJKfamily{zhcode}}
+% 圈数字 ① 到 ⑦ 交给中文字体，DejaVu 等宽里没有这几个字形
+\xeCJKDeclareCharClass{CJK}{"2460 -> "2473}
+\lstset{
+    basicstyle=\small\codefamily,
+    language=Python,
+    keywordstyle=\color{blue!70!black},
+    commentstyle=\color{green!45!black},
+    stringstyle=\color{red!60!black}
+}
+% ---------- 附录代码块字体结束 ----------
 \usepackage{tikz}                                % 流程图/示意图
 \usetikzlibrary{arrows.meta, positioning, shapes.geometric}
 
@@ -1087,6 +1105,764 @@ dp[S][i] = \min_{j \in S, j \neq i} \bigl( dp[S \setminus \{i\}][j] + d(j,i) \bi
 
 \section*{附录}
 
-	附录内容待填写。
+	\noindent 附录给出四个问题求解程序的主要部分，完整的工程代码见支撑材料。为控制篇幅，这里只保留与模型直接对应的算法函数：命令行解析、绘图、报告输出、控制台日志一类的工程代码不再列出。代码中出现的圆域半径、覆盖半径、采样格数等常数集中定义在各问题的 config 模块里。
 
+\subsection*{附录 A \quad 问题一：交会定位区域的求交与几何量}
+
+	\noindent 问题一把每条示向度展开成张角 $2\varepsilon$ 的楔形，检测点逐个与目标圆域求交，再从交出的凸多边形上量直径、最小覆盖圆与是否被圆域截断。下面是一个检测点集合求交与量测的完整实现。
+
+	\subsubsection*{A.1 \quad 定位区域类（t1/triangulation.py）}
+	\begin{lstlisting}
+class TriangulationRegion:
+    """交会定位区域：累积检测点后求定位区域凸多边形及其几何量"""
+
+    RADIUS = 1800.0  # 目标圆域半径（米），题目给定（直径 3600 m）
+    SIDES = 64       # 目标圆域的内接正多边形边数，须为 4 的倍数
+    TOUCH = 1.0      # 顶点贴合圆域边界的判定阈值（米）
+
+    def __init__(self, err: float = 1.0, radius: float | None = None, sides: int | None = None) -> None:
+        """构造交会定位区域，err 为示向度误差半宽（度）"""
+        self.err = float(err)
+        self.radius = self.RADIUS if radius is None else float(radius)
+        self.sides = self.SIDES if sides is None else int(sides)
+        if self.sides % 4:
+            raise ValueError("sides 必须是 4 的倍数")
+        self._nodes = []
+        self._clip = None    # 目标圆域的内接正多边形（惰性生成）
+        self._region = None  # 已并入前 _done 个检测点的交集；None 表示尚未求解
+        self._done = 0
+
+    # ---------- 检测点管理 ----------
+
+    def add_node(self, x: float, y: float, theta: float) -> TriangulationRegion:
+        """加入一个检测点，坐标为米、示向度为度，返回自身便于链式调用"""
+        self._nodes.append((float(x), float(y), float(theta) % 360.0))
+        return self
+
+    @classmethod
+    def from_nodes(cls, nodes: list[tuple[float, float, float]], err: float = 1.0,
+                   radius: float | None = None, sides: int | None = None) -> TriangulationRegion:
+        """由检测点列表 [(x, y, theta), ...] 构造定位区域，坐标为米、示向度为度"""
+        region = cls(err, radius, sides)
+        for x, y, theta in nodes:
+            region.add_node(x, y, theta)
+        return region
+
+    # ---------- 定位区域与几何量 ----------
+
+    @property
+    def clip(self) -> Polygon:
+        """目标圆域，也就是内接正 sides 边形，顶点精确落在半径 radius 的圆上"""
+        if self._clip is None:
+            self._clip = Point(0.0, 0.0).buffer(self.radius, quad_segs=self.sides // 4)
+        return self._clip
+
+    @property
+    def region(self) -> Polygon:
+        """定位区域的 shapely 几何，空区域返回空几何"""
+        if self._region is None:
+            # 楔形张角为 0，也就是 err<=0 时，区域退化成零面积
+            self._region = self.clip if self.err > 0.0 else Polygon()
+            self._done = 0
+        for x, y, theta in self._nodes[self._done:]:
+            self._region = self._region.intersection(self._wedge(x, y, theta))
+            self._done += 1
+            if self._region.is_empty:  # 空区域与任何楔形相交仍为空
+                self._done = len(self._nodes)
+                break
+        return self._region
+
+    @property
+    def vertices(self) -> list[tuple[float, float]]:
+        """定位区域顶点坐标列表 [(x, y), ...]，统一成逆时针，空区域返回空表"""
+        region = self.region
+        if region.is_empty or region.geom_type != "Polygon":
+            return []
+        pts = [(x, y) for x, y, *_ in region.exterior.coords[:-1]]
+        return pts if region.exterior.is_ccw else pts[::-1]
+
+    @property
+    def area(self) -> float:
+        """定位区域面积 / m²"""
+        return float(self.region.area)
+
+    @property
+    def diameter(self) -> float:
+        """定位区域直径：区域内任意两点距离的最大值 / m"""
+        pts = np.asarray(self.vertices, dtype=float)
+        if len(pts) < 2:
+            return 0.0
+        return float(np.linalg.norm(pts[:, None, :] - pts[None, :, :], axis=-1).max())
+
+    @property
+    def bounded(self) -> bool:
+        """定位是否只靠检测点就已确定，没被目标圆域截断"""
+        # 有顶点落在圆域边界上，说明那个方向约束不足
+        pts = self.vertices
+        return bool(pts) and all(self.clip.exterior.distance(Point(*p)) > self.TOUCH for p in pts)
+
+    @property
+    def enclosing_circle(self) -> tuple[float, float, float] | None:
+        """定位区域的最小覆盖圆 (cx, cy, r) / m，区域为空或退化时返回 None"""
+        # 问题 1 第二问的判据（以区域直径为直径的圆能否盖住区域）就是看 r <= diameter / 2
+        if not self.vertices:
+            return None
+        # 最小包围圆是正内接多边形，它的质心就是圆心
+        center = shapely.minimum_bounding_circle(self.region).centroid
+        return (center.x, center.y, float(shapely.minimum_bounding_radius(self.region)))
+
+    def contains(self, p: tuple[float, float]) -> bool:
+        """点 p 是否落在定位区域内，圆域按内接多边形算，圆边上的月牙不算"""
+        return bool(self.region.covers(Point(p)))
+
+    # ---------- 基础几何 ----------
+
+    def _wedge(self, x: float, y: float, theta: float) -> Polygon:
+        """单个检测点的楔形多边形，以 (x, y) 为顶点，边长足够覆盖整个目标圆域"""
+        length = 2.0 * (hypot(x, y) + self.radius)
+        a1, a2 = radians(theta - self.err), radians(theta + self.err)
+        return Polygon([(x, y),
+                        (x + length * cos(a1), y + length * sin(a1)),
+                        (x + length * cos(a2), y + length * sin(a2))])
+
+    @staticmethod
+    def bearing(a: tuple[float, float], b: tuple[float, float]) -> float:
+        """a 点观测 b 点的方位角 / 度，x 轴正向逆时针为正，取值 [0, 360)"""
+        return degrees(atan2(b[1] - a[1], b[0] - a[0])) % 360.0
+
+    def __repr__(self) -> str:
+        """对象的可读表示，汇总检测点数、顶点数、直径与 bounded"""
+        return (f"TriangulationRegion(检测点 {len(self._nodes)} 个, 顶点 {len(self.vertices)} 个, "
+                f"直径 {self.diameter:.4f} m, 仅靠检测点可确定 {self.bounded})")
+	\end{lstlisting}
+
+\subsection*{附录 B \quad 问题二：第二检测点的最坏定位直径寻优}
+
+	\noindent 问题二在源不确定集 $\mathcal{C}$ 与第二次测向误差上取最坏情形，把最坏定位直径 $J(S_2)$ 作为目标函数。源采样、楔形交会的候选顶点、全域粗搜与局部细化是这段代码的四步。
+
+	\subsubsection*{B.1 \quad 两楔形之交的候选顶点与定位直径（t2/region.py）}
+	\begin{lstlisting}
+def _candidate_points_batch(site: Sequence[float], theta1: float, sx: np.ndarray, sy: np.ndarray,
+                            theta2_batch: np.ndarray,
+                            err_deg: float) -> tuple[np.ndarray, np.ndarray]:
+    """一批楔形方向下两楔形之交的候选顶点 P (6, B, N, 2) 与在两楔形内的掩码 keep"""
+    x1, y1 = float(site[0]), float(site[1])
+    sx = np.asarray(sx, dtype=float)
+    sy = np.asarray(sy, dtype=float)
+    theta2_batch = np.asarray(theta2_batch, dtype=float)
+    shape = theta2_batch.shape
+    wx = np.broadcast_to(sx, shape) - x1
+    wy = np.broadcast_to(sy, shape) - y1
+    pts = []
+    # θ₂ ± err 的单位向量只算一次。原先 (sa, sb) 四个组合各算一遍，其中两个重复
+    bs = (_cos_sin(theta2_batch - err_deg), _cos_sin(theta2_batch + err_deg))
+    for sa in (-err_deg, err_deg):
+        ax, ay = unit(theta1 + sa)
+        for bx, by in bs:
+            den = ax * by - ay * bx
+            safe = np.where(np.abs(den) < PARALLEL_EPS, np.nan, den)
+            t = (wx * by - wy * bx) / safe
+            pts.append((x1 + t * ax, y1 + t * ay))
+    pts.append((np.full_like(theta2_batch, x1), np.full_like(theta2_batch, y1)))   # 楔形 1 顶点
+    pts.append((np.broadcast_to(sx, shape), np.broadcast_to(sy, shape)))           # 楔形 2 顶点
+    P = np.stack([np.stack([p[0], p[1]], axis=-1) for p in pts], axis=0)
+    keep = (in_wedge(P[..., 0], P[..., 1], site, theta1 - err_deg, theta1 + err_deg, WEDGE_TOL_DEG)
+            & in_wedge(P[..., 0], P[..., 1], (sx, sy), theta2_batch - err_deg,
+                       theta2_batch + err_deg, WEDGE_TOL_DEG))
+    return P, keep
+
+def _max_pair_distance(P: np.ndarray, keep: np.ndarray, sentinel: float) -> np.ndarray:
+    """候选顶点两两距离的最大值，区域是凸的，这个值就是直径；P 形状 (6, ..., 2)"""
+    # 距离走 np.hypot：换成平方距离取最大再开方会动最后 1 位，破坏逐字节一致
+    shape = P.shape[1:-1]
+    best = np.zeros(shape, dtype=float)
+    for i in range(P.shape[0]):
+        pi0, pi1 = P[i][..., 0], P[i][..., 1]
+        for j in range(i + 1, P.shape[0]):
+            d = np.hypot(pi0 - P[j][..., 0], pi1 - P[j][..., 1])
+            np.maximum(best, np.where(keep[i] & keep[j], d, 0.0), out=best)
+    return np.where(np.isnan(best), sentinel, best)
+
+def quad_diameters_batch(site: Sequence[float], theta1: float, sx: np.ndarray, sy: np.ndarray,
+                         theta2_batch: np.ndarray, err_deg: float = BEARING_ERROR_DEG,
+                         sentinel: float = DIAM_SENTINEL) -> np.ndarray:
+    """一批方向 (B, N) 对应的定位四边形直径 / m，算式与 quad_diameters 逐元素同值"""
+    P, keep = _candidate_points_batch(site, theta1, sx, sy, np.asarray(theta2_batch, dtype=float),
+                                      err_deg)
+    return _max_pair_distance(P, keep, sentinel)
+
+def analytic_diameter(d: float, r2: float, gamma_deg: float,
+                      err_deg: float = BEARING_ERROR_DEG) -> float:
+    """一阶展开式给出的定位直径 / m，用于论文引用与解析对照"""
+    g = math.radians(gamma_deg)
+    return (2.0 * math.radians(err_deg) / math.sin(g)) * math.sqrt(
+        d * d + r2 * r2 + 2.0 * d * r2 * abs(math.cos(g)))
+
+def exact_diameter(site: Sequence[float], theta1: float, s2: Sequence[float], theta2: float,
+                   err_deg: float = BEARING_ERROR_DEG,
+                   radius: float = REGION_RADIUS) -> float:
+    """定位区域直径的精确值：shapely/GEOS 求交 + 顶点最远点对，含圆域裁剪，单位 m"""
+    return float(exact_region(site, theta1, s2, theta2, err_deg, radius).diameter)
+
+def corner_sources(site: Sequence[float], theta1: float, d_lo: float = D_LO,
+                   d_hi: float = D_HI,
+                   err_deg: float = BEARING_ERROR_DEG) -> np.ndarray:
+    """源不确定集 C 的 4 个极点，(d, δ) 的四个角，形状 (4, 2)"""
+    pts = []
+    for d in (d_lo, d_hi):
+        for sd in (-err_deg, err_deg):
+            ux, uy = unit(theta1 + sd)
+            pts.append((float(site[0]) + d * ux, float(site[1]) + d * uy))
+    return np.asarray(pts, dtype=float)
+	\end{lstlisting}
+
+	\subsubsection*{B.2 \quad 源不确定集采样、最坏直径与两级搜索（t2/score.py）}
+	\begin{lstlisting}
+def source_samples(site: Sequence[float], theta1: float, d_lo: float = cfg.D_LO,
+                   d_hi: float = cfg.D_HI, n_d: int = cfg.D_SAMPLES,
+                   n_delta: int = cfg.DELTA_SAMPLES,
+                   err_deg: float = cfg.BEARING_ERROR_DEG,
+                   radius: float = cfg.REGION_RADIUS) -> np.ndarray:
+    """源不确定集 C 的采样点，形状 (M, 2)，圆域之外的样本已剔除"""
+    # 两端都取上：最坏情况出现在端点上，取最坏时拿到的才是真实极值候选
+    ds = np.linspace(float(d_lo), float(d_hi), int(n_d))
+    deltas = np.linspace(-err_deg, err_deg, int(n_delta))
+    pts = []
+    for d in ds:
+        for sd in deltas:
+            a = math.radians(theta1 + sd)
+            x, y = float(site[0]) + d * math.cos(a), float(site[1]) + d * math.sin(a)
+            if math.hypot(x, y) <= radius + 1e-9:
+                pts.append((x, y))
+    return np.asarray(pts, dtype=float)
+
+def delta2_grid(n: int = cfg.DELTA2_SAMPLES,
+                err_deg: float = cfg.BEARING_ERROR_DEG) -> np.ndarray:
+    """第二次测向误差 δ₂ 的采样，含 ±1° 两端"""
+    return np.linspace(-err_deg, err_deg, int(n))
+
+def worst_case_diameters(site: Sequence[float], sx: np.ndarray, sy: np.ndarray, theta1: float,
+                         sources: np.ndarray, deltas2: np.ndarray,
+                         err_deg: float = cfg.BEARING_ERROR_DEG,
+                         reduce: str = "max") -> np.ndarray:
+    """对源采样点与第二次测向误差取最坏或期望的定位直径 J(S2) / m，逐候选点向量化"""
+    # reduce="max" 是本文的 minimax 口径，"mean" 是文献常用的期望口径
+    sx = np.asarray(sx, dtype=float).ravel()
+    sy = np.asarray(sy, dtype=float).ravel()
+    if reduce not in ("max", "mean"):
+        raise ValueError(f"reduce 只能是 'max' 或 'mean'，收到 {reduce!r}")
+    src = np.asarray(sources, dtype=float)
+    d2s = np.asarray(deltas2, dtype=float)
+    # 行序就是原先双重循环的顺序，源采样点在外、δ₂ 在内，保证 mean 的逐行累加与原先同序
+    w2 = np.degrees(np.arctan2(src[:, 1][:, None] - sy[None, :],
+                               src[:, 0][:, None] - sx[None, :])) % 360.0          # (M, N)
+    combos = (w2[:, None, :] + d2s[None, :, None]).reshape(-1, sx.size)           # (M·K, N)
+    rows = int(_COMBO_CHUNK_ELEMS // max(sx.size, 1))
+    rows = max(1, min(rows, combos.shape[0]))
+    if reduce == "mean":
+        acc = np.zeros(sx.shape, dtype=float)
+        for i in range(0, combos.shape[0], rows):
+            block = quad_diameters_batch(site, theta1, sx, sy, combos[i:i + rows], err_deg)
+            for r in range(block.shape[0]):        # 逐行累加：与原先的求和顺序逐位一致
+                acc += block[r]
+        return acc / max(combos.shape[0], 1)
+    best = np.zeros(sx.shape, dtype=float)
+    for i in range(0, combos.shape[0], rows):
+        block = quad_diameters_batch(site, theta1, sx, sy, combos[i:i + rows], err_deg)
+        best = np.maximum(best, block.max(axis=0))     # 取最大：与逐组合取最大逐位同值，无非结合性
+    return best
+
+def suitability(j: np.ndarray, j_star: float) -> np.ndarray:
+    """适合度 F = J*/J，取值 (0, 1]，哨兵值按 0 处理"""
+    j = np.asarray(j, dtype=float)
+    safe = np.where(j > 0.0, j, np.inf)
+    f = float(j_star) / safe
+    return np.clip(np.nan_to_num(f, nan=0.0, posinf=0.0), 0.0, 1.0)
+
+def coarse_fields(site: Sequence[float], theta1: float, sources: np.ndarray,
+                  deltas2: np.ndarray, step: float = cfg.COARSE_STEP,
+                  err_deg: float = cfg.BEARING_ERROR_DEG,
+                  radius: float = cfg.REGION_RADIUS,
+                  receive_min: float = cfg.RECEIVE_MIN) -> dict[str, np.ndarray]:
+    """全域粗网格上的坐标网格、最坏源距、可测性掩码与最坏定位直径四个场"""
+    # 只在可行点上算 J，其余记哨兵值：可行域只是圆域里很小的一块透镜，能省九成计算
+    axis = np.arange(-radius, radius + 0.5 * step, step)
+    xx, yy = np.meshgrid(axis, axis)
+    in_region = np.hypot(xx, yy) <= radius + 1e-9
+    hear = worst_source_distance(xx.ravel(), yy.ravel(), sources).reshape(xx.shape)
+    feasible = in_region & (hear <= receive_min)
+    j = np.full(xx.shape, cfg.DIAM_SENTINEL, dtype=float)
+    if feasible.any():
+        j[feasible] = worst_case_diameters(site, xx[feasible], yy[feasible], theta1, sources,
+                                           deltas2, err_deg)
+    return {"x": xx, "y": yy, "hear": hear, "feasible": feasible, "j": j}
+
+def refine_best(site: Sequence[float], theta1: float, sources: np.ndarray, deltas2: np.ndarray,
+                x0: float, y0: float, half: float = cfg.REFINE_HALF,
+                step: float = cfg.REFINE_STEP, err_deg: float = cfg.BEARING_ERROR_DEG,
+                receive_min: float = cfg.RECEIVE_MIN,
+                reduce: str = "max") -> tuple[float, float, float]:
+    """在粗解附近做局部细化，返回 (x, y, J)"""
+    xs = np.arange(x0 - half, x0 + half + 0.5 * step, step)
+    ys = np.arange(y0 - half, y0 + half + 0.5 * step, step)
+    xx, yy = np.meshgrid(xs, ys)
+    px, py = xx.ravel(), yy.ravel()
+    feasible = worst_source_distance(px, py, sources) <= receive_min
+    if not feasible.any():                       # 理论上不会发生，x0, y0 本就可行的
+        return float(x0), float(y0), float("nan")
+    j = worst_case_diameters(site, px[feasible], py[feasible], theta1, sources, deltas2, err_deg,
+                             reduce=reduce)
+    k = int(np.argmin(j))
+    return float(px[feasible][k]), float(py[feasible][k]), float(j[k])
+	\end{lstlisting}
+
+	\subsubsection*{B.3 \quad 文献判据：Fisher 信息阵、GDOP 与 CRLB（t2/theory.py）}
+	\begin{lstlisting}
+def fim_two_station(s1: Sequence[float], theta1: float, s2: Sequence[float], theta2: float,
+                    g: Sequence[float], sigma_rad: float | None = None) -> np.ndarray:
+    """两站纯方位测向在真值 G 处的 Fisher 信息矩阵，2×2"""
+    # 与 t3.probing.fisher_sigma 是同一个量，但 t2 与 t3 是并列叶子不许互相 import，各写一份
+    s = math.radians(cfg.BEARING_ERROR_DEG) if sigma_rad is None else float(sigma_rad)
+    H = np.zeros((2, 2), dtype=float)
+    for (site, theta) in ((s1, theta1), (s2, theta2)):
+        dx = float(g[0]) - float(site[0])
+        dy = float(g[1]) - float(site[1])
+        r = math.hypot(dx, dy)
+        if r <= 0.0:
+            continue
+        # 视线方向的单位法向量，与 ∂θ/∂p 同向
+        n = np.array([-dy / r, dx / r])
+        H += (n[:, None] * n[None, :]) / (s * s * r * r)
+    _ = theta   # θ 只以"测量值"的身份出现；CRLB 围绕真值线性化，取真值方向就够了
+    return H
+
+def gdop(d: float, r2: float, gamma_deg: float, err_deg: float = cfg.BEARING_ERROR_DEG) -> float:
+    """文献 GDOP 闭式，位置误差的均方尺度 / m"""
+    g = math.radians(gamma_deg)
+    return math.radians(err_deg) * math.sqrt(d * d + r2 * r2) / math.sin(g)
+
+def crlb_major(d: float, r2: float, gamma_deg: float,
+               err_deg: float = cfg.BEARING_ERROR_DEG) -> float:
+    """两站测向 CRLB 误差椭圆主半轴的闭式 / m"""
+    g = math.radians(gamma_deg)
+    s = math.radians(err_deg)
+    a = d * d + r2 * r2
+    delta = math.sqrt(max(a * a - 4.0 * d * d * r2 * r2 * math.sin(g) ** 2, 0.0))
+    den = a - delta
+    if den <= 0.0:
+        return math.inf
+    return math.sqrt(2.0) * s * d * r2 / math.sqrt(den)
+	\end{lstlisting}
+
+\subsection*{附录 C \quad 问题三：覆盖圆布局与补测定位}
+
+	\noindent 问题三先用 7 个半径 1000 m 的圆盘盖住整个目标圆域，环半径取解析最优值 $\sqrt{3}R/2$；巡视结束仍未清除的频段按 Fisher 信息准则选补测点，逐轮把定位区域压到半径 20 m 以内。
+
+	\subsubsection*{C.1 \quad 六边形覆盖布局与覆盖校验（t3/covering.py）}
+	\begin{lstlisting}
+def hex_layout(ring_radius: float, rotation: float = 0.0,
+               n_ring: int = 6) -> np.ndarray:
+    """正六边形布局的圆心：第 0 个在原点，其余 n_ring 个均匀铺在半径 ring_radius 的环上，rotation 只管环心朝哪边"""
+    ang = rotation + np.arange(n_ring) * (2.0 * math.pi / n_ring)
+    ring = np.stack((ring_radius * np.cos(ang), ring_radius * np.sin(ang)), axis=1)
+    return np.vstack([[0.0, 0.0], ring])
+
+def optimal_ring_radius(region_radius: float = REGION_RADIUS) -> float:
+    """最优环半径 d* = √3·R/2，解析解，让最坏最近距离 D(d) 取到最小"""
+    return math.sqrt(3.0) * region_radius / 2.0
+
+def feasible_ring_interval(region_radius: float = REGION_RADIUS,
+                           cover_radius: float = COVER_RADIUS) -> tuple[float, float]:
+    """满足覆盖保证 D(d) ≤ r 的环半径区间 [d_min, d_max]，解析给出，两端点余量为零"""
+    root = math.sqrt(max(4.0 * cover_radius ** 2 - region_radius ** 2, 0.0))
+    lo = (math.sqrt(3.0) * region_radius - root) / 2.0
+    hi = min(math.sqrt(3.0) * cover_radius,
+             (math.sqrt(3.0) * region_radius + root) / 2.0)
+    return lo, hi
+
+def analytic_worst(ring_radius: float, region_radius: float = REGION_RADIUS) -> float:
+    """最坏最近距离的解析值 D(d) = max(d/√3, g₂)，两项在 d* = √3·R/2 处同时等于 R/2"""
+    def g(rho: float) -> float:
+        """半径 rho 的圆域边界点与最近环心夹角 30° 时到这个环心的距离，也就是边界项 g₂"""
+        return math.sqrt(max(rho * rho + ring_radius * ring_radius
+                             - math.sqrt(3.0) * rho * ring_radius, 0.0))
+    return max(ring_radius / math.sqrt(3.0), g(region_radius))
+
+def dense_sector_rotation(bearings: Sequence[float],
+                          step_deg: float = 1.0) -> float | None:
+    """选一个旋转角，让某个环心正对"听到的源最多"的那个 60° 扇区，入参示向度按度给，一个源都没听到时返回 None"""
+    if not len(bearings):
+        return None
+    beta = np.asarray([math.radians(float(b)) for b in bearings], dtype=float)
+    # 候选：把整个圆周按 1° 扫一遍，每个候选都是"某个环心正对的方向"。严格大于才替换，
+    # 所以同分时会取角度最小的那个，结果确定。
+    best = None
+    for k in range(int(round(360.0 / step_deg))):
+        phi = k * math.radians(step_deg)
+        score = _sector_score(beta, phi)
+        if best is None or score > best[0]:
+            best = (score, phi)
+    score0, phi0 = best
+    # 亚度精修：把扇区中心挪到片内源的质量中心。片内跨度 ≤ 60°，圆均值没有歧义。
+    # 只在"装入个数不减少"时采纳，免得挪动窗口反而漏掉边缘的源。
+    d = (beta - phi0 + math.pi) % (2.0 * math.pi) - math.pi
+    inside = np.abs(d) <= math.radians(SECTOR_HALF_DEG)
+    if inside.any():
+        phi1 = phi0 + math.atan2(float(np.sin(d[inside]).mean()),
+                                 float(np.cos(d[inside]).mean()))
+        if _sector_score(beta, phi1) > score0:
+            phi0 = phi1
+    return float(phi0 % (2.0 * math.pi))
+
+def nearest_distances(points: np.ndarray, waypoints: np.ndarray,
+                      chunk: int = 200_000) -> np.ndarray:
+    """每个采样点到最近圆心的距离，分块算，免得撑起一个大矩阵，开方只对最小值做一次"""
+    pts = np.asarray(points, dtype=float)
+    wp = np.asarray(waypoints, dtype=float)
+    out = np.empty(pts.shape[0], dtype=float)
+    for i in range(0, pts.shape[0], chunk):
+        blk = pts[i:i + chunk]
+        best2 = np.full(blk.shape[0], np.inf, dtype=float)
+        for cx, cy in wp:
+            dx = blk[:, 0] - cx
+            dy = blk[:, 1] - cy
+            np.minimum(best2, dx * dx + dy * dy, out=best2)
+        out[i:i + chunk] = np.sqrt(best2)
+    return out
+
+def worst_candidates_general(centers: np.ndarray,
+                            region_radius: float = REGION_RADIUS) -> np.ndarray:
+    """任意圆心布局下的精确最坏点候选集，取三角形外心、中垂线与边界的交点、圆心方向的边界点，不靠网格"""
+    C = np.asarray(centers, dtype=float)
+    n = len(C)
+    R = region_radius
+    cand = [np.zeros(2)]
+    # 1) 三角形外心
+    for i, j, k in itertools.combinations(range(n), 3):
+        a, b, c = C[i], C[j], C[k]
+        det = 2.0 * (a[0] * (b[1] - c[1]) + b[0] * (c[1] - a[1]) + c[0] * (a[1] - b[1]))
+        if abs(det) < 1e-12:
+            continue
+        na, nb, nc = float(a @ a), float(b @ b), float(c @ c)
+        p = np.array([(na * (b[1] - c[1]) + nb * (c[1] - a[1]) + nc * (a[1] - b[1])) / det,
+                      (na * (c[0] - b[0]) + nb * (a[0] - c[0]) + nc * (b[0] - a[0])) / det])
+        if float(p @ p) <= R * R + TOL:
+            cand.append(p)
+    # 2) 中垂线 ∩ 圆域边界；3) 圆心方向的边界点与原点
+    for i in range(n):
+        ci = C[i]
+        ri = float(np.hypot(*ci))
+        if ri > 1e-12:
+            cand.append(ci / ri * R)
+            cand.append(-ci / ri * R)
+        for j in range(i + 1, n):
+            v = C[j] - ci
+            vn2 = float(v @ v)
+            if vn2 < 1e-12:
+                continue
+            base = (0.5 * float(C[j] @ C[j] - ci @ ci) / vn2) * v
+            perp = np.array([-v[1], v[0]]) / math.sqrt(vn2)
+            rem = R * R - float(base @ base)
+            if rem < -TOL:
+                continue
+            t = math.sqrt(max(rem, 0.0))
+            cand.append(base + t * perp)
+            cand.append(base - t * perp)
+    return np.array(cand, dtype=float)
+
+def cover_counts(points: np.ndarray, waypoints: np.ndarray, radius: float,
+                 chunk: int = 200_000) -> np.ndarray:
+    """每个采样点被几个覆盖圆同时覆盖，也就是覆盖重数，判据写成平方距离 ≤ (r + TOL)² 免开方"""
+    pts = np.asarray(points, dtype=float)
+    wp = np.asarray(waypoints, dtype=float)
+    lim = (float(radius) + TOL) ** 2
+    out = np.empty(pts.shape[0], dtype=np.int64)
+    for i in range(0, pts.shape[0], chunk):
+        blk = pts[i:i + chunk]
+        cnt = np.zeros(blk.shape[0], dtype=np.int64)
+        for cx, cy in wp:
+            dx = blk[:, 0] - cx
+            dy = blk[:, 1] - cy
+            cnt += (dx * dx + dy * dy) <= lim
+        out[i:i + chunk] = cnt
+    return out
+	\end{lstlisting}
+
+	\subsubsection*{C.2 \quad 巡视顺序的精确最短开放路径（common/routing.py）}
+	\begin{lstlisting}
+def exact_open_order(n: int, D: np.ndarray, limit: int = 16) -> list[int]:
+    """从起点出发访问全部 n 个点的精确最短开放路径，终点任意，超 limit 个点就退化为启发式"""
+    # 返回不含起点占位符的点编号序列，与 nearest_order / path_len 的约定一致；遍历顺序固定，
+    # 最优值并列时取字典序最小的路径
+    if n <= 0:
+        return []
+    if n == 1:
+        return [0]
+    if n > limit:
+        return two_opt_greedy(two_opt_first(nearest_order_from_D(n, D), D), D)
+    dp, prev = _held_karp(n, D)
+    last = min(range(n), key=lambda j: (dp[(1 << n) - 1, j], j))
+    return _hk_path(prev, n, last)
+	\end{lstlisting}
+
+	\subsubsection*{C.3 \quad 补测点的 Fisher 信息选点（t3/probing.py）}
+	\begin{lstlisting}
+def fisher_sigma(p: Sequence[float], bearings: Sequence[Sequence[float]]) -> float:
+    """在假设源位置 p 处，由一组 (检测点x, 检测点y, 示向度) 预测的位置 1σ / m
+    权重取 Fisher 信息口径的 1/(σ²r²)，J 退化时返回 inf 表示定不了距。"""
+    J = np.zeros((2, 2))
+    for qx, qy, theta in bearings:
+        r = math.hypot(p[0] - qx, p[1] - qy)
+        if r < 1.0:                     # 源几乎落在检测点上，距离不可估
+            return math.inf
+        t = math.radians(theta)
+        n = np.array([-math.sin(t), math.cos(t)])
+        J += np.outer(n, n) / (SIGMA_RAD ** 2 * r * r)
+    det = J[0, 0] * J[1, 1] - J[0, 1] * J[1, 0]
+    if det <= 1e-30:
+        return math.inf
+    return math.sqrt((J[0, 0] + J[1, 1]) / det)     # tr(J⁻¹) = (J₁₁ + J₀₀)/det
+
+def hypothesis_points(region: "ProbRegion",
+                      obs_list: Sequence[Obs]) -> list[tuple[float, float]]:
+    """补测选点用的"假设源位置"集合，也就是真源可能落在哪儿
+    区域已知时取最小覆盖圆圆心加最远点采样出的顶点，只在区域退化时沿射线枚举可能距离。"""
+    pts: list[tuple[float, float]] = []
+    mec = region.enclosing_circle
+    verts = list(region.vertices)
+    if verts:
+        # 区域已知，含 no_signal 禁区与接收半径环带：最小覆盖圆心加最远点采样出的几个顶点
+        if mec is not None:
+            pts.append((mec[0], mec[1]))
+        while len(pts) < HYP_MAX and verts:
+            far = max(verts, key=lambda v: min(dist(v, q) for q in pts))
+            verts.remove(far)
+            pts.append(far)
+    elif len(obs_list) == 1:
+        # 区域退化、还没有禁区约束：只能沿那条射线按可能距离枚举
+        o = obs_list[0]
+        for s in SINGLE_HYP:
+            hx = o.x + s * math.cos(math.radians(o.theta))
+            hy = o.y + s * math.sin(math.radians(o.theta))
+            if math.hypot(hx, hy) <= REGION_RADIUS:
+                pts.append((hx, hy))
+    # 离已有检测点太近的假设点估不了距离，r → 0，剔除；顺手去重
+    keep: list[tuple[float, float]] = []
+    for h in pts:
+        if any(dist(h, (o.x, o.y)) < HYP_GAP for o in obs_list):
+            continue
+        if any(dist(h, k) < 1.0 for k in keep):
+            continue
+        keep.append(h)
+    return keep
+
+def probe_candidates(obs_list: Sequence[Obs], hyps: Sequence[Sequence[float]],
+                     pos: Sequence[float]) -> list[Probe]:
+    """按文献准则给补测点排序，目标是让"对全部假设源位置的平均预测 σ"最小
+    候选点由距离环乘方位角格撒出，评价走 Fisher 信息口径，兼顾离源近与交角接近正交。"""
+    base = [(o.x, o.y, o.theta) for o in obs_list]      # 已有观测：检测点加示向度
+    cands: list[Probe] = []
+    seen = set()
+    for hx, hy in hyps:
+        for rho in PROBE_RADII:
+            for k in range(PROBE_ANGLES):
+                a = 2.0 * math.pi * k / PROBE_ANGLES
+                qx, qy = hx + rho * math.cos(a), hy + rho * math.sin(a)
+                if math.hypot(qx, qy) > REGION_RADIUS - REGION_MARGIN:   # 必须在作业圆域内
+                    continue
+                if any(math.hypot(qx - o.x, qy - o.y) < PROBE_GAP for o in obs_list):
+                    continue                    # 离已有检测点太近：同处复测不提供新信息
+                key = (round(qx, 1), round(qy, 1))
+                if key in seen:
+                    continue
+                seen.add(key)
+                total, ok = 0.0, True
+                for h in hyps:                          # 对全部假设源位置求平均 σ
+                    sig = fisher_sigma(h, base + [(qx, qy, bearing((qx, qy), h))])
+                    if sig == math.inf:                 # 与已有射线共线，提供不了新信息
+                        ok = False
+                        break
+                    total += sig
+                if ok:
+                    cands.append(Probe(qx, qy, total / len(hyps), dist(pos, (qx, qy))))
+    if not cands:
+        return []
+    # 与最优 σ 相差 2% 以内算同等好，这类候选里取里程最短的，并列时再取坐标字典序最小
+    best = min(c.sigma for c in cands)
+    good = [c for c in cands if c.sigma <= best * 1.02] if best < math.inf \
+        else [c for c in cands if c.sigma == math.inf]
+    good.sort(key=lambda c: (c.travel, c.x, c.y))
+    rest = sorted((c for c in cands if c not in good),
+                  key=lambda c: (c.sigma, c.travel, c.x, c.y))
+    return (good + rest)[:PROBE_TRY]
+	\end{lstlisting}
+
+\subsection*{附录 D \quad 问题四：二十点测量布局与听到率校验}
+
+	\noindent 问题四的测量位置由原点、问题三的 7 个覆盖基点与 12 个外圈点组成，外圈点压在定向源迎光区内沿以内，保证任何方位、任何波束朝向的贴边源都有人听到。布局确定后按半圆盘命中判据做全口径蒙特卡洛与贴边对抗校验。
+
+	\subsubsection*{D.1 \quad 测量布局、命中判据与听到率校验（t4/sweep.py）}
+	\begin{lstlisting}
+def measure_layout() -> list[tuple[float, float]]:
+    """20 个测量位置：原点 + 7 覆盖基点 + 12 均匀方位外圈点"""
+    base = np.asarray(SURVEY_CENTERS, dtype=float)
+    ang = np.arange(OUTER_RING_N, dtype=float) * (2.0 * math.pi / OUTER_RING_N) \
+        + math.radians(OUTER_RING_ROT_DEG)   # 外圈起始旋转角：与内圈基点方位错开（2026-09-12）
+    ring = np.stack((OUTER_RING_RAD * np.cos(ang), OUTER_RING_RAD * np.sin(ang)), axis=1)
+    mid_pts = np.empty((0, 2))
+    if MID_RING_N > 0:                        # MID_RING_N=0 时无内部补点（20 点定案）
+        mid = np.arange(MID_RING_N, dtype=float) * (2.0 * math.pi / MID_RING_N) \
+            + math.radians(MID_RING_ROT_DEG)
+        mid_pts = np.stack((MID_RING_RAD * np.cos(mid), MID_RING_RAD * np.sin(mid)), axis=1)
+    return [(0.0, 0.0)] + [(float(x), float(y)) for x, y in base] + \
+        [(float(x), float(y)) for x, y in mid_pts] + \
+        [(float(x), float(y)) for x, y in ring]
+
+def build_sweep_plan() -> SweepPlan:
+    """构造默认扫描方案：20 个测量位置，从原点出发，最近邻 + 2-opt 精修开路径"""
+    # 顺序与里程都不参与检测效果，只影响行驶耗时，所以取确定性下里程较短的一种，
+    # nearest_order 与 two_opt_* 都是无随机算子，见 common.routing
+    arr = np.asarray(measure_layout(), dtype=float)
+    D = dist_matrix(arr, (0.0, 0.0))
+    order = two_opt_greedy(two_opt_first(nearest_order(arr, start=(0.0, 0.0)), D), D)
+    route = list(order)
+    route_m = 0.0
+    prev = arr[0]
+    for i in order:
+        route_m += float(np.hypot(*(arr[i] - prev)))
+        prev = arr[i]
+    return SweepPlan(outer_n=OUTER_RING_N, outer_radius=OUTER_RING_RAD,
+                     interior_n=MID_RING_N, interior_radius=MID_RING_RAD,
+                     points=arr, route=route, route_m=route_m)
+
+def _hit_report(pts: np.ndarray, g: np.ndarray, theta_rad: float, R: float) -> tuple[bool, float]:
+    """单个算例：是否存在测量点在距离 ≤ R 且在光束内；返回 (命中?, 命中深度 |m−g|/R)"""
+    d = pts - g
+    r2 = np.einsum("ij,ij->i", d, d)
+    ok = (r2 <= R * R + 1e-9) & (
+        d[:, 0] * math.cos(theta_rad) + d[:, 1] * math.sin(theta_rad) >= -1e-9)
+    if not ok.any():
+        return False, math.inf
+    return True, float(np.sqrt(r2[ok]).min() / R)
+
+def _hit_cases(pts: np.ndarray, gx: np.ndarray, gy: np.ndarray, theta: np.ndarray,
+               R: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """一批算例的命中掩码与命中深度；逐例与 `_hit_report` 同一套算式，逐元素对应"""
+    # 批量口径要逐例等价：距离仍按两分量平方和算，命中深度仍是先取最小 r² 再开方除以 R，
+    # 判定容差 1e-9 原样保留，`python -m t4.sweep` 的随机对照就是这么核的
+    pts = np.asarray(pts, dtype=float)
+    dx = pts[None, :, 0] - np.asarray(gx, dtype=float)[:, None]
+    dy = pts[None, :, 1] - np.asarray(gy, dtype=float)[:, None]
+    r2 = dx * dx + dy * dy
+    rr = np.asarray(R, dtype=float)[:, None]
+    el = np.asarray(theta, dtype=float)
+    ok = (r2 <= rr * rr + 1e-9) & (dx * np.cos(el)[:, None] + dy * np.sin(el)[:, None] >= -1e-9)
+    hit = ok.any(axis=1)
+    depth = np.sqrt(np.where(ok, r2, np.inf).min(axis=1)) / np.asarray(R, dtype=float)
+    return hit, depth
+
+@lru_cache(maxsize=8)                     # 算例只与参数有关，布局搜索会拿同一批反复评估候选
+def adversarial_cases(n_azi: int = 360, n_off: int = 40, radius: float = 1770.0,
+                      Rs: Sequence[float] = (1000.0, 1250.0, 1500.0),
+                      span_deg: float = 8.0, wrap: bool = True
+                      ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """贴边对抗算例 `(gx, gy, θ/rad, R)`：源贴在源生成圆盘边缘、θ 取径向 ±span/2 内的偏角"""
+    # 返回的是缓存里的共享只读数组，调用方不要就地修改；枚举顺序 R → 方位 → 偏角
+    gx: list[float] = []
+    gy: list[float] = []
+    th: list[float] = []
+    rr: list[float] = []
+    for R in Rs:
+        for ka in range(int(n_azi)):
+            a = 2.0 * math.pi * ka / n_azi
+            cx = radius * math.cos(a)
+            cy = radius * math.sin(a)
+            for ko in range(int(n_off)):
+                off = (ko / (n_off - 1) - 0.5) * span_deg
+                t = a + math.radians(off)
+                gx.append(cx)
+                gy.append(cy)
+                th.append(t % (2.0 * math.pi) if wrap else t)   # 不取模的那版供布局搜索用
+                rr.append(R)
+    return (np.asarray(gx, dtype=float), np.asarray(gy, dtype=float),
+            np.asarray(th, dtype=float), np.asarray(rr, dtype=float))
+
+def verify_hearing_stats(points: Sequence[Sequence[float]],
+                         mc_n: int = 4_000_000,
+                         seed: int = 2026) -> dict[str, Any]:
+    """对测量点集合做"半圆盘命中"统计校验，返回听到率与最坏漏例
+    这是统计口径，本布局仍有零星漏例，调用方不得把它当"严格不漏"用
+    """
+    P = np.asarray(points, dtype=float)
+    n_cases = 0
+    n_fail = 0
+    worst_fail: dict | None = None
+    edge_miss = 0
+
+    # 校验 1：贴边对抗（枚举顺序：R → 方位 → 径向偏角），g 贴 1770 m 圆盘边缘、θ 取径向
+    # ±8° 内 40 个偏角乘 360 方位，这一档专打"外翻光束"的刀口，也是最严的一档
+    n1, nf1, w1 = _scan_cases(P, *adversarial_cases(360, 40))
+    n_cases += n1
+    n_fail += nf1
+    worst_fail = w1
+    edge_miss = nf1
+
+    # 校验 2：精细对抗枚举，g 取半径 {0,300,…,1770} × 48 方位，θ 取 180 个等分角，R 取 3 档
+    # 枚举顺序：R → 半径 → 方位 → 光束角
+    g2x: list[float] = []
+    g2y: list[float] = []
+    t2: list[float] = []
+    r2_list: list[float] = []
+    for R in (1000.0, 1250.0, 1500.0):
+        for r in list(range(0, 1800, 300)) + [1770]:
+            for k in range(48):
+                a = 2.0 * math.pi * k / 48
+                gx = r * math.cos(a)
+                gy = r * math.sin(a)
+                for t in (2.0 * math.pi * kk / 180 for kk in range(180)):
+                    g2x.append(gx)
+                    g2y.append(gy)
+                    t2.append(t)
+                    r2_list.append(R)
+    n2, nf2, w2 = _scan_cases(P, g2x, g2y, np.asarray(t2, dtype=float),
+                              np.asarray(r2_list, dtype=float))
+    n_cases += n2
+    n_fail += nf2
+    if worst_fail is None:
+        worst_fail = w2
+
+    # 校验 3：蒙特卡洛，g 在圆域内面积均匀、θ 均匀、R ∈ [1000,1500] 均匀
+    # 抽取顺序与原先逐例循环完全一致：g_r → g_a → θ → R
+    rng = np.random.default_rng(seed)
+    mc_miss = 0
+    for _ in range(max(1, mc_n // 1000)):
+        g_r = 1770.0 * np.sqrt(rng.random(1000))
+        g_a = rng.random(1000) * 2.0 * math.pi
+        gs = np.stack((g_r * np.cos(g_a), g_r * np.sin(g_a)), axis=1)
+        th = rng.random(1000) * 2.0 * math.pi
+        RR = rng.uniform(1000.0, 1500.0, 1000)
+        hit, _ = _hit_cases(P, gs[:, 0], gs[:, 1], th, RR)
+        miss = ~hit
+        n_miss = int(miss.sum())
+        n_cases += int(hit.size)
+        n_fail += n_miss
+        mc_miss += n_miss
+        if n_miss and worst_fail is None:
+            k = int(np.argmax(miss))
+            worst_fail = {"g": [float(gs[k, 0]), float(gs[k, 1])],
+                          "theta_deg": round(math.degrees(float(th[k])), 1),
+                          "R_m": float(RR[k])}
+
+    return {
+        "n_cases": n_cases,
+        "n_fail": n_fail,
+        "hear_rate": round(1.0 - n_fail / n_cases, 6),
+        "mc_miss": mc_miss,
+        "mc_n": mc_n,
+        "edge_miss": edge_miss,
+        "worst_fail": worst_fail,
+        "guaranteed": False,
+        "note": "原点 + 7 覆盖基点 + 12 均匀外圈点（20 点定案）：实测听到率统计，不是严格不漏",
+    }
+	\end{lstlisting}
 \end{document}

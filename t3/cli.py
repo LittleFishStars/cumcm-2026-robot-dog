@@ -213,7 +213,7 @@ def run_practice(args: argparse.Namespace, res: CoverSolveResult, save_dir: Path
 
 
 def run_official(args: argparse.Namespace, res: CoverSolveResult, save_dir: Path) -> int:
-    """官方评测接口模式：连 127.0.0.1 上已开放接口的模拟器跑完整一局，接口调用日志即证据链"""
+    """官方评测接口模式：连 127.0.0.1 上已开放接口的模拟器跑完整一局，接口调用日志就是证据链"""
     sim = Simulator(robot_id=args.robot_id, base_url=args.base_url, timeout=args.timeout)
     if is_verbose():
         print(f"连接模拟器 {args.base_url}（robot_id={args.robot_id}）")

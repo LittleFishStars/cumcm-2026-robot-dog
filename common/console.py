@@ -71,9 +71,7 @@ def _pad(text: str, width: int, right: bool) -> str:
 def print_table(headers: Sequence[str], rows: Sequence[Sequence[Any]],
                 align: str = "", indent: int = 0) -> None:
     """打印一张对齐表格，列宽按显示宽度算，表头下面画一条虚线
-
-    align 是每列的对齐方式，`l` 或 `r`，缺的按左对齐；数值列给 `r` 更整齐。
-    """
+    align 逐列给 `l` 或 `r`，缺的按左对齐，数值列给 `r` 更整齐"""
     cols = len(headers)
     cells = [[("" if c is None else str(c)) for c in row] for row in rows]
     widths = [display_width(h) for h in headers]

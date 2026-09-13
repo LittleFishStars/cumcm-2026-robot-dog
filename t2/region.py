@@ -111,7 +111,7 @@ def _candidate_points_batch(site: Sequence[float], theta1: float, sx: np.ndarray
 
 def _candidate_points(site: Sequence[float], theta1: float, sx: np.ndarray, sy: np.ndarray,
                       theta2: np.ndarray, err_deg: float) -> tuple[np.ndarray, np.ndarray]:
-    """单点情形的候选顶点，即 `_candidate_points_batch` 的 B = 1 特例"""
+    """单点情形的候选顶点，`_candidate_points_batch` 的 B = 1 特例"""
     P, keep = _candidate_points_batch(site, theta1, sx, sy,
                                       np.asarray(theta2, dtype=float)[None, :], err_deg)
     return P[:, 0], keep[:, 0]
@@ -326,7 +326,7 @@ def _selfcheck(n: int = 400) -> None:
     rows: list[list[Any]] = []
     # 解析构造与 shapely 走的是两套几何，偏差只该有浮点误差那么大
     rows.append(["解析构造 vs shapely", "✓", f"{rep['impl_max_abs_rel_dev']:.3e}",
-                 "最大绝对相对偏差，应 ~1e-12，即同一套几何"])
+                 "最大绝对相对偏差，应 ~1e-12，两条路径同源"])
     lo, hi = rep["gamma_ok_deg"]
     rows.append([f"一阶公式 vs 解析构造（{rep['formula_n']} 例）", "✓",
                  f"中位 {rep['formula_median_rel_dev']:.3%}",

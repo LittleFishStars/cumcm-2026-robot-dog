@@ -51,9 +51,9 @@ site-packages 里也全是 linux-x86_64 的扩展模块（numpy 2.5.3、shapely 
 ```bash
 # 四个问题的入口
 uv run -m t1                            # 问题一：4 个检测点的交会定位区域示例
-uv run -m t2                            # 问题二：最优第二检测点 + 成果图（离线，约 15 s）
-uv run -m t3 --plan-only                # 问题三：只求覆盖圆方案（不连模拟器，约 0.6 s）
-uv run -m t4 --plan-only                # 问题四：只求扫描方案 + 听到率统计（约 1.7 s）
+uv run -m t2                            # 问题二：最优第二检测点 + 成果图（离线，约 25 s）
+uv run -m t3 --plan-only                # 问题三：只求覆盖圆方案（不连模拟器，约 1 s）
+uv run -m t4 --plan-only                # 问题四：只求扫描方案 + 听到率统计（约 3 s）
 uv run -m t3 --practice 1 --robot-id <队号>   # 问题三：本地演练 1 局（自动拉起包内 jammers-py/）
 uv run -m t4 --practice 20 --seed 0 --robot-id <队号>   # 问题四：演练 20 局，固定 seed 可复现
 
@@ -92,5 +92,6 @@ uv run -m t4.sweep                      # 扫描判据：批量实现 vs 单例�
 
 ## 依赖方向
 
-`common ← t1/t2/t3/t4`，只能往下（`t2` 可以 import `t1`，`t4` 可以 import `t1` 和 `t3.probing`）。
+`common ← t1/t2/t3/t4`，只能往下。`t1` 是共用的几何核心，只依赖 `common`；`t2`、`t3` 都 import `t1`；
+`t4` 除了 `t1` 还 import `t3.probing` 和 `t3.config`，因为它的测量点按问题三的 7 个覆盖圆心摆。
 模型怎么推出来、算法怎么选、踩过哪些坑，都写在对应模块的 docstring 里。

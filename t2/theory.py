@@ -268,6 +268,13 @@ def verify_theory(n: int = 300, seed: int = 2026,
     }
 
 
+def _ratio_label(b: dict[str, Any]) -> str:
+    """分桶的区间标签，最后一桶上界是 1e9 这种哨兵值，直接打出来难看"""
+    if b["hi"] >= 1e9:
+        return f"≥ {b['lo']:.1f}"
+    return f"[{b['lo']:.1f}, {b['hi']:.1f})"
+
+
 def _selfcheck(n: int = 300) -> None:
     """自检：文献闭式与数值特征值是否一致，集员闭式与精确构造是否一致，文献判据偏低多少"""
     print("问题二文献判据自检")
@@ -298,7 +305,7 @@ def _selfcheck(n: int = 300) -> None:
                   f"中位 {out['minimax_closed_median_rel_dev'] * 100:.3f}%，"
                   f"最大 {out['minimax_closed_max_rel_dev'] * 100:.1f}%"],
                  ["文献 GDOP/CRLB/Foy 判据 vs 精确最坏半径", "✓",
-                  f"中位偏差 {out['gdop_vs_exact_median_rel_dev'] * 100:+.1f}%，负值即低估"]],
+                  f"中位偏差 {out['gdop_vs_exact_median_rel_dev'] * 100:+.1f}%，负值为低估"]],
                 align="lcr")
     print("  按交会角 γ 分桶，列出本文闭式与文献 GDOP 式的中位相对偏差：")
     print_table(["γ / °", "样本数", "本文中位偏差 / %", "本文最大偏差 / %", "GDOP 中位偏差 / %"],
@@ -310,7 +317,7 @@ def _selfcheck(n: int = 300) -> None:
                 align="lrrrr")
     print("  按 r₂/d 分桶：")
     print_table(["r₂/d", "样本数", "本文中位偏差 / %", "本文最大偏差 / %", "GDOP 中位偏差 / %"],
-                [[f"[{b['lo']:.1f}, {b['hi']:.1f})", b["n"],
+                [[_ratio_label(b), b["n"],
                   f"{b['minimax_median_rel_dev'] * 100:+.2f}",
                   f"{b['minimax_max_abs_rel_dev'] * 100:.1f}",
                   f"{b['gdop_median_rel_dev'] * 100:+.1f}"]

@@ -2,4 +2,4 @@
 
 from t1.triangulation import TriangulationRegion
 
-__all__ = ["TriangulationRegion"]
+__all__ = ["TriangulationRegion", "cli"]

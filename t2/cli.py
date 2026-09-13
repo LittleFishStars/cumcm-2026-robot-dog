@@ -22,7 +22,7 @@ def build_parser() -> argparse.ArgumentParser:
         description="CUMCM 2026 B 问题二：第二个检测点的选择与候选区域（最坏情况最小化）")
     p.add_argument("--site", nargs=2, type=float, metavar=("X", "Y"),
                    default=list(cfg.DEFAULT_SITE),
-                   help="第一检测点坐标 / m（缺省原点，即机器狗起点）")
+                   help="第一检测点坐标 / m（缺省原点，机器狗起点）")
     p.add_argument("--bearing", type=float, default=cfg.DEFAULT_BEARING,
                    help=f"第一检测点测得的示向度 / 度（缺省 {cfg.DEFAULT_BEARING:.0f}，正东）")
     p.add_argument("--eta", type=float, default=cfg.ETA,

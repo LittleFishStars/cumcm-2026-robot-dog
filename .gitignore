@@ -13,7 +13,11 @@ desktop.ini
 #   Problem/      赛题材料
 #   References/   参考文献 PDF（53 M，撰写论文时本地查阅用）
 #   latex/        论文源文件
+# resources/latex 要放行，得先把目录本身反忽略：光在文件末尾写 !resources/latex/*.tex 没用，
+# git 不会进入被忽略的目录，那条规则永远匹配不上
 resources/*
+!resources/latex/
+resources/latex/*
 
 # 本地演练场 jammers-py/ 是独立子仓库（git submodule，私有远端），已移到仓库根，
 # 只登记其提交指针；它内部的 data/、figures/ 由子仓库自己的 .gitignore 排除
@@ -23,6 +27,7 @@ results/
 
 # LaTeX 编译中间产物（交付物是 .tex 源码与编译好的 PDF）
 *.aux
+*.log
 *.toc
 *.out
 *.synctex.gz

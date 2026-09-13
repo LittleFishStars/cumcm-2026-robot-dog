@@ -1,0 +1,154 @@
+%!TEX program = xelatex
+% ---------------------------------------------------------------------------
+% AI 工具使用声明（论文用）/ AI 工具使用详情（支撑材料用）
+% 2026 年高教社杯全国大学生数学建模竞赛 B 题
+%
+% 依据《全国大学生数学建模竞赛人工智能工具使用规定（2026 年试行）》第 3、4 条：
+% 论文参考文献之前要有"AI 工具使用声明"，内容二选一；用了 AI 的，还得在支撑材料里
+% 放一份"AI工具使用详情.pdf"。规定原文：
+% https://www.mcm.edu.cn/html_cn/node/fef94648f2836ab6cc81586f4c38512b.html
+%
+% 同一个文件两种用法，看编译方式自动切换，不用手工改：
+%
+%   独立编译   xelatex ai-declaration.tex
+%              出《AI 工具使用详情》，就是支撑材料要的那份 PDF。交之前改名：
+%                mv ai-declaration.pdf AI工具使用详情.pdf
+%
+%   论文引用   在论文"参考文献"之前写 \input{resources/latex/ai-declaration.tex}
+%              只出标题和那一句话，详情表格自动跳过，正文不会违反第 3 条。
+%              这段不依赖任何宏包，塞进哪个模板都行；想让标题带编号，把下面
+%              \AIDeclHeading 里的 \section* 换成 \section。
+%
+% 交之前自己核一遍（第 5 条：假声明、瞒着不报会取消评奖资格）：
+%   - 二选一跟实际对不对得上？本文件按"用了"填，没用 AI 的那句在下面注释里；
+%   - "主要用于……"、工具名称与版本、使用环节、核验情况是不是本队真实情况？
+%     详情表里没做过的行删掉；
+%   - 论文和支撑材料里不能出现学校、赛区、队号，所以这里不写队号。
+% ---------------------------------------------------------------------------
+
+\makeatletter
+% \@classoptionslist 是 \documentclass 定义的宏。文件开头它已经存在，就说明文档类加载过了，
+% 也就是本文件正在被论文 \input，不是独立编译
+\@ifundefined{ifAIDeclStandalone}{\newif\ifAIDeclStandalone}{}
+\@ifundefined{@classoptionslist}{\AIDeclStandalonetrue}{\AIDeclStandalonefalse}
+\ifAIDeclStandalone
+  \documentclass[12pt,a4paper]{ctexart}
+  \usepackage{geometry}
+  \geometry{a4paper,left=2.6cm,right=2.6cm,top=2.6cm,bottom=2.6cm}
+  \usepackage{booktabs}
+  \usepackage{array}
+  \usepackage{xeCJK}
+  \linespread{1.3}
+  \pagestyle{empty}                         % 支撑材料附件不要页码
+\fi
+\makeatother
+
+% 规程第 3 条要的那句话。两种用法共用，改这里两边同步。
+\providecommand{\AIDeclSentence}{%
+  本参赛队在竞赛过程中使用了AI工具，主要用于代码编写与调试、模型方案比选与%
+  数值结果核验、图表与文字整理及语言润色，详细使用情况见支撑材料。%
+}
+% 没用 AI 就换成下面这句，并把详情表格和后面几节一并删掉：
+% \providecommand{\AIDeclSentence}{本参赛队在竞赛过程中未使用任何AI工具。}
+
+\ifAIDeclStandalone
+% 独立编译：出支撑材料用的《AI 工具使用详情》，覆盖规程第 4 条的四项内容
+\begin{document}
+
+\begin{center}
+  {\zihao{3}\bfseries AI 工具使用详情}\\[0.6em]
+\end{center}
+
+\subsection*{一、声明}
+
+\AIDeclSentence
+
+\subsection*{二、所用 AI 工具的名称、版本或型号}
+
+\begin{table}[htbp]
+  \centering
+  \begin{tabular}{@{}p{5.0cm}p{3.5cm}p{6.45cm}@{}}
+    \toprule
+    工具名称 & 版本 / 型号 & 使用环节 \\
+    \midrule
+    DeepSeek Harness 智能体 & deepseek-v4-flash &
+      建模推导草案、求解代码编写与调试、数值结果复核、图表与文字整理 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+% 本队还用过别的工具就照上面的格式加行，没有就保持原样
+\noindent\emph{注：除上表所列工具外，本队未使用其他 AI 工具。}
+
+\subsection*{三、具体使用目的和环节}
+
+\begin{table}[htbp]
+  \centering
+  \begin{tabular}{@{}p{3.0cm}p{5.2cm}p{6.75cm}@{}}
+    \toprule
+    环节 & 使用目的 & 采纳情况 \\
+    \midrule
+    赛题理解与建模设计 &
+      梳理子问题、提出可行模型（测向交会定位、最坏情形定位误差、覆盖圆搜索、多源扫描计划）作为讨论草案 &
+      部分采纳：模型假设、目标函数与判据由参赛队确定 \\
+    \addlinespace
+    求解代码实现 &
+      生成几何计算、覆盖圆布局、批量扫描判据等代码骨架 &
+      采纳后逐行修改：几何裁剪方式、最少覆盖圆选向等不符合题意的部分由参赛队改写 \\
+    \addlinespace
+    结果核验与复现 &
+      编写模块自检脚本、固定随机种子的复现脚本 &
+      采纳：用作参赛队核验结果的辅助手段 \\
+    \addlinespace
+    图表与论文撰写 &
+      绘制数据图、整理表格与图注、语言润色 &
+      采纳：仅整理表述与排版，不改变数据与结论 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\subsection*{四、主要提示方式与使用过程说明}
+
+提示一律用自然语言，把题目条件、精度要求和必须可复现这些约束一次说清；同时要求给出推导过程
+和\emph{可运行}的代码，不接受只有结论的描述。关键判断上再追问一轮，让它自查，或者要求批量实现
+与单例参考逐元素对齐，免得拿到"看着对但核不动"的东西。
+
+两个有代表性的例子：
+
+\begin{itemize}
+  \item 问题三的覆盖圆。提示："作业区里每个干扰源都必须落在某个覆盖圆内，给出覆盖圆数量最少
+    的方案，并说明旋转与选向怎么取舍。"返回的方案与代码可用，但参赛队核对"作业区边界截断"
+    的确切含义后，改掉了最少覆盖圆数的判定。
+  \item 批量命中判定。提示："把命中判定改成批量实现，要求每个元素与单例参考做完全相同的浮点
+    运算，结果逐字节一致。"拿到实现后，先用自检脚本比对批量与单例，再跑一遍演练，确认一致
+    才采纳。
+\end{itemize}
+
+\subsection*{五、对 AI 输出的采纳、人工修改和核验的主要情况}
+
+采纳的部分：推导草案、代码骨架、自检脚本，以及文档与语言润色。
+
+人工修改的部分：模型假设、几何构造、判据与参数取值都由参赛队确定；AI 给出的代码逐行读过，
+不符合题意的地方（几何裁剪方式、覆盖圆选向规则、扫描点排布等）都作了改写。
+
+核验做了四件事：
+
+\begin{enumerate}
+  \item 全部求解代码在本机重新运行，模块自检脚本逐项通过：几何构造与解析解对比、文献判据
+    对比、覆盖方案检查、批量实现与单例参考对比、静态检查；
+  \item 关键结果以固定随机种子重复运行，重复运行的产物与论文、附录中的数据一致；产物位于
+    \texttt{results/}，删除后重跑即可重建；
+  \item 论文中的公式、数据与结论逐项与程序输出核对，不一致处以程序输出为准；
+  \item 语言润色与文字整理只调整表述，没有改动任何数据与结论。
+\end{enumerate}
+
+\end{document}
+
+\else
+% 论文模式：只出规程第 3 条要求的"AI 工具使用声明"小节
+\providecommand{\AIDeclHeading}[1]{\section*{#1}}% 需要编号时改为 \section
+\AIDeclHeading{AI 工具使用声明}
+
+\AIDeclSentence
+
+\fi

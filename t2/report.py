@@ -116,7 +116,7 @@ def print_report(result: SolveResult, figure: Path | None = None,
                 align="lrr")
     print()
     print("候选区域（弧带）")
-    print(f"  判据 J ≤ {result.band.level_m:.0f} m，即最优值的 {1.0 + c['eta']:.2f} 倍；"
+    print(f"  判据 J ≤ {result.band.level_m:.0f} m，是最优值的 {1.0 + c['eta']:.2f} 倍；"
           f"合计面积 {result.band.area_m2 / 1e6:.3f} km²")
     print_table(["瓣号", "径向范围 / m", "方位差范围 / °", "面积 / km²"],
                 [[i, f"[{lobe['r_lo']:.0f}, {lobe['r_hi']:.0f}]",

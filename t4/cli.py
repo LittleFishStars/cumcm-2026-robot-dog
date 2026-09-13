@@ -297,7 +297,16 @@ def main(argv: Sequence[str] | None = None) -> int:
     # 第一步：求扫描方案并做听到率统计，只算一次，随后所有局共用这份点集
     src = None
     if args.layout_file:
-        plan = plan_from_points(np.load(args.layout_file))
+        try:
+            layout = np.load(args.layout_file)
+        except (OSError, ValueError) as exc:        # 读不了或不是 npy，别抛一整条调用栈给用户看
+            print(f"读取布局文件失败：{args.layout_file}（{exc}）", file=sys.stderr)
+            return 2
+        try:
+            plan = plan_from_points(layout)
+        except ValueError as exc:
+            print(f"布局文件不可用：{args.layout_file}（{exc}）", file=sys.stderr)
+            return 2
         src = args.layout_file                     # 缺省档并进"扫描方案"一行，详细档单独一行
         if is_verbose():
             print(f"布局来源：{args.layout_file}，{plan.n_points} 个测量位置，里程 "

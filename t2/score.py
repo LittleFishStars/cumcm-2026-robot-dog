@@ -424,7 +424,7 @@ def _polar_to_xy(r: np.ndarray, phi_deg: np.ndarray, theta1: float,
 
 @dataclass
 class SolveResult:
-    """问题二的完整解：最优第二检测点、最优区域即候选弧带、可行域，以及全部校验"""
+    """问题二的完整解：最优第二检测点、候选弧带、可行域，以及全部校验"""
 
     site: tuple[float, float]
     theta1: float

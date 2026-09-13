@@ -93,7 +93,9 @@ def build_sweep_plan() -> SweepPlan:
 def plan_from_points(points: Sequence[Sequence[float]]) -> SweepPlan:
     """按给定点集构造扫描方案，供布局对照实验复现同一路线口径"""
     arr = np.asarray(points, dtype=float)
-    assert arr.ndim == 2 and arr.shape[1] == 2, "点集形状应为 (K, 2)"
+    # 点集来自 --layout-file，是外部输入，用 raise 而不是 assert，免得 -O 下这道校验被摘掉
+    if arr.ndim != 2 or arr.shape[1] != 2 or arr.shape[0] < 1:
+        raise ValueError(f"点集形状应为 (K, 2)，K ≥ 1，实际是 {arr.shape}")
     D = dist_matrix(arr, (0.0, 0.0))
     order = two_opt_greedy(two_opt_first(nearest_order(arr, start=(0.0, 0.0)), D), D)
     route = list(order)

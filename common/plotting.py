@@ -87,4 +87,3 @@ NO_PLOT_HINT = ("提示：未安装 matplotlib，已跳过出图。装上即可�
 def no_plot_hint() -> None:
     """说明"图没能生成"以及怎么才能生成，只打印一次，免得逐局、逐步骤刷屏"""
     hint_plot_once(NO_PLOT_HINT)
-

@@ -272,7 +272,7 @@ class RobotDog(ActionRecorder):
     # ---- 阶段二 b：访问顺序 ----
     def _nearest_order(self, channels: Sequence[int]) -> list[int]:
         """精确最短开放路径定序，用 Held-Karp，算法本身见 t3.strategy 同名函数的注释"""
-        # 空输入要给空：r0 顺路清除之后真会出现"扫描即全清、收尾没剩下什么"的局
+        # 空输入要给空：r0 顺路清除之后真会出现"扫描时全清、收尾没剩下什么"的局
         if not channels:
             return []
         pts = self._clear_points(channels)

@@ -14,9 +14,10 @@ modules as well (`python -m t2.region`, `python -m t4.sweep`). The local simulat
 `jammers-py/` sits at the root too; it used to live under `resources/`, which is gitignored and never
 submitted.
 
-Dependencies only point down: `common <- t1/t2/t3/t4`. `t2` may import `t1` (same wedge-intersection
-duct, vectorized), `t4` may import `t1` and `t3.probing`. Importing upward, `common` reaching into
-`t3` for instance, is out of the question.
+Dependencies only point down: `common <- t1/t2/t3/t4`. `t1` is the shared geometry core and only
+reaches into `common`; `t2` and `t3` import `t1`; `t4` imports `t1` plus `t3.probing` and `t3.config`,
+because its measurement layout is built around problem 3's seven cover centers. Nothing reaches
+upward, `common` importing `t3` for instance is out of the question.
 
 `results/` is gitignored output. `python -m t2` writes the six T2 files, `--plan-only` writes the
 T3/T4 plans, a practice run writes the per-episode CSV/JSON plus `scan/` and `trajectory/`. Both
@@ -66,15 +67,15 @@ way: no team number, school or personal data in any tracked file.
 
 - `uv run python -m t1` — problem 1 demo.
 - `uv run python -m t2` — problem 2: best second detection point + suitability figure + literature
-  criteria figure (offline, ~15 s; writes `results/t2/{t2_suitability.png,pdf,t2_criteria.png,pdf,
+  criteria figure (offline, ~25 s; writes `results/t2/{t2_suitability.png,pdf,t2_criteria.png,pdf,
   t2_suitability.csv,t2_second_site.json}`).
 - `uv run python -m t2.region` — problem 2 geometry self-check (analytic quad vs shapely).
 - `uv run python -m t2.theory` — problem 2 literature self-check (CRLB/GDOP closed forms vs
   the exact set-membership worst-case bound; prints per-γ and per-r₂/d deviation buckets).
-- `uv run python -m t3 --plan-only` — solve the 7 cover circles; no simulator, no ground truth.
+- `uv run python -m t3 --plan-only` — solve the 7 cover circles (~1 s); no simulator, no ground truth.
 - `uv run python -m t3.covering` — cover-layout self-check (rotation/selection/min-circle).
 - `uv run python -m t4 --plan-only` — solve the 20 measurement positions + hearing-rate statistics
-  (~2 s; writes `results/t4/t4_sweep_plan.json` + `t4_sweep_points.csv`).
+  (~3 s; writes `results/t4/t4_sweep_plan.json` + `t4_sweep_points.csv`).
 - `uv run python -m t4 --practice 20 --seed 0 --robot-id <team id> --layout-file <layout.npy>
   --save-dir <dir>` — benchmark an alternative measurement layout with the same harness
   (benchmark any candidate layout on the same seed set).

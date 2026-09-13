@@ -84,7 +84,7 @@ class TriangulationRegion:
 
     @property
     def diameter(self) -> float:
-        """定位区域直径，即区域内任意两点距离的最大值 / m"""
+        """定位区域直径：区域内任意两点距离的最大值 / m"""
         pts = np.asarray(self.vertices, dtype=float)
         if len(pts) < 2:
             return 0.0
@@ -132,7 +132,7 @@ class TriangulationRegion:
                 f"直径 {self.diameter:.4f} m, 仅靠检测点可确定 {self.bounded})")
 
 
-def _demo() -> None:
+def demo() -> None:
     """示例：4 个检测点对同一个干扰源交会定位"""
     # 没有实测数据，先假定真值 G，再按几何关系反推各点示向度，保证区域非空
     g = (500.0, 400.0)
@@ -151,4 +151,4 @@ def _demo() -> None:
 
 
 if __name__ == '__main__':
-    _demo()
+    demo()

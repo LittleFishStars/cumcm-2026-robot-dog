@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from t1.triangulation import _demo
+from t1.cli import main
 
 
 if __name__ == '__main__':
-    _demo()
+    raise SystemExit(main())

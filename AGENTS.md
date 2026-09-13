@@ -30,7 +30,8 @@ mathematical-modelling problems 1-4).
 - `pyproject.toml` requires **Python >= 3.14** and uses the Tsinghua PyPI mirror; the stack is
   Python 3.14 + numpy/matplotlib/shapely.
 - **uv is mandatory**: `uv sync`, then `uv run -m <package>` (equivalently `uv run python -m <package>`).
-  Never invoke a bare system `python`; README documents this as the only supported entry. Prefer
+  Never invoke a bare system `python`; the shipped `.venv` interpreter (`.venv/bin/python`) is the only
+  other supported entry, and README documents both for the submission package. Prefer
   `uv run python -X utf8 -m <package>` so Chinese output renders.
 
 ## Commands that work offline

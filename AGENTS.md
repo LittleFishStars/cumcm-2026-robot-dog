@@ -6,12 +6,12 @@ mathematical-modelling problems 1-4).
 ## Repo layout
 
 - Git repo root is **this** directory (`cumcm-2026-robot-dog/`). Run all commands from here.
-- Code is flat at the repo root: `common/`, `t1/`, `t2/`, `t3/`, `t4/`, `analysis/` are
+- Code is flat at the repo root: `common/`, `t1/`, `t2/`, `t3/`, `t4/` are
   top-level packages (no enclosing `cumcm` package, no `T*.py` shim scripts). Each problem
   package ships a `__main__.py`, so `python -m t3 --practice 3` replaces the old
-  `python T3.py --practice 3`; `python -m t4.sweep`, `python -m analysis.undefined_names`, etc.
+  `python T3.py --practice 3`; `python -m t2.region`, `python -m t4.sweep`, etc.
   run the self-checks.
-- Layering is a hard convention: deps only point down `common <- t1/t2/t3/t4 <- analysis`
+- Layering is a hard convention: deps only point down `common <- t1/t2/t3/t4`
   (`t2` may import `t1` — same wedge-intersection duct, vectorized; `t4` may import `t1` and
   `t3.probing`).
   Never import upward (e.g. `common` must not import `t3`).
@@ -51,8 +51,6 @@ mathematical-modelling problems 1-4).
   seed set).
 - `uv run python -m t4.sweep` — problem 4 scan self-check (batched hearing predicate vs the
   single-case reference, then the 4.2 M-case statistics without touching any simulator).
-- `uv run python -m analysis.undefined_names` — static scan of every repo `.py` for names read
-  but never bound / parameters that silently do not exist (the de-facto lint).
 
 ## Local simulator (`resources/jammers-py/`)
 
@@ -83,12 +81,11 @@ mathematical-modelling problems 1-4).
 ## Verification (no test/lint/CI exists)
 
 - There is no test suite, linter config, or CI workflow. The checks are: the module self-checks
-  (`t2.region`, `t2.theory`, `t3.covering`, `t4.sweep`,
-  `analysis.undefined_names`) and byte-identical fixed-seed reruns. `python -m t2` is fully
-  deterministic (no RNG): its six outputs are byte-identical across runs, and every run self-checks
-  the analytic geometry against shapely (max rel. dev ~1e-15), a 3x-refined discretization,
-  the literature CRLB/GDOP closed forms, and a 5 m global GDOP-prefiltered certification of
-  the optimum.
+  (`t2.region`, `t2.theory`, `t3.covering`, `t4.sweep`) and byte-identical fixed-seed reruns.
+  `python -m t2` is fully deterministic (no RNG): its six outputs are byte-identical across runs,
+  and every run self-checks the analytic geometry against shapely (max rel. dev ~1e-15), a
+  3x-refined discretization, the literature CRLB/GDOP closed forms, and a 5 m global
+  GDOP-prefiltered certification of the optimum.
 - **Optimization invariant:** performance work must keep the artifacts byte-identical. The batched
   hot paths (`t2.region.quad_diameters_batch` / `t2.score.worst_case_diameters`, `t3.covering`
   distance kernels, `t4.sweep._hit_cases`) are built so each element performs exactly the same
@@ -148,14 +145,14 @@ the author's own habit across `~/Projects/python/MBridge`, `~/Projects/python/GN
 **Style changes are bound by the same optimization invariant**: after a purely stylistic change (extra
 annotations, docstrings, comments, rewrapped lines) the artifacts of `python -m t2`,
 `python -m t3 --plan-only` and `python -m t4 --plan-only` must stay byte-identical to before, and the
-self-checks (`analysis.undefined_names` and the rest) must all pass. **Annotations and docstrings must
-not change any expression, literal, control flow or output text.**
+module self-checks (`t2.region`, `t2.theory`, `t3.covering`, `t4.sweep`) must all pass.
+**Annotations and docstrings must not change any expression, literal, control flow or output text.**
 
 How to verify this class of change (there is no test suite; the three pieces of evidence are):
 
 1. **Full self-checks + unchanged artifacts**: before touching anything, hash the baseline inside the
    workspace with `find results -type f | sort | xargs sha256sum > .results.sha256`; after running the
-   five self-checks plus `python -m t2`, `python -m t3 --plan-only` and `python -m t4 --plan-only`,
+   four self-checks plus `python -m t2`, `python -m t3 --plan-only` and `python -m t4 --plan-only`,
    `sha256sum -c .results.sha256` must report every entry OK, then delete the baseline file. Three
    gotchas: `results/` is no longer tracked, so `git status` can no longer tell you this; keep the
    baseline inside the workspace (this machine wipes `/tmp` between commands, so a `/tmp` baseline is

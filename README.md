@@ -20,8 +20,6 @@
   ```
 
 - 之后所有命令一律走 uv（见下一节的 `uv run -m <包名>`），无需 `source .venv/bin/activate`
-- 中文输出若乱码，用 `uv run python -X utf8 -m <包名> ...` 代替 `uv run -m <包名> ...`
-
 ## 使用说明
 
 下面一律用 `uv run -m <包名>`（在仓库根执行；uv 自动用本仓库的 `.venv`，不必先激活）。
@@ -41,7 +39,6 @@ uv run -m t2.region                     # 几何：解析构造 vs shapely 精�
 uv run -m t2.theory                     # 文献判据（CRLB/GDOP）vs 精确最坏界
 uv run -m t3.covering                   # 覆盖圆方案：旋转/选向/最少圆数
 uv run -m t4.sweep                      # 扫描判据：批量实现 vs 单例参考
-uv run -m analysis.undefined_names      # 静态检查：漏定义 / 缺失参数
 ```
 
 - **演练模式**（`--practice N`）自动拉起 `resources/jammers-py/` 里的本地复刻模拟器（自带真值，
@@ -62,12 +59,11 @@ uv run -m analysis.undefined_names      # 静态检查：漏定义 / 缺失参�
 ```
 common/            跨题通用层：几何、路线算子、模拟器接口、演练场、绘图、落盘、路径、控制台
 t1/ t2/ t3/ t4/    问题一~四
-analysis/          静态检查工具
 resources/         本机材料（不入库）：Problem/ 赛题、References/ 文献、latex/ 论文源文件；
                    jammers-py/ 是子仓库
 results/           运行产物（不入库）
 ```
 
-依赖方向是硬约定：`common ← t1/t2/t3/t4 ← analysis`，只能向下（`t2` 可 import `t1`，`t4` 可
+依赖方向是硬约定：`common ← t1/t2/t3/t4`，只能向下（`t2` 可 import `t1`，`t4` 可
 import `t1` 与 `t3.probing`）。模型推导、算法选择与踩过的坑都写在对应模块的 docstring 里；
 仓库约定、验证办法与代码风格见 `AGENTS.md`。

@@ -19,10 +19,12 @@ duct, vectorized), `t4` may import `t1` and `t3.probing`. Importing upward, `com
 `t3` for instance, is out of the question.
 
 `results/` is gitignored output. `python -m t2` writes the six T2 files, `--plan-only` writes the
-T3/T4 plans, a practice run writes the per-episode CSV/JSON plus `scan/` and `trajectory/`. Re-running
-rewrites them in place, and a fixed `--seed` gives byte-identical files; `api_calls.jsonl` is the one
-exception since it carries wall-clock timestamps. Never `git add -f` them. Prove reproducibility by
-hashing the files (see Verification), not with `git status`.
+T3/T4 plans, a practice run writes the per-episode CSV/JSON plus `scan/` and `trajectory/`. Both
+`t3_survey.json` and `t4_survey.json` carry a `summary` block under the same key names (`summarize()`
+in `t3/report.py` and `t4/report.py`), so the two problems read side by side. Re-running rewrites the
+files in place, and a fixed `--seed` gives byte-identical output; `api_calls.jsonl` is the one exception
+since it carries wall-clock timestamps. Never `git add -f` them. Prove reproducibility by hashing the
+files (see Verification), not with `git status`.
 
 The old `figures/` directory, the `figures_t4*.py` / `T4_figures.py` generators, `paper/` (paper
 sources, `make_figures.py` included) and `reports/` (stage reports) were deleted at the user's

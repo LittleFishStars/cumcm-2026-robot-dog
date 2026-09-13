@@ -75,6 +75,49 @@ def truth_check(truth: Sequence[dict] | None, plan: SweepPlan,
     }
 
 
+def summarize(rows: Sequence[dict]) -> dict[str, Any]:
+    """整批演练汇总：清除率、时间、里程、测向次数、定位误差与清除方式分布
+
+    键名与问题三的 summarize 对齐，两份 survey 可以并排读；问题四另外给出拖网特有的两项：
+    首次听到的最晚步骤，以及顺路补测次数。清除方式由逐局的 methods 累加。
+    官方模式拿不到真值，定位误差与首次听到步会留空，其余字段照常。
+    """
+    n_src = sum(r["n_sources"] for r in rows if r.get("n_sources"))
+    n_cleared = sum(r.get("cleared", 0) for r in rows)
+    avg_times = [r["avg_time_s"] for r in rows if r.get("avg_time_s")]
+    means = [r["localize_err_mean_m"] for r in rows if r.get("localize_err_mean_m") is not None]
+    maxes = [r["localize_err_max_m"] for r in rows if r.get("localize_err_max_m") is not None]
+    heard = [r["worst_first_heard_step"] for r in rows
+             if r.get("worst_first_heard_step") is not None]
+    methods: dict[str, int] = {}
+    for r in rows:
+        for name, cnt in (r.get("methods") or {}).items():
+            methods[str(name)] = methods.get(str(name), 0) + int(cnt)
+    # 策略侧会把没用到的清除方式也记成 0，分布里只留真出现过的
+    methods = {k: v for k, v in methods.items() if v}
+    return {
+        "episodes": len(rows),
+        "n_sources": n_src,
+        "n_cleared": n_cleared,
+        "clear_ratio": (n_cleared / n_src) if n_src else None,
+        "avg_time_s": round(float(np.mean(avg_times)), 3) if avg_times else None,
+        "virtual_time_s_mean": round(float(np.mean([r["virtual_time_s"] for r in rows])), 3),
+        "virtual_time_s_min": round(float(np.min([r["virtual_time_s"] for r in rows])), 3),
+        "virtual_time_s_max": round(float(np.max([r["virtual_time_s"] for r in rows])), 3),
+        "travel_m_mean": round(float(np.mean([r["travel_m"] for r in rows])), 1),
+        "n_measure_mean": round(float(np.mean([r["n_measure"] for r in rows])), 1),
+        "n_probe_mean": round(float(np.mean([r["n_probe"] for r in rows])), 2),
+        "n_skip_measure": sum(r.get("n_skip_measure", 0) for r in rows),
+        "n_inline_cleared": sum(r.get("n_inline", 0) for r in rows),
+        "n_inline_fail": sum(r.get("n_inline_fail", 0) for r in rows),
+        "n_side_scan_mean": round(float(np.mean([r.get("n_side_scan", 0) for r in rows])), 2),
+        "localize_err_mean_m": round(float(np.mean(means)), 3) if means else None,
+        "localize_err_max_m": round(float(np.max(maxes)), 3) if maxes else None,
+        "worst_first_heard_step": int(max(heard)) if heard else None,
+        "methods": methods,
+    }
+
+
 def episode_row(ep: int, seed: int | None, truth: Sequence[dict] | None,
                 dog: "RobotDog", stats: dict, check: dict) -> dict:
     """一局的汇总行，整批汇总表与落盘 JSON 都用它
@@ -162,6 +205,7 @@ def save_survey(save_dir: Path, rows: Sequence[dict], observations: Sequence[dic
     out = {
         "meta": meta,
         "sweep_plan": plan_json,
+        "summary": summarize(rows),
         "episodes": [dict(r) for r in rows],
     }
     paths = [save_dir / SURVEY_JSON]

@@ -132,9 +132,10 @@ def save_survey(save_dir: Path, rows: list[dict], observations: list[dict],
                 plan_json: dict[str, Any], meta: dict | None = None) -> list[Path]:
     """巡视扫描结果落盘：逐局统计 JSON + 逐条观测 CSV。
 
-    `meta` 说明这次运行的来源（mode 取 practice / official，另含地址、队号、局数等）。
-    结果目录已不按模式分家，故**目录名与文件名都不再透露模式信息**，来源只能靠这份元数据
-    交代；官方产物没有真值（接口不返回），`mode` 是事后判断"这批数字为何缺真值字段"的唯一线索。
+    `meta` 说明这次运行的来源（mode 取 practice / official，另含地址、局数等）。**不写参赛队号**：
+    队号一律运行时经 `--robot-id` 传入、只用于通信，落盘会把它带进交付物（竞赛要求交付物中不含
+    身份信息）。结果目录已不按模式分家，故**目录名与文件名都不再透露模式信息**，来源只能靠这份
+    元数据交代；官方产物没有真值（接口不返回），`mode` 是事后判断"这批数字为何缺真值字段"的唯一线索。
     """
     save_dir.mkdir(parents=True, exist_ok=True)
     json_path = save_dir / SURVEY_JSON

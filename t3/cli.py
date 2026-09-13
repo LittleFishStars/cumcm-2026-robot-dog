@@ -196,8 +196,7 @@ def run_practice(args: argparse.Namespace, res: CoverSolveResult, save_dir: Path
     paths = (save_plan(res, save_dir)
              + save_survey(save_dir, rows, observations, res.to_json(),
                            {"mode": "practice", "problem_no": 3,
-                            "robot_id": args.robot_id, "seed0": args.seed,
-                            "episodes": args.practice,
+                            "seed0": args.seed, "episodes": args.practice,
                             "bearing_error_deg": BEARING_ERROR_DEG}))
     print("结果已保存：" + "，".join(str(p) for p in paths))
     if api_log is not None and not is_quiet():
@@ -257,8 +256,7 @@ def run_official(args: argparse.Namespace, res: CoverSolveResult, save_dir: Path
                  + save_survey(save_dir, [row], observation_rows(1, dog.plan, dog.meas),
                                res.to_json(),
                                {"mode": "official", "problem_no": 3,
-                                "base_url": args.base_url, "robot_id": args.robot_id,
-                                "episodes": 1,
+                                "base_url": args.base_url, "episodes": 1,
                                 "bearing_error_deg": BEARING_ERROR_DEG,
                                 "note": "官方模式接口不返回真值，故真值相关字段为 null"}))
         print("结果已保存：" + "，".join(str(p) for p in paths))

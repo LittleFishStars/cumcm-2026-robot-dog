@@ -290,7 +290,7 @@ def build_parser() -> argparse.ArgumentParser:
                         "官方模式须与模拟器登录的队号一致，演练模式会把它传给模拟器的 --team")
     p.add_argument("--timeout", type=float, default=5.0, help="HTTP 超时 / s")
     p.add_argument("--ring-radius", type=float, default=None,
-                   help=f"覆盖圆环半径 d / m，只对六边形族有效。缺省 {CHOSEN_RING_RADIUS:.0f}，"
+                   help=f"覆盖圆环半径 d / m，只对六边形族有效。缺省 {CHOSEN_RING_RADIUS:g}，"
                         f"传 {optimal_ring_radius():.3f} 则取余量最大的 d*，里程增加约 2153 m。"
                         f"指定本项就自动改用六边形族")
     p.add_argument("--hex-layout", action="store_true",
@@ -302,7 +302,7 @@ def build_parser() -> argparse.ArgumentParser:
                         "里程 ~6207 m；optimized 是数值优化的最短路径布局，余量 ~5 m，"
                         "里程 ~6167 m。仅当未用六边形族时生效")
     p.add_argument("--jammers-dir", default=None,
-                   help="jammers-py 目录，缺省是本仓库根目录下的 resources/jammers-py/")
+                   help="jammers-py 目录，缺省是本仓库根目录下的 jammers-py/")
     p.add_argument("--console-port", type=int, default=8090,
                    help="演练时 jammers-py 控制台端口，缺省 8090，被占用则自动顺延")
     p.add_argument("--robot-port", type=int, default=2026,
@@ -321,13 +321,13 @@ def build_parser() -> argparse.ArgumentParser:
                    help=f"试清未中后最多再补清几个点：用 K 个半径 20 m 的圆覆盖定位区域。"
                         f"缺省 {K_CLEAR_MAX}，只在能盖满区域时才用，盖不满就转入补测")
     p.add_argument("--inline-r-min", type=float, default=INLINE_R_MIN,
-                   help=f"站点间前向顺路清除的估计点半径下界 / m，缺省 {INLINE_R_MIN:.0f}")
+                   help=f"站点间前向顺路清除的估计点半径下界 / m，缺省 {INLINE_R_MIN:g}")
     p.add_argument("--inline-r-max", type=float, default=INLINE_R_MAX,
-                   help=f"站点间前向顺路清除的估计点半径上界 / m，缺省 {INLINE_R_MAX:.0f}")
+                   help=f"站点间前向顺路清除的估计点半径上界 / m，缺省 {INLINE_R_MAX:g}")
     p.add_argument("--inline-near-r", type=float, default=INLINE_NEAR_R,
-                   help=f"每站到站后的近距顺路清除半径 / m，缺省 {INLINE_NEAR_R:.0f}")
+                   help=f"每站到站后的近距顺路清除半径 / m，缺省 {INLINE_NEAR_R:g}")
     p.add_argument("--inline-max-mec-r", type=float, default=INLINE_MAX_MEC_R,
-                   help=f"参与顺路清除的区域最大最小覆盖圆半径 / m，缺省 {INLINE_MAX_MEC_R:.0f}。"
+                   help=f"参与顺路清除的区域最大最小覆盖圆半径 / m，缺省 {INLINE_MAX_MEC_R:g}。"
                         f"区域更大的频道不参与顺路，留给阶段二")
     p.add_argument("--survey-only", action="store_true",
                    help="只做阶段一：巡视扫描加覆盖核对，不做定位与清除")

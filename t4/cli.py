@@ -223,7 +223,7 @@ def build_parser() -> argparse.ArgumentParser:
                         "官方模式须与模拟器登录的队号一致，演练模式会把它传给模拟器的 --team")
     p.add_argument("--timeout", type=float, default=5.0, help="HTTP 超时 / s")
     p.add_argument("--jammers-dir", default=None,
-                   help="jammers-py 目录，缺省为本仓库根目录下的 resources/jammers-py/")
+                   help="jammers-py 目录，缺省为本仓库根目录下的 jammers-py/")
     p.add_argument("--console-port", type=int, default=8090,
                    help="演练时 jammers-py 控制台端口，缺省 8090，被占用则自动顺延")
     p.add_argument("--robot-port", type=int, default=2026,

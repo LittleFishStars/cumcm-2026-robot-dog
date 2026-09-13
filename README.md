@@ -12,7 +12,7 @@
 common/            跨题通用层：几何、路线算子、模拟器接口、演练场、绘图、落盘、路径、控制台
 t1/ t2/ t3/ t4/    问题一~四，每个包都带 __main__.py
 jammers-py/        本地复刻模拟器，纯标准库，--practice 靠它
-results/           最后一次正式运行的产物
+results/           正式测评与本地演练的产物，见下面"产物"一节
 README.md          本文件
 pyproject.toml     Python 版本与依赖声明
 uv.lock            依赖版本锁，装出来的就是本队验证过的那几个版本
@@ -87,11 +87,33 @@ uv run -m t4.sweep                      # 扫描判据：批量实现 vs 单例�
 别拿它试跑。官方和演练写同一个 `--save-dir`，一个目录就是最新一次运行；官方模式拿不到真值，
 每次请求与响应都落进 `api_calls.jsonl`，那是唯一的证据链。
 
-产物都在 `results/` 下：`trajectory/` 是总轨迹图加同名轨迹表，`scan/` 是逐步扫描图，
+产物都在 `results/` 下，按来路分了四份：
+
+```
+results/t3/ results/t4/   正式测评（官方模式）的产物，各一局。t3 清除 16 个、虚拟耗时 4058.8 s、
+                          里程 16419 m；t4 清除 10 个、虚拟耗时 6503.3 s、里程 23331 m。
+                          meta.mode 是 official。官方不返回真值，源数这类字段为 null
+results/t2/               问题二的六个产物，python -m t2 离线生成，随时可复现
+results/practice/t3/ t4/  本地演练那批，seed 2026 起 10 局，meta.mode 是 practice
+```
+
+每一份里的构成一样：`trajectory/` 是总轨迹图加同名轨迹表，`scan/` 是逐步扫描图，
 `*_survey.json` 汇总逐局，`*_observations.csv` 记逐条观测，`api_calls.jsonl` 记接口调用，
-另外还有 plan 类的 JSON 和 CSV。同一个 seed 重跑，产物逐字节一致，只有 `api_calls.jsonl` 因为
-写的是现实时间戳而不同。包内这份就是最后一次正式运行的产物，`meta.mode` 能看出是官方还是演练；
-重跑会就地覆盖，要留底先备份。
+另外还有 plan 类的 JSON 和 CSV。
+
+`results/practice/` 那批是演练跑满 10 局的产物，两条命令生成，同 seed 逐字节可复现，随时能重跑对照：
+
+```bash
+uv run -m t3 --practice 10 --seed 2026 --save-dir results/practice/t3
+uv run -m t4 --practice 10 --seed 2026 --save-dir results/practice/t4
+```
+
+`api_calls.jsonl` 是唯一不可复现的产物，它写的是现实时间戳。官方模式更是一局一次机会，
+那批跑完什么样就存什么样。
+
+正式测评每个问题 3 次机会，都跑了一局，包里放的是最后一次。**重跑别用缺省 `--save-dir`**：
+官方和演练都往 `results/t3`、`results/t4` 里写，会把正式测评的产物就地覆盖掉，演练请另给
+`--save-dir` 目录。
 
 ## 依赖方向
 
